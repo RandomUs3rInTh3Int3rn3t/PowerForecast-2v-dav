@@ -36,6 +36,15 @@ import {
   Timeline as TimelineIcon,
   Block as BlockIcon,
 } from "@mui/icons-material";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+} from "recharts";
 import { UserAppliance, ApplianceList, DailyApplianceUsage, ApplianceUsageLog } from "../../types";
 import { useList } from "@refinedev/core";
 import { calculateMeralcoBill } from "../../lib/meralcoCalculator";
@@ -267,6 +276,32 @@ export const ForecastingView: React.FC = () => {
       billDelta,
     };
   }, [targetAppliances, whatIfHours, mtdActuals, remainingDays, daysInActiveMonth, simulatedGenRate, tariffType, trajectoryForecast]);
+
+  // Trajectory Curve Data: Cumulative Day-by-Day comparison (Baseline vs Simulated)
+  const trajectoryCurveData = useMemo(() => {
+    const points = [];
+    const dailyBaseBill = routineBaseline.monthlyBaselineBill / Math.max(1, daysInActiveMonth);
+    const dailySimulatedBill = scenarios.smartBill / Math.max(1, daysInActiveMonth);
+
+    let cumBaselineCost = 0;
+    let cumSimulatedCost = 0;
+
+    for (let day = 1; day <= daysInActiveMonth; day++) {
+      cumBaselineCost += dailyBaseBill;
+      cumSimulatedCost += dailySimulatedBill;
+
+      points.push({
+        day: `D${day}`,
+        dayNum: day,
+        isPast: day <= elapsedDays,
+        baselineCost: Math.round(cumBaselineCost),
+        simulatedCost: Math.round(cumSimulatedCost),
+        savingsDiff: Math.max(0, Math.round(cumBaselineCost - cumSimulatedCost)),
+      });
+    }
+
+    return points;
+  }, [daysInActiveMonth, elapsedDays, routineBaseline.monthlyBaselineBill, scenarios.smartBill]);
 
   // 7. Appliance Pareto Breakdown (Ranked by Forecasted Energy Share)
   const paretoBreakdown = useMemo(() => {
@@ -592,6 +627,134 @@ export const ForecastingView: React.FC = () => {
                 </Paper>
               </Grid>
             </Grid>
+          </Card>
+
+          {/* 4.5. Dual Trajectory Forecast: Baseline Path vs Simulated Plan */}
+          <Card
+            sx={{
+              p: { xs: 2.5, sm: 3 },
+              borderRadius: 1.5,
+              border: "1px solid",
+              borderColor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.2)" : "#e2e8f0",
+              bgcolor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.78)" : "#ffffff",
+            }}
+          >
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 1.5 }}>
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1 }}>
+                  <TimelineIcon sx={{ color: "primary.main" }} />
+                  {language === "tl" ? "Tala ng Trajectory: Karaniwan vs Plano ng Simulasyon" : "Cumulative Trajectory: Baseline Trend vs Simulated Path"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  {language === "tl"
+                    ? "Tingnan ang takbo ng bill kada araw kung susundin ang karaniwang quota laban sa na-simulate na routine."
+                    : "Track cumulative month-end bill run rate comparing baseline quota against your simulated routine schedule."}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Box sx={{ width: 12, height: 2, bgcolor: "#818cf8", borderTop: "2px dashed #818cf8" }} />
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                    Baseline Trend
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Box sx={{ width: 12, height: 3, bgcolor: "#00e5c9", borderRadius: 1 }} />
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                    Simulated Path
+                  </Typography>
+                </Box>
+                <Chip
+                  label={
+                    scenarios.smartSavings > 0
+                      ? `Net Savings: -₱${scenarios.smartSavings.toFixed(2)}`
+                      : "Quota Matched"
+                  }
+                  size="small"
+                  color="success"
+                  sx={{ fontWeight: 800, fontSize: "0.72rem" }}
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ height: 240, width: "100%" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trajectoryCurveData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorBaselineTraj" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#818cf8" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#818cf8" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="colorSimulatedTraj" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00e5c9" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#00e5c9" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.12} />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} unit=" ₱" />
+                  <RechartsTooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const d = payload[0].payload;
+                        return (
+                          <Box
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1.25,
+                              bgcolor: (theme) => (theme.palette.mode === "dark" ? "#17191d" : "background.paper"),
+                              border: "1px solid",
+                              borderColor: (theme) =>
+                                theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.35)" : "rgba(13, 148, 136, 0.35)",
+                              color: "text.primary",
+                              boxShadow: (theme) =>
+                                theme.palette.mode === "dark" ? "0 8px 32px rgba(0,0,0,0.6)" : "0 8px 24px rgba(0,0,0,0.12)",
+                              minWidth: 200,
+                            }}
+                          >
+                            <Typography variant="caption" sx={{ fontWeight: 800, display: "block", mb: 0.5 }}>
+                              {d.day} {d.isPast ? "• Past / Logged" : "• Forward Projection"}
+                            </Typography>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                Baseline:
+                              </Typography>
+                              <Typography variant="caption" sx={{ fontWeight: 800, fontFamily: "monospace" }}>
+                                ₱{d.baselineCost}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
+                              <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700 }}>
+                                Simulated:
+                              </Typography>
+                              <Typography variant="caption" sx={{ fontWeight: 800, fontFamily: "monospace", color: "primary.main" }}>
+                                ₱{d.simulatedCost}
+                              </Typography>
+                            </Box>
+                            {d.savingsDiff > 0 && (
+                              <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, mt: 0.5, pt: 0.5, borderTop: "1px solid", borderColor: "divider" }}>
+                                <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
+                                  Savings Diff:
+                                </Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 800, fontFamily: "monospace", color: "success.main" }}>
+                                  -₱{d.savingsDiff}
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area type="monotone" dataKey="baselineCost" name="Baseline Quota" stroke="#818cf8" strokeDasharray="3 3" strokeWidth={2} fillOpacity={1} fill="url(#colorBaselineTraj)" />
+                  <Area type="monotone" dataKey="simulatedCost" name="Simulated Plan" stroke="#00e5c9" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSimulatedTraj)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Box>
           </Card>
 
           {/* 5. Meralco Rate Fluctuation Simulator */}

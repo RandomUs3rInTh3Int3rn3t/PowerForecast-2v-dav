@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Box from "@mui/material/Box";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
@@ -14,32 +12,24 @@ import {
   CalendarMonth as CalendarIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
-  FormatListBulleted as QueueIcon,
-  ReceiptLong as ReceiptIcon,
-  PowerSettingsNew as PowerIcon,
   Whatshot as FlameIcon,
   AccessTime as ClockIcon,
   CheckCircle as CheckCircleIcon,
-  Insights as InsightsIcon,
   Home as HomeIcon,
   Store as StoreIcon,
   Public as PublicIcon,
   AutoAwesome as SparklesIcon,
+  Bolt as BoltIcon,
+  TrendingDown as TrendingDownIcon,
+  Savings as SavingsIcon,
 } from "@mui/icons-material";
-import { UserCalendarEvent, UserAppliance, ApplianceUsageLog, DailyApplianceUsage, ApplianceList } from "../../types";
-import { useList, useUpdate, useCreate, useDelete } from "@refinedev/core";
+import { UserCalendarEvent, UserAppliance, DailyApplianceUsage, ApplianceList } from "../../types";
+import { useList } from "@refinedev/core";
 import { DateAnalyticsModal } from "./DateAnalyticsModal";
-import { LiveSessionModal } from "./LiveSessionModal";
-import { ScheduleQueueModal } from "./ScheduleQueueModal";
-import { SessionLogsModal } from "./SessionLogsModal";
 import { RoutineAutofillModal } from "./RoutineAutofillModal";
-import { useToast } from "../common/ToastProvider";
 import {
   formatDateToKey,
   computeDayMetrics,
-  accumulateLiveSessionDailyUsage,
-  deductSessionDailyUsage,
-  reconcileUpdatedSessionLog,
   DEFAULT_EFFECTIVE_RATE,
 } from "../../lib/dailyUsageService";
 
@@ -47,25 +37,10 @@ export const SmartCalendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDateForModal, setSelectedDateForModal] = useState<Date | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
+  const [mobileViewMode, setMobileViewMode] = useState<"projected" | "simulated">("simulated");
 
   // Modals state
-  const [selectedApplianceForLive, setSelectedApplianceForLive] = useState<UserAppliance | null>(null);
-  const [selectedReceiptLog, setSelectedReceiptLog] = useState<ApplianceUsageLog | null>(null);
-  const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
-  const [selectedApplianceForQueue, setSelectedApplianceForQueue] = useState<UserAppliance | null>(null);
-  const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
-  const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
   const [isRoutineAutofillOpen, setIsRoutineAutofillOpen] = useState(false);
-
-  const { showSuccess, showInfo } = useToast();
-
-  const [now, setNow] = useState<number>(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const eventsRes = useList<UserCalendarEvent>({
     resource: "user_calendar_events",
@@ -82,29 +57,17 @@ export const SmartCalendar: React.FC = () => {
     pagination: { mode: "off" },
   }) as any;
 
-  const logsRes = useList<ApplianceUsageLog>({
-    resource: "appliance_usage_logs",
-    pagination: { mode: "off" },
-  }) as any;
-
   const dailyUsageRes = useList<DailyApplianceUsage>({
     resource: "daily_appliance_usage",
     pagination: { mode: "off" },
   }) as any;
 
-  const { mutate: updateAppliance } = useUpdate();
-  const { mutate: createLog } = useCreate();
-  const { mutate: createEvent } = useCreate();
-  const { mutate: deleteEvent, mutateAsync: deleteEventAsync } = useDelete();
-  const { mutate: deleteLog, mutateAsync: deleteLogAsync } = useDelete();
-
   const events: UserCalendarEvent[] = eventsRes?.data?.data || eventsRes?.result?.data || [];
   const allAppliances: UserAppliance[] = appliancesRes?.data?.data || appliancesRes?.result?.data || [];
-  const logs: ApplianceUsageLog[] = logsRes?.data?.data || logsRes?.result?.data || [];
   const dailyUsageList: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
   const spaces: ApplianceList[] = spacesRes?.data?.data || spacesRes?.result?.data || [];
 
-  // Filter appliances by selected space (excluding blacklisted appliances)
+  // Filter appliances by selected space (excluding inactive/blacklisted)
   const appliances = useMemo(() => {
     const spaceFiltered = selectedSpaceId === "all" ? allAppliances : allAppliances.filter((a) => a.list_id === selectedSpaceId);
     return spaceFiltered.filter((a) => a.is_active !== false);
@@ -141,42 +104,13 @@ export const SmartCalendar: React.FC = () => {
     setCurrentDate(new Date(year, month + 1, 1));
   };
 
-  // Active running appliances
-  const activeAppliances = appliances.filter((a) => a.is_currently_on);
-  const activeWattage = activeAppliances.reduce(
-    (acc, curr) => acc + curr.watts * (curr.quantity || 1),
-    0
-  );
-
-  const [, setCalendarLiveTick] = useState(0);
-
-  // Live real-time 1-second ticker when appliances are actively metered
-  useEffect(() => {
-    if (activeAppliances.length === 0) return;
-    const interval = setInterval(() => {
-      setCalendarLiveTick((t) => t + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [activeAppliances.length]);
-
-  // Listen for midnight rollover events
-  useEffect(() => {
-    const handleRolloverEvent = () => {
-      if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
-      if (logsRes?.refetch) logsRes.refetch();
-      if (appliancesRes?.refetch) appliancesRes.refetch();
-    };
-    window.addEventListener("powerforecast_stopwatch_rollover", handleRolloverEvent);
-    return () => window.removeEventListener("powerforecast_stopwatch_rollover", handleRolloverEvent);
-  }, [dailyUsageRes, logsRes, appliancesRes]);
-
-  // Month aggregations: Audited Actuals vs Future Projections
+  // Month aggregations: Baseline Projected vs Simulated Scenario
   const monthSummary = useMemo(() => {
-    let loggedDaysCount = 0;
-    let actualKwh = 0;
-    let actualCost = 0;
-    let projectedKwh = 0;
-    let projectedCost = 0;
+    let baselineMonthKwh = 0;
+    let baselineMonthCost = 0;
+    let simulatedMonthKwh = 0;
+    let simulatedMonthCost = 0;
+    let simulatedDaysCount = 0;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dayDate = new Date(year, month, d);
@@ -190,246 +124,34 @@ export const SmartCalendar: React.FC = () => {
         DEFAULT_EFFECTIVE_RATE
       );
 
-      if (metrics.isLogged) {
-        loggedDaysCount += 1;
-        actualKwh += metrics.kwh;
-        actualCost += metrics.cost;
-      } else {
-        projectedKwh += metrics.kwh;
-        projectedCost += metrics.cost;
+      baselineMonthKwh += metrics.baselineKwh;
+      baselineMonthCost += metrics.baselineCost;
+      simulatedMonthKwh += metrics.kwh;
+      simulatedMonthCost += metrics.cost;
+
+      if (metrics.isSimulated || metrics.isLogged) {
+        simulatedDaysCount += 1;
       }
     }
 
-    const totalMonthKwh = actualKwh + projectedKwh;
-    const totalMonthCost = actualCost + projectedCost;
+    const monthlySavings = baselineMonthCost - simulatedMonthCost;
+    const monthlySavingsPct = baselineMonthCost > 0 ? (monthlySavings / baselineMonthCost) * 100 : 0;
 
     return {
-      loggedDaysCount,
-      unloggedDaysCount: daysInMonth - loggedDaysCount,
-      actualKwh: Number(actualKwh.toFixed(1)),
-      actualCost: Number(actualCost.toFixed(2)),
-      projectedKwh: Number(projectedKwh.toFixed(1)),
-      projectedCost: Number(projectedCost.toFixed(2)),
-      totalMonthKwh: Number(totalMonthKwh.toFixed(1)),
-      totalMonthCost: Number(totalMonthCost.toFixed(2)),
+      baselineMonthKwh: Number(baselineMonthKwh.toFixed(1)),
+      baselineMonthCost: Number(baselineMonthCost.toFixed(2)),
+      simulatedMonthKwh: Number(simulatedMonthKwh.toFixed(1)),
+      simulatedMonthCost: Number(simulatedMonthCost.toFixed(2)),
+      simulatedDaysCount,
+      daysInMonth,
+      monthlySavings: Number(monthlySavings.toFixed(2)),
+      monthlySavingsPct: Number(monthlySavingsPct.toFixed(1)),
     };
   }, [daysInMonth, year, month, dailyUsageMap, appliances, events]);
 
-  // Handle Stop Live Session
-  const handleStopLiveSession = async (
-    applianceId: string,
-    customDurationMinutes?: number,
-    customEndTime?: Date
-  ) => {
-    const app = appliances.find((a) => a.id === applianceId);
-    if (!app) return;
-
-    const startDate = app.last_turned_on_at ? new Date(app.last_turned_on_at) : new Date(Date.now() - 3600000);
-    const durationMins =
-      customDurationMinutes !== undefined
-        ? customDurationMinutes
-        : Math.max(1, Math.round((Date.now() - startDate.getTime()) / 60000));
-    const endDate = customEndTime || new Date(startDate.getTime() + durationMins * 60000);
-
-    const kwh = (app.watts * (app.quantity || 1) * (durationMins / 60)) / 1000;
-    const cost = kwh * DEFAULT_EFFECTIVE_RATE;
-
-    // 1. Record in appliance_usage_logs
-    createLog(
-      {
-        resource: "appliance_usage_logs",
-        values: {
-          appliance_id: app.id,
-          user_id: app.user_id,
-          started_at: startDate.toISOString(),
-          ended_at: endDate.toISOString(),
-          duration_minutes: durationMins,
-          kwh_consumed: kwh,
-          estimated_cost: cost,
-          source: customDurationMinutes !== undefined ? "stopwatch_adjusted" : "stopwatch_live",
-        },
-      },
-      {
-        onSuccess: () => {
-          if (logsRes?.refetch) {
-            logsRes.refetch();
-          }
-        },
-      }
-    );
-
-    // 2. Accumulate across midnight boundaries in daily_appliance_usage
-    await accumulateLiveSessionDailyUsage({
-      appliance_id: app.id,
-      durationMinutes: durationMins,
-      watts: app.watts,
-      quantity: app.quantity || 1,
-      effectiveRate: DEFAULT_EFFECTIVE_RATE,
-      user_id: app.user_id || null,
-      startTime: startDate,
-      endTime: endDate,
-    });
-
-    // 3. Stop stopwatch
-    updateAppliance({
-      resource: "user_appliances",
-      id: app.id,
-      values: {
-        is_currently_on: false,
-        last_turned_on_at: null,
-      },
-    });
-
-    if (dailyUsageRes?.refetch) {
-      dailyUsageRes.refetch();
-    }
-
-    showSuccess(`Stopwatch stopped for ${app.name}. Log saved (₱${cost.toFixed(2)})!`, "Stopwatch Stopped");
-  };
-
-  const handleOpenLiveModal = (app: UserAppliance) => {
-    setSelectedApplianceForLive(app);
-    setSelectedReceiptLog(null);
-    setIsLiveModalOpen(true);
-  };
-
-  const handleViewReceiptFromLogs = (log: ApplianceUsageLog, app?: UserAppliance) => {
-    setSelectedReceiptLog(log);
-    setSelectedApplianceForLive(app || null);
-    setIsLiveModalOpen(true);
-    setIsLogsModalOpen(false);
-  };
-
-  const handleDeleteLog = async (id: string) => {
-    const log = logs.find((l) => l.id === id);
-    if (log) {
-      const app = appliances.find((a) => a.id === log.appliance_id);
-      if (app) {
-        await deductSessionDailyUsage({
-          appliance_id: app.id,
-          durationMinutes: log.duration_minutes || 60,
-          watts: app.watts,
-          quantity: app.quantity || 1,
-          effectiveRate: DEFAULT_EFFECTIVE_RATE,
-          user_id: app.user_id || null,
-          startTime: new Date(log.started_at),
-          endTime: log.ended_at ? new Date(log.ended_at) : new Date(new Date(log.started_at).getTime() + (log.duration_minutes || 60) * 60000),
-        });
-      }
-    }
-    await deleteLogAsync({ resource: "appliance_usage_logs", id });
-    if (logsRes?.refetch) logsRes.refetch();
-    if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
-    showInfo("Session log deleted and daily usage reconciled.");
-  };
-
-  const handleUpdateLog = async (id: string, newDurationMinutes: number) => {
-    const log = logs.find((l) => l.id === id);
-    if (!log) return;
-    const app = appliances.find((a) => a.id === log.appliance_id);
-    const watts = app?.watts || 1000;
-    const qty = app?.quantity || 1;
-
-    const start = new Date(log.started_at);
-    const end = new Date(start.getTime() + newDurationMinutes * 60000);
-    const kwh = (watts * qty * (newDurationMinutes / 60)) / 1000;
-    const cost = kwh * DEFAULT_EFFECTIVE_RATE;
-    const oldMinutes = log.duration_minutes || 60;
-
-    updateAppliance(
-      {
-        resource: "appliance_usage_logs",
-        id,
-        values: {
-          duration_minutes: newDurationMinutes,
-          ended_at: end.toISOString(),
-          kwh_consumed: kwh,
-          estimated_cost: cost,
-        },
-      },
-      {
-        onSuccess: async () => {
-          if (app) {
-            await reconcileUpdatedSessionLog({
-              appliance_id: app.id,
-              oldDurationMinutes: oldMinutes,
-              newDurationMinutes: newDurationMinutes,
-              watts: app.watts,
-              quantity: app.quantity || 1,
-              effectiveRate: DEFAULT_EFFECTIVE_RATE,
-              user_id: app.user_id || null,
-              startTime: start,
-            });
-          }
-          if (logsRes?.refetch) logsRes.refetch();
-          if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
-          showSuccess("Session log updated and daily usage reconciled!");
-        },
-      }
-    );
-  };
-
-  const handleClearAllLogs = async () => {
-    for (const l of logs) {
-      const app = appliances.find((a) => a.id === l.appliance_id);
-      if (app) {
-        await deductSessionDailyUsage({
-          appliance_id: app.id,
-          durationMinutes: l.duration_minutes || 60,
-          watts: app.watts,
-          quantity: app.quantity || 1,
-          effectiveRate: DEFAULT_EFFECTIVE_RATE,
-          user_id: app.user_id || null,
-          startTime: new Date(l.started_at),
-          endTime: l.ended_at ? new Date(l.ended_at) : new Date(new Date(l.started_at).getTime() + (l.duration_minutes || 60) * 60000),
-        });
-      }
-    }
-    await Promise.all(logs.map((l) => deleteLogAsync({ resource: "appliance_usage_logs", id: l.id })));
-    if (logsRes?.refetch) logsRes.refetch();
-    if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
-    showInfo("All session logs cleared and daily usage reconciled.");
-  };
-
-  const handleCreateEvent = async (eventData: Partial<UserCalendarEvent>) => {
-    createEvent({
-      resource: "user_calendar_events",
-      values: eventData,
-    });
-    showSuccess("Schedule slot created!");
-  };
-
-  const handleUpdateEvent = async (id: string, updates: Partial<UserCalendarEvent>) => {
-    updateAppliance(
-      {
-        resource: "user_calendar_events",
-        id,
-        values: updates,
-      },
-      {
-        onSuccess: () => {
-          if (eventsRes?.refetch) eventsRes.refetch();
-          showSuccess("Schedule slot updated!");
-        },
-      }
-    );
-  };
-
-  const handleDeleteEvent = async (id: string) => {
-    await deleteEventAsync({ resource: "user_calendar_events", id });
-    if (eventsRes?.refetch) eventsRes.refetch();
-    showInfo("Schedule slot removed.");
-  };
-
-  const handleBulkDeleteEvents = async (ids: string[]) => {
-    await Promise.all(ids.map((id) => deleteEventAsync({ resource: "user_calendar_events", id })));
-    if (eventsRes?.refetch) eventsRes.refetch();
-    showInfo(`Removed ${ids.length} scheduled slots.`);
-  };
-
-return (
+  return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2.5, sm: 3 } }}>
-      {/* 1. Header Banner & Quick Modals Triggers */}
+      {/* 1. Header Banner & Simulate Schedule Action */}
       <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: "-0.02em", display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -448,39 +170,34 @@ return (
             >
               <CalendarIcon sx={{ color: "#ffd54f" }} />
             </Box>
-            Smart Energy Calendar & Scheduler
+            Smart Energy Calendar & Simulation
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-            Log daily appliance hours, project month-end bill trends, track live stopwatch draws, and plan off-peak tasks.
+            Plan daily appliance schedules, compare baseline quotas against simulated scenarios, and project month-end bill savings.
           </Typography>
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap" }}>
           <Button
-            variant="outlined"
+            variant="contained"
             size="small"
-            startIcon={<ReceiptIcon />}
-            onClick={() => setIsLogsModalOpen(true)}
-            sx={{ borderRadius: 1, fontWeight: 700 }}
+            startIcon={<SparklesIcon sx={{ color: "#ffd54f" }} />}
+            onClick={() => setIsRoutineAutofillOpen(true)}
+            sx={{
+              borderRadius: 1.25,
+              fontWeight: 800,
+              px: 2,
+              py: 0.85,
+              bgcolor: "primary.main",
+              color: "#ffffff",
+              boxShadow: "0 4px 14px rgba(0, 229, 201, 0.25)",
+              "&:hover": {
+                bgcolor: "primary.dark",
+              },
+            }}
           >
-            Session Logs ({logs.length})
+            ⚡ Simulate Schedule
           </Button>
-
-          {appliances.length > 0 && (
-            <Button
-              data-tour="calendar-queue"
-              variant="outlined"
-              size="small"
-              startIcon={<QueueIcon />}
-              onClick={() => {
-                setSelectedApplianceForQueue(appliances[0]);
-                setIsQueueModalOpen(true);
-              }}
-              sx={{ borderRadius: 1, fontWeight: 700 }}
-            >
-              Schedule Queue
-            </Button>
-          )}
         </Box>
       </Box>
 
@@ -624,8 +341,9 @@ return (
         </Box>
       )}
 
-      {/* 2. MONTH SUMMARY & PROJECTED CONSUMPTION DIAGNOSTIC BANNER */}
+      {/* 2. TOP KPI CARDS: BASELINE VS SIMULATED TELEMETRY */}
       <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+        {/* Card 1: Baseline Projected Month */}
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper
             sx={{
@@ -641,7 +359,42 @@ return (
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <CheckCircleIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488" }} /> Audited Actuals
+              <ClockIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#818cf8" : "#6366f1" }} /> Baseline Month
+            </Typography>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 900,
+                color: (theme) => (theme.palette.mode === "dark" ? "#a5b4fc" : "#4f46e5"),
+                mt: 0.5,
+                fontFamily: "monospace",
+              }}
+            >
+              ~₱{monthSummary.baselineMonthCost.toFixed(2)}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
+              Full-month quota ({monthSummary.baselineMonthKwh} kWh)
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Card 2: Simulated Month Bill */}
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <Paper
+            sx={{
+              p: 2,
+              borderRadius: 1.25,
+              bgcolor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.75)" : "#ffffff",
+              border: "1px solid",
+              borderColor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.25)",
+              boxShadow: (theme) =>
+                theme.palette.mode === "dark" ? "none" : "0 2px 10px rgba(15, 23, 42, 0.04)",
+            }}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
+              <BoltIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488" }} /> Simulated Month
             </Typography>
             <Typography
               variant="h6"
@@ -652,14 +405,15 @@ return (
                 fontFamily: "monospace",
               }}
             >
-              ₱{monthSummary.actualCost.toFixed(2)}
+              ₱{monthSummary.simulatedMonthCost.toFixed(2)}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              {monthSummary.loggedDaysCount} Days Logged ({monthSummary.actualKwh} kWh)
+              With planned routines ({monthSummary.simulatedMonthKwh} kWh)
             </Typography>
           </Paper>
         </Grid>
 
+        {/* Card 3: Projected Savings */}
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper
             sx={{
@@ -675,25 +429,30 @@ return (
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <ClockIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#26c6da" : "#0284c7" }} /> Remaining Projected
+              <SavingsIcon sx={{ fontSize: 16, color: monthSummary.monthlySavings >= 0 ? "#34d399" : "#fbbf24" }} /> Projected Savings
             </Typography>
             <Typography
               variant="h6"
               sx={{
                 fontWeight: 900,
-                color: (theme) => (theme.palette.mode === "dark" ? "#26c6da" : "#0284c7"),
+                color: monthSummary.monthlySavings >= 0 ? "#34d399" : "#f59e0b",
                 mt: 0.5,
                 fontFamily: "monospace",
               }}
             >
-              ~₱{monthSummary.projectedCost.toFixed(2)}
+              {monthSummary.monthlySavings >= 0
+                ? `-₱${monthSummary.monthlySavings.toFixed(2)}`
+                : `+₱${Math.abs(monthSummary.monthlySavings).toFixed(2)}`}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              {monthSummary.unloggedDaysCount} Days Forecast ({monthSummary.projectedKwh} kWh)
+              {monthSummary.monthlySavings >= 0
+                ? `${monthSummary.monthlySavingsPct}% reduction vs baseline`
+                : `${Math.abs(monthSummary.monthlySavingsPct)}% higher vs baseline`}
             </Typography>
           </Paper>
         </Grid>
 
+        {/* Card 4: Simulation Coverage */}
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper
             sx={{
@@ -709,7 +468,7 @@ return (
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <InsightsIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#ffd54f" : "#d97706" }} /> Projected Month Bill
+              <CheckCircleIcon sx={{ fontSize: 16, color: "#ffd54f" }} /> Simulation Coverage
             </Typography>
             <Typography
               variant="h6"
@@ -720,95 +479,17 @@ return (
                 fontFamily: "monospace",
               }}
             >
-              ₱{monthSummary.totalMonthCost.toFixed(2)}
+              {monthSummary.simulatedDaysCount} / {monthSummary.daysInMonth} Days
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              Est. Total: {monthSummary.totalMonthKwh} kWh
-            </Typography>
-          </Paper>
-        </Grid>
-
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <Paper
-            sx={{
-              p: 2,
-              borderRadius: 1.25,
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.75)" : "#ffffff",
-              border: "1px solid",
-              borderColor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
-              boxShadow: (theme) =>
-                theme.palette.mode === "dark" ? "none" : "0 2px 10px rgba(15, 23, 42, 0.04)",
-            }}
-          >
-            <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              Live Power Load
-            </Typography>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 900,
-                color: (theme) =>
-                  activeWattage > 2000
-                    ? "#f87171"
-                    : theme.palette.mode === "dark"
-                    ? "#00e5c9"
-                    : "#0d9488",
-                mt: 0.5,
-                fontFamily: "monospace",
-              }}
-            >
-              {activeWattage} W ({activeAppliances.length} Running)
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              {appliances.length} Registered Circuits
+              {Math.round((monthSummary.simulatedDaysCount / monthSummary.daysInMonth) * 100)}% of month tailored
             </Typography>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* 3. Active Stopwatch Sessions Quick Bar (if any running) */}
-      {activeAppliances.length > 0 && (
-        <Card
-          data-tour="calendar-live-sessions"
-          sx={{
-            p: 2.5,
-            borderRadius: 1.5,
-            bgcolor: (theme) =>
-              theme.palette.mode === "dark" ? "rgba(24, 28, 33, 0.85)" : "rgba(16, 185, 129, 0.05)",
-            border: "1px solid",
-            borderColor: (theme) =>
-              theme.palette.mode === "dark" ? "rgba(52, 211, 153, 0.25)" : "rgba(16, 185, 129, 0.25)",
-          }}
-        >
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#34d399", display: "flex", alignItems: "center", gap: 1 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#34d399" }} />
-              Active Stopwatch Sessions ({activeAppliances.length})
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Click to view live stopwatch & meter
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: "flex", gap: 1.25, flexWrap: "wrap" }}>
-            {activeAppliances.map((app) => (
-              <Chip
-                key={app.id}
-                icon={<PowerIcon sx={{ color: "#34d399 !important" }} />}
-                label={`${app.name} (${app.watts}W)`}
-                color="success"
-                onClick={() => handleOpenLiveModal(app)}
-                sx={{ fontWeight: 700, cursor: "pointer", height: 32 }}
-              />
-            ))}
-          </Box>
-        </Card>
-      )}
-
-      {/* 4. Calendar Controls & Month Navigator Card */}
-      <Card sx={{ p: 2.5, borderRadius: 1.5 }}>
+      {/* 3. Calendar Controls & Month Navigator Card */}
+      <Card sx={{ p: 2, borderRadius: 1.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <IconButton onClick={handlePrevMonth} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
@@ -824,43 +505,84 @@ return (
             </IconButton>
           </Box>
 
-          {/* Actions & Visual Legend */}
+          {/* Visual Legend */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Button
-              data-tour="calendar-routine-autofill"
-              size="small"
-              variant="outlined"
-              color="primary"
-              startIcon={<SparklesIcon sx={{ color: "#ffd54f" }} />}
-              onClick={() => setIsRoutineAutofillOpen(true)}
-              sx={{ borderRadius: 1, fontWeight: 700, fontSize: "0.75rem", textTransform: "none" }}
-            >
-              Autofill Routine Defaults
-            </Button>
-
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#34d399" }} />
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                  Actual Logged
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#818cf8" }} />
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                  Projected Estimate
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#fbbf24" }} />
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                  Heavy / Peak Load
-                </Typography>
-              </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#818cf8" }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                ~₱ Baseline
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#00e5c9" }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                ⚡ ₱ Simulated
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#34d399" }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                Savings Diff
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#fbbf24" }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                Heavy Peak Load
+              </Typography>
             </Box>
           </Box>
         </Box>
       </Card>
+
+      {/* 4. Mobile Responsive View Mode Segmented Pill (xs & sm only) */}
+      <Box
+        sx={{
+          display: { xs: "flex", md: "none" },
+          justifyContent: "center",
+          alignItems: "center",
+          gap: 1,
+          p: 0.75,
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f1f5f9"),
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mr: 0.5 }}>
+          Cell Display:
+        </Typography>
+        <Button
+          size="small"
+          variant={mobileViewMode === "projected" ? "contained" : "text"}
+          onClick={() => setMobileViewMode("projected")}
+          sx={{
+            borderRadius: 1.5,
+            fontSize: "0.72rem",
+            fontWeight: 700,
+            textTransform: "none",
+            py: 0.35,
+            px: 1.5,
+          }}
+        >
+          📊 Baseline
+        </Button>
+        <Button
+          size="small"
+          variant={mobileViewMode === "simulated" ? "contained" : "text"}
+          onClick={() => setMobileViewMode("simulated")}
+          sx={{
+            borderRadius: 1.5,
+            fontSize: "0.72rem",
+            fontWeight: 700,
+            textTransform: "none",
+            py: 0.35,
+            px: 1.5,
+          }}
+        >
+          ⚡ Simulated
+        </Button>
+      </Box>
 
       {/* 5. Monthly Grid View */}
       <Card data-tour="calendar-grid" sx={{ p: { xs: 1, sm: 2.5 }, borderRadius: 1.5 }}>
@@ -889,7 +611,7 @@ return (
           {/* Empty cells before 1st day */}
           {Array.from({ length: firstDayIndex }).map((_, idx) => (
             <Grid size={1} key={`empty-${idx}`}>
-              <Box sx={{ minHeight: { xs: 72, sm: 96 }, opacity: 0.2 }} />
+              <Box sx={{ minHeight: { xs: 76, sm: 98 }, opacity: 0.2 }} />
             </Grid>
           ))}
 
@@ -916,7 +638,7 @@ return (
                   variant="outlined"
                   onClick={() => setSelectedDateForModal(dayDate)}
                   sx={{
-                    minHeight: { xs: 72, sm: 96 },
+                    minHeight: { xs: 76, sm: 98 },
                     p: { xs: 0.5, sm: 1, md: 1.25 },
                     borderRadius: { xs: 1, sm: 1.25 },
                     cursor: "pointer",
@@ -931,20 +653,20 @@ return (
                           theme.palette.mode === "dark"
                             ? "rgba(0, 229, 201, 0.15)"
                             : "rgba(13, 148, 136, 0.08)"
-                      : metrics.isLogged
+                      : metrics.isSimulated || metrics.isLogged
                       ? (theme) =>
                           theme.palette.mode === "dark"
-                            ? "rgba(16, 185, 129, 0.06)"
-                            : "rgba(5, 150, 105, 0.05)"
+                            ? "rgba(0, 229, 201, 0.06)"
+                            : "rgba(13, 148, 136, 0.05)"
                       : "background.paper",
                     border: isCurrentToday ? "2px solid" : "1px solid",
                     borderColor: isCurrentToday
                       ? "primary.main"
-                      : metrics.isLogged
+                      : metrics.isSimulated || metrics.isLogged
                       ? (theme) =>
                           theme.palette.mode === "dark"
-                            ? "rgba(52, 211, 153, 0.4)"
-                            : "rgba(5, 150, 105, 0.3)"
+                            ? "rgba(0, 229, 201, 0.35)"
+                            : "rgba(13, 148, 136, 0.3)"
                       : "divider",
                     boxShadow: isCurrentToday
                       ? (theme) =>
@@ -1010,9 +732,9 @@ return (
                       >
                         {dayNum}
                       </Typography>
-                      {metrics.isLogged && (
-                        <Tooltip title="Actual Logged Data">
-                          <Box sx={{ width: { xs: 5, sm: 6 }, height: { xs: 5, sm: 6 }, borderRadius: "50%", bgcolor: "#34d399" }} />
+                      {(metrics.isSimulated || metrics.isLogged) && (
+                        <Tooltip title="Custom Simulation Active">
+                          <Box sx={{ width: { xs: 5, sm: 6 }, height: { xs: 5, sm: 6 }, borderRadius: "50%", bgcolor: "#00e5c9" }} />
                         </Tooltip>
                       )}
                     </Box>
@@ -1022,48 +744,105 @@ return (
                         <FlameIcon sx={{ fontSize: { xs: 13, sm: 15 }, color: "warning.main" }} />
                       </Tooltip>
                     ) : (
-                      <ClockIcon sx={{ fontSize: { xs: 11, sm: 13 }, color: metrics.isLogged ? "success.main" : "text.secondary" }} />
+                      <ClockIcon sx={{ fontSize: { xs: 11, sm: 13 }, color: metrics.isSimulated ? "primary.main" : "text.secondary" }} />
                     )}
                   </Box>
 
-                  <Box sx={{ textAlign: "right", mt: 0.5 }}>
+                  {/* DESKTOP VIEW: Dual values (Baseline vs Simulated) */}
+                  <Box sx={{ display: { xs: "none", md: "block" }, textAlign: "right", mt: 0.5 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: "text.secondary",
+                          fontSize: "0.6875rem",
+                          fontFamily: "monospace",
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        ~₱{metrics.baselineCost.toFixed(2)}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 800,
+                          fontFamily: "monospace",
+                          color: (theme) =>
+                            metrics.isSimulated
+                              ? theme.palette.mode === "dark"
+                                ? "#00e5c9"
+                                : "#0d9488"
+                              : theme.palette.mode === "dark"
+                              ? "#ffd54f"
+                              : "#d97706",
+                          fontSize: "0.8125rem",
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        ⚡ ₱{metrics.cost.toFixed(2)}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 0.25 }}>
+                      {metrics.savings !== 0 ? (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: "0.625rem",
+                            fontWeight: 800,
+                            fontFamily: "monospace",
+                            color: metrics.savings > 0 ? "#34d399" : "#fbbf24",
+                          }}
+                        >
+                          {metrics.savings > 0 ? `-₱${metrics.savings.toFixed(0)}` : `+₱${Math.abs(metrics.savings).toFixed(0)}`}
+                        </Typography>
+                      ) : (
+                        <Box />
+                      )}
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: "text.secondary",
+                          fontSize: "0.625rem",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {metrics.kwh} kWh
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* MOBILE VIEW: Segmented display based on mobileViewMode */}
+                  <Box sx={{ display: { xs: "block", md: "none" }, textAlign: "right", mt: 0.5 }}>
                     <Typography
                       variant="caption"
                       sx={{
                         fontWeight: 800,
                         fontFamily: "monospace",
                         color: (theme) =>
-                          metrics.isLogged
+                          mobileViewMode === "simulated"
                             ? theme.palette.mode === "dark"
-                              ? "#ffd54f"
-                              : "#d97706"
+                              ? "#00e5c9"
+                              : "#0d9488"
                             : theme.palette.mode === "dark"
                             ? "#a5b4fc"
                             : "#4f46e5",
                         display: "block",
-                        fontSize: { xs: "0.625rem", sm: "0.8125rem" },
+                        fontSize: "0.6875rem",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         lineHeight: 1.1,
                       }}
                     >
-                      {/* On small mobile: round integer to prevent text cutoff like ₱233. */}
-                      <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
-                        {metrics.isLogged ? `₱${Math.round(metrics.cost)}` : `~₱${Math.round(metrics.cost)}`}
-                      </Box>
-                      <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                        {metrics.isLogged ? `₱${metrics.cost.toFixed(2)}` : `~₱${metrics.cost.toFixed(2)}`}
-                      </Box>
+                      {mobileViewMode === "projected"
+                        ? `~₱${Math.round(metrics.baselineCost)}`
+                        : `⚡ ₱${Math.round(metrics.cost)}`}
                     </Typography>
                     <Typography
                       variant="caption"
                       sx={{
                         color: "text.secondary",
-                        fontSize: { xs: "0.55rem", sm: "0.625rem" },
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        fontSize: "0.55rem",
                         display: "block",
                         lineHeight: 1,
                         mt: 0.25,
@@ -1079,7 +858,7 @@ return (
         </Grid>
       </Card>
 
-      {/* Date Analytics Modal */}
+      {/* Date Analytics Modal (Tab 1: Donut Breakdown "Hati" + Tab 2: Simulated Day Plan) */}
       {selectedDateForModal && (
         <DateAnalyticsModal
           isOpen={Boolean(selectedDateForModal)}
@@ -1090,58 +869,11 @@ return (
           initialUsageRecords={dailyUsageList}
           spaces={spaces}
           selectedSpaceId={selectedSpaceId}
-          logs={logs}
           onUsageSaved={() => {
             if (dailyUsageRes?.refetch) {
               dailyUsageRes.refetch();
             }
           }}
-        />
-      )}
-
-      {/* Live Stopwatch & Historical Receipt Modal */}
-      {isLiveModalOpen && (
-        <LiveSessionModal
-          isOpen={isLiveModalOpen}
-          onClose={() => {
-            setIsLiveModalOpen(false);
-            setSelectedApplianceForLive(null);
-            setSelectedReceiptLog(null);
-          }}
-          appliance={selectedApplianceForLive}
-          receiptLog={selectedReceiptLog}
-          onStopSession={handleStopLiveSession}
-        />
-      )}
-
-      {/* Schedule Queue Modal */}
-      {isQueueModalOpen && selectedApplianceForQueue && (
-        <ScheduleQueueModal
-          isOpen={isQueueModalOpen}
-          onClose={() => {
-            setIsQueueModalOpen(false);
-            setSelectedApplianceForQueue(null);
-          }}
-          appliance={selectedApplianceForQueue}
-          events={events}
-          onCreateEvent={handleCreateEvent}
-          onUpdateEvent={handleUpdateEvent}
-          onDeleteEvent={handleDeleteEvent}
-          onBulkDeleteEvents={handleBulkDeleteEvents}
-        />
-      )}
-
-      {/* Session Logs Modal */}
-      {isLogsModalOpen && (
-        <SessionLogsModal
-          isOpen={isLogsModalOpen}
-          onClose={() => setIsLogsModalOpen(false)}
-          logs={logs}
-          appliances={appliances}
-          onViewReceipt={handleViewReceiptFromLogs}
-          onDeleteLog={handleDeleteLog}
-          onClearAllLogs={handleClearAllLogs}
-          onUpdateLog={handleUpdateLog}
         />
       )}
 

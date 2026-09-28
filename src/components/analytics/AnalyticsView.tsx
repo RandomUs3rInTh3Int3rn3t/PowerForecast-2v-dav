@@ -348,13 +348,32 @@ export const AnalyticsView: React.FC = () => {
   }
 
   const HOURLY_LOAD_DATA = useMemo(() => {
-    return computeHourlyLoadCurve({
+    const simulatedCurve = computeHourlyLoadCurve({
       appliances: targetAppliances,
       events,
       resolutionMinutes,
       startHour,
       endHour,
       effectiveRate,
+    });
+
+    const baselineCurve = computeHourlyLoadCurve({
+      appliances: targetAppliances,
+      events: [],
+      resolutionMinutes,
+      startHour,
+      endHour,
+      effectiveRate,
+    });
+
+    return simulatedCurve.map((pt, idx) => {
+      const basePt = baselineCurve[idx];
+      const baselineWatts = basePt ? basePt.watts : pt.watts;
+      return {
+        ...pt,
+        baselineWatts,
+        simulatedWatts: pt.watts,
+      };
     });
   }, [targetAppliances, events, resolutionMinutes, startHour, endHour, effectiveRate]);
 
@@ -942,29 +961,50 @@ export const AnalyticsView: React.FC = () => {
             </Typography>
           </Box>
 
-          <ButtonGroup size="small" variant="outlined">
-            {[
-              { label: "All 24h", val: "24h" },
-              { label: "Morning", val: "morning" },
-              { label: "Daytime", val: "day" },
-              { label: "Night", val: "evening" },
-            ].map((b) => (
-              <Button
-                key={b.val}
-                variant={zoomPreset === b.val ? "contained" : "outlined"}
-                onClick={() => setZoomPreset(b.val as any)}
-                sx={{ fontWeight: 700 }}
-              >
-                {b.label}
-              </Button>
-            ))}
-          </ButtonGroup>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mr: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Box sx={{ width: 12, height: 2, bgcolor: "#818cf8", borderTop: "2px dashed #818cf8" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                  Baseline Quota
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Box sx={{ width: 12, height: 3, bgcolor: "#00e5c9", borderRadius: 1 }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                  Simulated Plan
+                </Typography>
+              </Box>
+            </Box>
+
+            <ButtonGroup size="small" variant="outlined">
+              {[
+                { label: "All 24h", val: "24h" },
+                { label: "Morning", val: "morning" },
+                { label: "Daytime", val: "day" },
+                { label: "Night", val: "evening" },
+              ].map((b) => (
+                <Button
+                  key={b.val}
+                  variant={zoomPreset === b.val ? "contained" : "outlined"}
+                  onClick={() => setZoomPreset(b.val as any)}
+                  sx={{ fontWeight: 700 }}
+                >
+                  {b.label}
+                </Button>
+              ))}
+            </ButtonGroup>
+          </Box>
         </Box>
 
         <Box sx={{ height: 280, width: "100%" }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={HOURLY_LOAD_DATA} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
+                <linearGradient id="colorBaselineLoad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#818cf8" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#818cf8" stopOpacity={0.0} />
+                </linearGradient>
                 <linearGradient id="colorLoadCurve" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#00e5c9" stopOpacity={0.45} />
                   <stop offset="95%" stopColor="#00e5c9" stopOpacity={0.0} />
@@ -977,6 +1017,7 @@ export const AnalyticsView: React.FC = () => {
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     const d = payload[0].payload;
+                    const diff = (d.baselineWatts || 0) - (d.simulatedWatts || 0);
                     return (
                       <Box
                         sx={{
@@ -989,7 +1030,7 @@ export const AnalyticsView: React.FC = () => {
                           color: "text.primary",
                           boxShadow: (theme) =>
                             theme.palette.mode === "dark" ? "0 8px 32px rgba(0,0,0,0.6)" : "0 8px 24px rgba(0,0,0,0.12)",
-                          maxWidth: 260,
+                          maxWidth: 280,
                         }}
                       >
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5, gap: 1 }}>
@@ -1000,12 +1041,34 @@ export const AnalyticsView: React.FC = () => {
                             <Chip label="PEAK HOUR" size="small" color="error" sx={{ height: 16, fontSize: "0.6rem", fontWeight: 800 }} />
                           )}
                         </Box>
-                        <Typography
-                          variant="caption"
-                          sx={{ display: "block", color: "primary.main", fontWeight: 800, fontFamily: "monospace", fontSize: "0.95rem" }}
-                        >
-                          {d.watts} Watts
-                        </Typography>
+                        
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", my: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                            Baseline: {d.baselineWatts ?? d.watts} W
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "primary.main", fontWeight: 900, fontFamily: "monospace", fontSize: "0.95rem" }}
+                          >
+                            ⚡ {d.simulatedWatts ?? d.watts} W
+                          </Typography>
+                        </Box>
+
+                        {diff !== 0 && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              display: "block",
+                              fontWeight: 800,
+                              color: diff > 0 ? "success.main" : "warning.main",
+                              fontSize: "0.75rem",
+                              mb: 0.5,
+                            }}
+                          >
+                            {diff > 0 ? `⚡ Peak Shaved: -${diff}W (Off-Peak)` : `+${Math.abs(diff)}W Load Shift`}
+                          </Typography>
+                        )}
+
                         <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 0.25 }}>
                           Running Cost: ₱{d.costPerHour.toFixed(2)}/hr
                         </Typography>
@@ -1033,7 +1096,8 @@ export const AnalyticsView: React.FC = () => {
                   return null;
                 }}
               />
-              <Area type="monotone" dataKey="watts" stroke="#00e5c9" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLoadCurve)" />
+              <Area type="monotone" dataKey="baselineWatts" stroke="#818cf8" strokeDasharray="3 3" strokeWidth={2} fillOpacity={1} fill="url(#colorBaselineLoad)" />
+              <Area type="monotone" dataKey="simulatedWatts" stroke="#00e5c9" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLoadCurve)" />
             </AreaChart>
           </ResponsiveContainer>
         </Box>
