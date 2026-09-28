@@ -20,11 +20,9 @@ import {
   Add as PlusIcon,
   Edit as EditIcon,
   Delete as TrashIcon,
-  PowerSettingsNew as PowerIcon,
   Storage as DatabaseIcon,
   AccessTime as ClockIcon,
   Speed as SpeedIcon,
-  CalendarMonth as CalendarIcon,
   DeleteSweep as DeleteSweepIcon,
   Home as HomeIcon,
   Store as StoreIcon,
@@ -34,13 +32,12 @@ import {
   Refresh as RefreshIcon,
   Block as BlockIcon,
 } from "@mui/icons-material";
-import { UserAppliance, UserCalendarEvent, ApplianceList as ApplianceSpace, STREAMLINED_CATEGORIES } from "../../types";
+import { UserAppliance, ApplianceList as ApplianceSpace, STREAMLINED_CATEGORIES } from "../../types";
 import { useList, useDelete, useUpdate, useCreate } from "@refinedev/core";
 import { ApplianceModal } from "./ApplianceModal";
 import { PelpCatalogModal } from "./PelpCatalogModal";
 import { SpaceManagementModal } from "./SpaceManagementModal";
 import { AiVisionScannerModal } from "../vision/AiVisionScannerModal";
-import { ScheduleQueueModal } from "../calendar/ScheduleQueueModal";
 import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmProvider";
 import { devLog } from "../../lib/devLogger";
@@ -76,9 +73,6 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
   const [initialSpaceName, setInitialSpaceName] = useState("");
   const [initialTariffType, setInitialTariffType] = useState<"residential" | "commercial">("residential");
 
-  const [selectedApplianceForQueue, setSelectedApplianceForQueue] = useState<UserAppliance | null>(null);
-  const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
-
   const { showSuccess, showInfo, showError } = useToast();
   const { confirm } = useConfirm();
 
@@ -92,20 +86,12 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
     pagination: { mode: "off" },
   }) as any;
 
-  const eventsRes = useList<UserCalendarEvent>({
-    resource: "user_calendar_events",
-    pagination: { mode: "off" },
-  }) as any;
-
   const { mutate: deleteAppliance } = useDelete();
   const { mutate: updateAppliance } = useUpdate();
-  const { mutate: createEvent } = useCreate();
-  const { mutate: deleteEvent } = useDelete();
   const { mutate: createSpace, isLoading: isCreatingSpace } = useCreate();
 
   const appliances: UserAppliance[] = appliancesRes?.data?.data || appliancesRes?.result?.data || [];
   const spaces: ApplianceSpace[] = spacesRes?.data?.data || spacesRes?.result?.data || [];
-  const events: UserCalendarEvent[] = eventsRes?.data?.data || eventsRes?.result?.data || [];
 
   // Sync activeSpaceId when spaces list changes
   useEffect(() => {
@@ -117,14 +103,6 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
       setActiveSpaceId("");
     }
   }, [spaces, activeSpaceId]);
-
-  const [now, setNow] = useState<number>(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const activeSpace = spaces.find((s) => s.id === activeSpaceId) || spaces[0];
 
@@ -336,27 +314,6 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
       }
     );
   };
-
-  const getRunningDuration = (turnedOnAt?: string | null) => {
-    if (!turnedOnAt) return "00:00:00";
-    const start = new Date(turnedOnAt).getTime();
-    const diffSeconds = Math.max(0, Math.floor((now - start) / 1000));
-    const hrs = String(Math.floor(diffSeconds / 3600)).padStart(2, "0");
-    const mins = String(Math.floor((diffSeconds % 3600) / 60)).padStart(2, "0");
-    const secs = String(diffSeconds % 60).padStart(2, "0");
-    return `${hrs}:${mins}:${secs}`;
-  };
-
-  const getAccumulatedPesos = (app: UserAppliance) => {
-    if (!app.is_currently_on || !app.last_turned_on_at) return 0;
-    const start = new Date(app.last_turned_on_at).getTime();
-    const diffSeconds = Math.max(0, (now - start) / 1000);
-    const totalWatts = app.watts * (app.quantity || 1);
-    const totalKwh = (totalWatts * (diffSeconds / 3600)) / 1000;
-    const effectiveRate = spaceTariffType === "commercial" ? 15.2 : 14.8261;
-    return totalKwh * effectiveRate;
-  };
-
 
   const handleClearAll = async () => {
     const ok = await confirm({
@@ -891,8 +848,6 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
         ) : (
           filteredAppliances.map((app: UserAppliance, appIdx: number) => {
             const isBlacklisted = app.is_active === false;
-            const isOn = app.is_currently_on && !isBlacklisted;
-            const liveSpent = getAccumulatedPesos(app);
             const w = Number(app.watts) || 0;
             const h = Number(app.hours_per_day) || 0;
             const q = Number(app.quantity) || 1;
@@ -943,25 +898,17 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                         ? theme.palette.mode === "dark"
                           ? "rgba(245, 158, 11, 0.45)"
                           : "rgba(217, 119, 6, 0.4)"
-                        : isOn
-                          ? theme.palette.mode === "dark"
-                            ? "rgba(0, 229, 201, 0.28)"
-                            : "rgba(13, 148, 136, 0.25)"
-                          : theme.palette.mode === "dark"
-                            ? "rgba(255, 255, 255, 0.06)"
-                            : "#e2e8f0",
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.06)"
+                          : "#e2e8f0",
                     bgcolor: (theme) =>
                       isBlacklisted
                         ? theme.palette.mode === "dark"
                           ? "rgba(22, 24, 28, 0.88)"
                           : "rgba(254, 243, 199, 0.12)"
-                        : isOn
-                          ? theme.palette.mode === "dark"
-                            ? "rgba(24, 30, 34, 0.88)"
-                            : "rgba(13, 148, 136, 0.04)"
-                          : theme.palette.mode === "dark"
-                            ? "rgba(20, 24, 28, 0.75)"
-                            : "background.paper",
+                        : theme.palette.mode === "dark"
+                          ? "rgba(20, 24, 28, 0.75)"
+                          : "background.paper",
                     opacity: isBlacklisted ? 0.82 : 1,
                     display: "flex",
                     flexDirection: "column",
@@ -986,7 +933,7 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                   }}
                 >
                   <Box>
-                    {/* Top Row: Category, Blacklist badge & Power Toggle */}
+                    {/* Top Row: Category, Blacklist badge & Room Tag */}
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.5, gap: 1 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
                         <Chip
@@ -1021,46 +968,19 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                           </Tooltip>
                         )}
                       </Box>
-                      <Tooltip title={isBlacklisted ? "Appliance is blacklisted — click restore below to enable stopwatch" : isOn ? "Stop Live Stopwatch" : "Start Live Stopwatch"}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            disabled={isBlacklisted}
-                            onClick={() => togglePower(app)}
-                            sx={{
-                              opacity: isBlacklisted ? 0.4 : 1,
-                              bgcolor: (theme) =>
-                                isOn
-                                  ? theme.palette.mode === "dark"
-                                    ? "primary.main"
-                                    : "#0d9488"
-                                  : theme.palette.mode === "dark"
-                                    ? "rgba(255, 255, 255, 0.06)"
-                                    : "#f1f5f9",
-                              color: (theme) =>
-                                isOn
-                                  ? theme.palette.mode === "dark"
-                                    ? "#0c1b18"
-                                    : "#ffffff"
-                                  : "text.secondary",
-                              "&:hover": {
-                                bgcolor: (theme) =>
-                                  isOn
-                                    ? theme.palette.mode === "dark"
-                                      ? "primary.dark"
-                                      : "#0f766e"
-                                    : theme.palette.mode === "dark"
-                                      ? "rgba(0, 229, 201, 0.2)"
-                                      : "#e2e8f0",
-                                transform: "scale(1.08)",
-                              },
-                              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                            }}
-                          >
-                            <PowerIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
+                      {app.room_location && (
+                        <Chip
+                          label={app.room_location}
+                          size="small"
+                          variant="outlined"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: "0.6875rem",
+                            borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "#cbd5e1"),
+                            color: "text.secondary",
+                          }}
+                        />
+                      )}
                     </Box>
 
                     {/* Appliance Name & Details */}
@@ -1143,20 +1063,11 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                     </Box>
                   </Box>
 
-                  {/* Card Footer with Live Cost & Actions */}
+                  {/* Card Footer with Rate & Actions */}
                   <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid", borderColor: "divider", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    {isOn ? (
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "success.main" }}>
-                        <ClockIcon sx={{ fontSize: 12 }} />
-                        <Typography variant="caption" sx={{ fontWeight: 700, fontFamily: "monospace" }}>
-                          {getRunningDuration(app.last_turned_on_at)} (₱{liveSpent.toFixed(4)})
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                        ₱{hourlyRate.toFixed(2)}/hr rate
-                      </Typography>
-                    )}
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                      ₱{hourlyRate.toFixed(2)}/hr rate
+                    </Typography>
 
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       {/* Blacklist / Exclude Toggle Action */}
@@ -1186,19 +1097,6 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                           }}
                         >
                           <BlockIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-
-                      <Tooltip title="Manage Schedule Queue">
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => {
-                            setSelectedApplianceForQueue(app);
-                            setIsQueueModalOpen(true);
-                          }}
-                        >
-                          <CalendarIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
 
@@ -1281,31 +1179,6 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
             if (spacesRes?.refetch) spacesRes.refetch();
             if (appliancesRes?.refetch) appliancesRes.refetch();
             showInfo("Space deleted and appliances reassigned.");
-          }}
-        />
-      )}
-
-      {/* Schedule Queue Manager Modal */}
-      {isQueueModalOpen && selectedApplianceForQueue && (
-        <ScheduleQueueModal
-          isOpen={isQueueModalOpen}
-          onClose={() => {
-            setIsQueueModalOpen(false);
-            setSelectedApplianceForQueue(null);
-          }}
-          appliance={selectedApplianceForQueue}
-          events={events}
-          onCreateEvent={async (eventData: Partial<UserCalendarEvent>) => {
-            createEvent({ resource: "user_calendar_events", values: eventData });
-            showSuccess("Scheduled slot added!");
-          }}
-          onDeleteEvent={async (id: string) => {
-            deleteEvent({ resource: "user_calendar_events", id });
-            showInfo("Scheduled slot deleted.");
-          }}
-          onBulkDeleteEvents={async (ids: string[]) => {
-            ids.forEach((id) => deleteEvent({ resource: "user_calendar_events", id }));
-            showInfo(`Removed ${ids.length} slots.`);
           }}
         />
       )}

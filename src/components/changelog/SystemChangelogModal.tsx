@@ -41,6 +41,16 @@ export interface SystemChangelogEntry {
 // Master compiled GitHub deployment history covering all releases
 const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.0v",
+    version: "3.4.0v",
+    git_commit_tag: "3.4.0v",
+    created_at: "2026-09-28T19:42:00.000Z",
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.0v - Kickstart Simulation Architecture: Declutter Appliance Hub bento cards, remove live stopwatch power buttons and schedule queue modal, and streamline PELP quota setup",
+  },
+  {
     id: "3.3.8v",
     version: "3.3.8v",
     git_commit_tag: "3.3.8v",

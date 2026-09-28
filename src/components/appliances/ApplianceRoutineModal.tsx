@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -9,8 +9,6 @@ import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import TextField from "@mui/material/TextField";
 import Paper from "@mui/material/Paper";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
 import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
 import MenuItem from "@mui/material/MenuItem";
@@ -23,23 +21,14 @@ import {
   Bolt as BoltIcon,
   Close as CloseIcon,
   Save as SaveIcon,
-  AutoAwesome as SparklesIcon,
-  CalendarMonth as CalendarIcon,
   TrendingUp as TrendingUpIcon,
-  Check as CheckIcon,
-  Lock as LockIcon,
-  Clear as ClearIcon,
 } from "@mui/icons-material";
 import { UserAppliance, ApplianceList } from "../../types";
 import { useCreate } from "@refinedev/core";
 import {
   calculateKwh,
-  calculateApplianceKwh,
   calculateCost,
   DEFAULT_EFFECTIVE_RATE,
-  formatDateToKey,
-  parseKeyToDate,
-  batchSaveDailyUsageAcrossRange,
   hmsToDecimalHours,
   decimalHoursToHms,
   isCompressorInverterCategory,
@@ -63,7 +52,6 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
   selectedListId,
   onApplianceCreated,
 }) => {
-  const [activeTab, setActiveTab] = useState<number>(0);
   const [targetListId, setTargetListId] = useState<string>("");
   const [roomLocation, setRoomLocation] = useState<string>("Living Room");
   const [hoursPerDay, setHoursPerDay] = useState<number>(8);
@@ -71,27 +59,6 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
   const [isInverter, setIsInverter] = useState<boolean>(false);
   const [customCruisingWatts, setCustomCruisingWatts] = useState<number | "">("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
-
-  // Month and Date boundaries for the Mini Calendar
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth(); // 0-indexed
-  const todayDateNumber = today.getDate();
-  const todayKey = formatDateToKey(today);
-
-  const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayWeekdayIndex = new Date(currentYear, currentMonth, 1).getDay();
-  const monthName = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
-  // Initial set of selected past dates: Day 1 up to yesterday
-  const [selectedDateKeys, setSelectedDateKeys] = useState<Set<string>>(() => {
-    const keys = new Set<string>();
-    for (let d = 1; d < todayDateNumber; d++) {
-      const dKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      keys.add(dKey);
-    }
-    return keys;
-  });
 
   const { showSuccess, showWarning, showError } = useToast();
   const { mutateAsync: createAppliance } = useCreate();
@@ -103,7 +70,6 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
       setHms(decimalHoursToHms(initialHours));
       setTargetListId(selectedListId || incomingAppliance.list_id || spaces[0]?.id || "");
       setRoomLocation(incomingAppliance.room_location || "Living Room");
-      setActiveTab(0);
 
       const category = incomingAppliance.category || "";
       const catLower = category.toLowerCase();
@@ -117,72 +83,13 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
           ? Number(incomingAppliance.ai_metadata.cruising_watts)
           : ""
       );
-
-      // Re-initialize past days
-      const keys = new Set<string>();
-      for (let d = 1; d < todayDateNumber; d++) {
-        const dKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        keys.add(dKey);
-      }
-      setSelectedDateKeys(keys);
     }
-  }, [isOpen, incomingAppliance, selectedListId, spaces, currentYear, currentMonth, todayDateNumber]);
+  }, [isOpen, incomingAppliance, selectedListId, spaces]);
 
   const handleHoursChange = (decimal: number) => {
     const clamped = Math.max(0, Math.min(24, Number(decimal.toFixed(2))));
     setHoursPerDay(clamped);
     setHms(decimalHoursToHms(clamped));
-  };
-
-  // Mini Calendar Selection Shortcuts
-  const handleSelectAllPast = () => {
-    const keys = new Set<string>();
-    for (let d = 1; d < todayDateNumber; d++) {
-      const dKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      keys.add(dKey);
-    }
-    setSelectedDateKeys(keys);
-  };
-
-  const handleSelectWeekdays = () => {
-    const keys = new Set<string>();
-    for (let d = 1; d < todayDateNumber; d++) {
-      const dayOfWeek = new Date(currentYear, currentMonth, d).getDay();
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        const dKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        keys.add(dKey);
-      }
-    }
-    setSelectedDateKeys(keys);
-  };
-
-  const handleSelectWeekends = () => {
-    const keys = new Set<string>();
-    for (let d = 1; d < todayDateNumber; d++) {
-      const dayOfWeek = new Date(currentYear, currentMonth, d).getDay();
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        const dKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        keys.add(dKey);
-      }
-    }
-    setSelectedDateKeys(keys);
-  };
-
-  const handleClearSelection = () => {
-    setSelectedDateKeys(new Set<string>());
-  };
-
-  const handleToggleDay = (dKey: string, isPast: boolean) => {
-    if (!isPast) return;
-    setSelectedDateKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(dKey)) {
-        next.delete(dKey);
-      } else {
-        next.add(dKey);
-      }
-      return next;
-    });
   };
 
   const watts = incomingAppliance?.watts || 100;
@@ -224,11 +131,6 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
   const dailyCost = calculateCost(dailyKwh, DEFAULT_EFFECTIVE_RATE);
   const monthlyKwh = dailyKwh * 30;
   const monthlyCost = dailyCost * 30;
-
-  // Elaborated selection totals
-  const selectedDaysCount = selectedDateKeys.size;
-  const backfillTotalKwh = dailyKwh * selectedDaysCount;
-  const backfillTotalCost = dailyCost * selectedDaysCount;
 
   const handleSave = async () => {
     if (!incomingAppliance) return;
@@ -272,30 +174,6 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
           `Added ${incomingAppliance.name} with ${hoursPerDay}h/day target quota (₱${monthlyCost.toFixed(2)}/mo)!`,
           "Appliance Added"
         );
-      }
-
-      // If Elaborated Past Dates mode was used and user has selected past dates
-      if (activeTab === 1 && selectedDateKeys.size > 0 && hoursPerDay > 0 && createdItem?.id) {
-        try {
-          const sortedDates = Array.from(selectedDateKeys).sort();
-          for (const dKey of sortedDates) {
-            const dDate = parseKeyToDate(dKey);
-            await batchSaveDailyUsageAcrossRange({
-              startDate: dDate,
-              endDate: dDate,
-              appliances: [{ ...createdItem, hours_per_day: hoursPerDay, watts, quantity }],
-              effectiveRate: DEFAULT_EFFECTIVE_RATE,
-              source: "routine_default",
-              overwriteExisting: true,
-            });
-          }
-          showSuccess(
-            `Backfilled ${selectedDateKeys.size} historical day(s) for ${incomingAppliance.name}!`,
-            "History Backfilled"
-          );
-        } catch (backfillErr: any) {
-          console.warn("Backfill history warning:", backfillErr);
-        }
       }
 
       onApplianceCreated(createdItem);
@@ -365,27 +243,6 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
       </DialogTitle>
 
       <Divider />
-
-      {/* TABS HEADER */}
-      <Box sx={{ px: 3, borderBottom: "1px solid", borderColor: "divider" }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
-          sx={{
-            minHeight: 44,
-            "& .MuiTab-root": {
-              textTransform: "none",
-              fontWeight: 800,
-              fontSize: "0.8125rem",
-              minHeight: 44,
-              py: 1,
-            },
-          }}
-        >
-          <Tab icon={<SparklesIcon fontSize="small" />} iconPosition="start" label="Quick Target Quota" />
-          <Tab icon={<CalendarIcon fontSize="small" />} iconPosition="start" label="Elaborated Past Dates (Backfill)" />
-        </Tabs>
-      </Box>
 
       <DialogContent sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2.5 }}>
         {/* Device Information Card */}
@@ -614,17 +471,16 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
           </Paper>
         )}
 
-        {/* TAB 0: QUICK TARGET QUOTA */}
-        {activeTab === 0 && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", letterSpacing: "0.04em" }}>
-                HOW MANY HOURS DO YOU PLAN TO USE THIS PER DAY?
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: "0.6875rem" }}>
-                Serves as your baseline budget quota. Your live stopwatch or past logging will track actual usage against this.
-              </Typography>
-            </Box>
+        {/* QUICK TARGET QUOTA */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Box>
+            <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", letterSpacing: "0.04em" }}>
+              HOW MANY HOURS DO YOU PLAN TO USE THIS PER DAY?
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: "0.6875rem" }}>
+              Serves as your baseline budget quota and default routine for calendar schedule simulations.
+            </Typography>
+          </Box>
 
             {/* Quick Presets Grid */}
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
@@ -719,384 +575,6 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
               </Box>
             </Box>
           </Box>
-        )}
-
-        {/* TAB 1: ELABORATED PAST DATES (INTERACTIVE MINI CALENDAR GRID) */}
-        {activeTab === 1 && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
-              <Box>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", letterSpacing: "0.04em" }}>
-                  SELECT PAST DATES TO BACKFILL USAGE ({monthName.toUpperCase()}):
-                </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: "0.6875rem" }}>
-                  Click days you operated this appliance before today. Future dates are strictly locked.
-                </Typography>
-              </Box>
-            </Box>
-
-            {/* Quick Selection Shortcuts */}
-            <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={handleSelectAllPast}
-                sx={{
-                  fontSize: "0.6875rem",
-                  py: 0.4,
-                  px: 1,
-                  borderRadius: 1,
-                  fontWeight: 800,
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "transparent" : "#ffffff"),
-                  borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
-                  color: "text.primary",
-                }}
-              >
-                All Past (1–{todayDateNumber - 1})
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={handleSelectWeekdays}
-                sx={{
-                  fontSize: "0.6875rem",
-                  py: 0.4,
-                  px: 1,
-                  borderRadius: 1,
-                  fontWeight: 800,
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "transparent" : "#ffffff"),
-                  borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
-                  color: "text.primary",
-                }}
-              >
-                Weekdays Only
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={handleSelectWeekends}
-                sx={{
-                  fontSize: "0.6875rem",
-                  py: 0.4,
-                  px: 1,
-                  borderRadius: 1,
-                  fontWeight: 800,
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "transparent" : "#ffffff"),
-                  borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
-                  color: "text.primary",
-                }}
-              >
-                Weekends Only
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                color="inherit"
-                onClick={handleClearSelection}
-                startIcon={<ClearIcon sx={{ fontSize: 13 }} />}
-                sx={{
-                  fontSize: "0.6875rem",
-                  py: 0.4,
-                  px: 1,
-                  borderRadius: 1,
-                  fontWeight: 700,
-                  opacity: 0.85,
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "transparent" : "#ffffff"),
-                  borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
-                }}
-              >
-                Clear
-              </Button>
-            </Box>
-
-            {/* Mini Calendar Grid */}
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 1.5,
-                borderRadius: 1.25,
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.6)" : "#f8fafc",
-                borderColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
-              }}
-            >
-              {/* Month Header Label */}
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: 800,
-                  color: (theme) => (theme.palette.mode === "dark" ? "primary.light" : "primary.main"),
-                  mb: 1,
-                  display: "block",
-                  textAlign: "center",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                {monthName.toUpperCase()}
-              </Typography>
-
-              {/* Day-of-Week Headers */}
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.5, mb: 0.75, textAlign: "center" }}>
-                {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((dName, idx) => (
-                  <Typography
-                    key={dName}
-                    variant="caption"
-                    sx={{
-                      fontSize: "0.625rem",
-                      fontWeight: 800,
-                      color: idx === 0 || idx === 6 ? "text.secondary" : "text.primary",
-                      opacity: 0.65,
-                    }}
-                  >
-                    {dName}
-                  </Typography>
-                ))}
-              </Box>
-
-              {/* Days Grid */}
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.5 }}>
-                {/* Empty cells before Day 1 */}
-                {Array.from({ length: firstDayWeekdayIndex }).map((_, i) => (
-                  <Box key={`pad-${i}`} sx={{ height: 32 }} />
-                ))}
-
-                {/* Days of Month */}
-                {Array.from({ length: totalDaysInMonth }).map((_, i) => {
-                  const dayNum = i + 1;
-                  const dKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-                  const isPast = dayNum < todayDateNumber;
-                  const isToday = dayNum === todayDateNumber;
-                  const isFuture = dayNum > todayDateNumber;
-                  const isSelected = selectedDateKeys.has(dKey);
-
-                  if (isFuture) {
-                    return (
-                      <Tooltip key={dKey} title="Future date (cannot log past usage)">
-                        <Box
-                          sx={{
-                            height: 32,
-                            borderRadius: 1.5,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            bgcolor: (theme) =>
-                              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#f1f5f9",
-                            opacity: 0.4,
-                            cursor: "not-allowed",
-                            border: "1px solid",
-                            borderColor: (theme) =>
-                              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#e2e8f0",
-                          }}
-                        >
-                          <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
-                            {dayNum}
-                          </Typography>
-                        </Box>
-                      </Tooltip>
-                    );
-                  }
-
-                  if (isToday) {
-                    return (
-                      <Tooltip key={dKey} title="Today (tracked via live stopwatch)">
-                        <Box
-                          sx={{
-                            height: 32,
-                            borderRadius: 1,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            bgcolor: (theme) =>
-                              theme.palette.mode === "dark"
-                                ? "rgba(0, 229, 201, 0.12)"
-                                : "rgba(13, 148, 136, 0.1)",
-                            border: (theme) =>
-                              theme.palette.mode === "dark"
-                                ? "1px dashed rgba(0, 229, 201, 0.6)"
-                                : "1px dashed rgba(13, 148, 136, 0.6)",
-                            cursor: "not-allowed",
-                          }}
-                        >
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontSize: "0.6875rem",
-                              fontWeight: 900,
-                              color: (theme) => (theme.palette.mode === "dark" ? "primary.main" : "#0d9488"),
-                              lineHeight: 1,
-                            }}
-                          >
-                            {dayNum}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontSize: "0.5rem",
-                              fontWeight: 800,
-                              color: (theme) => (theme.palette.mode === "dark" ? "primary.main" : "#0d9488"),
-                              lineHeight: 1,
-                            }}
-                          >
-                            TODAY
-                          </Typography>
-                        </Box>
-                      </Tooltip>
-                    );
-                  }
-
-                  // Past Clickable Day
-                  return (
-                    <Box
-                      key={dKey}
-                      onClick={() => handleToggleDay(dKey, isPast)}
-                      sx={{
-                        height: 32,
-                        borderRadius: 1,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        bgcolor: (theme) =>
-                          isSelected
-                            ? theme.palette.mode === "dark"
-                              ? "primary.main"
-                              : "#0d9488"
-                            : theme.palette.mode === "dark"
-                            ? "rgba(255, 255, 255, 0.03)"
-                            : "#ffffff",
-                        border: (theme) =>
-                          isSelected
-                            ? theme.palette.mode === "dark"
-                              ? "1px solid #00e5c9"
-                              : "1px solid #0d9488"
-                            : theme.palette.mode === "dark"
-                            ? "1px solid rgba(255, 255, 255, 0.08)"
-                            : "1px solid #e2e8f0",
-                        color: isSelected ? "#ffffff" : "text.primary",
-                        boxShadow: (theme) =>
-                          isSelected
-                            ? theme.palette.mode === "dark"
-                              ? "0 0 10px rgba(0, 229, 201, 0.5)"
-                              : "0 2px 8px rgba(13, 148, 136, 0.3)"
-                            : "none",
-                        transition: "all 0.12s ease",
-                        "&:hover": {
-                          bgcolor: (theme) =>
-                            isSelected
-                              ? theme.palette.mode === "dark"
-                                ? "primary.dark"
-                                : "#0f766e"
-                              : theme.palette.mode === "dark"
-                              ? "rgba(0, 229, 201, 0.15)"
-                              : "rgba(13, 148, 136, 0.1)",
-                          borderColor: "primary.main",
-                        },
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
-                        <Typography variant="caption" sx={{ fontSize: "0.75rem", fontWeight: isSelected ? 900 : 600 }}>
-                          {dayNum}
-                        </Typography>
-                        {isSelected && <CheckIcon sx={{ fontSize: 11, color: "#ffffff" }} />}
-                      </Box>
-                    </Box>
-                  );
-                })}
-              </Box>
-            </Paper>
-
-            {/* Daily Hours for Backfill */}
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 1.25,
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.25)" : "#f8fafc",
-                border: "1px solid",
-                borderColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0",
-              }}
-            >
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
-                  Daily Runtime for Backfill Days:
-                </Typography>
-                <Typography
-                  variant="subtitle2"
-                  sx={{
-                    fontWeight: 800,
-                    color: (theme) => (theme.palette.mode === "dark" ? "primary.main" : "#0d9488"),
-                  }}
-                >
-                  {hoursPerDay} hrs / day
-                </Typography>
-              </Box>
-
-              <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
-                {[1, 2, 4, 8, 12, 24].map((h) => (
-                  <Button
-                    key={h}
-                    size="small"
-                    variant={hoursPerDay === h ? "contained" : "outlined"}
-                    onClick={() => handleHoursChange(h)}
-                    sx={{
-                      minWidth: 40,
-                      px: 1,
-                      py: 0.25,
-                      fontSize: "0.72rem",
-                      fontWeight: 800,
-                      bgcolor:
-                        hoursPerDay === h
-                          ? "primary.main"
-                          : (theme) => (theme.palette.mode === "dark" ? "transparent" : "#ffffff"),
-                      borderColor:
-                        hoursPerDay === h
-                          ? "primary.main"
-                          : (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "#cbd5e1"),
-                      color: hoursPerDay === h ? "#ffffff" : "text.primary",
-                    }}
-                  >
-                    {h}h
-                  </Button>
-                ))}
-              </Box>
-            </Box>
-
-            {/* Backfill Total Summary Banner */}
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 1.5,
-                borderRadius: 1.25,
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.08)" : "rgba(13, 148, 136, 0.08)",
-                borderColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.25)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 1,
-              }}
-            >
-              <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
-                Backfill Selection Total ({selectedDaysCount} days):
-              </Typography>
-              <Typography
-                variant="subtitle2"
-                sx={{
-                  fontWeight: 900,
-                  fontFamily: "monospace",
-                  color: (theme) => (theme.palette.mode === "dark" ? "#ffd54f" : "#d97706"),
-                }}
-              >
-                ~₱{backfillTotalCost.toFixed(2)} ({backfillTotalKwh.toFixed(2)} kWh)
-              </Typography>
-            </Paper>
-          </Box>
-        )}
 
         {/* FORECASTED IMPACT PREVIEW BANNER */}
         <Paper
