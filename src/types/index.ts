@@ -220,3 +220,23 @@ export interface VisionScanResult {
   raw_markdown?: string;
   confidence?: 'high' | 'medium' | 'low';
 }
+
+export type BillingPeriodMode = 'calendar_month' | 'recurring_cycle' | 'custom_range';
+export type CycleEndOffset = 'same_day' | 'day_before' | 'day_after';
+
+export interface BillingPeriodConfig {
+  mode: BillingPeriodMode;
+  cycleStartDay: number; // 1 to 31
+  cycleEndOffset: CycleEndOffset; // 'same_day' | 'day_before' | 'day_after'
+  customStartDate?: string; // 'YYYY-MM-DD'
+  customEndDate?: string;   // 'YYYY-MM-DD'
+}
+
+export interface BillingPeriodWindow {
+  startDate: Date;
+  endDate: Date;
+  days: Date[];
+  label: string;
+  subLabel?: string;
+  isCrossMonth: boolean;
+}

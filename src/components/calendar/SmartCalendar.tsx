@@ -22,15 +22,27 @@ import {
   Bolt as BoltIcon,
   TrendingDown as TrendingDownIcon,
   Savings as SavingsIcon,
+  DateRange as DateRangeIcon,
 } from "@mui/icons-material";
-import { UserCalendarEvent, UserAppliance, DailyApplianceUsage, ApplianceList } from "../../types";
+import {
+  UserCalendarEvent,
+  UserAppliance,
+  DailyApplianceUsage,
+  ApplianceList,
+  BillingPeriodConfig,
+  BillingPeriodWindow,
+} from "../../types";
 import { useList } from "@refinedev/core";
 import { DateAnalyticsModal } from "./DateAnalyticsModal";
 import { RoutineAutofillModal } from "./RoutineAutofillModal";
+import { BillingPeriodModal } from "./BillingPeriodModal";
 import {
   formatDateToKey,
   computeDayMetrics,
   DEFAULT_EFFECTIVE_RATE,
+  getStoredBillingPeriodConfig,
+  setStoredBillingPeriodConfig,
+  resolveBillingPeriodWindow,
 } from "../../lib/dailyUsageService";
 
 export const SmartCalendar: React.FC = () => {
@@ -38,6 +50,10 @@ export const SmartCalendar: React.FC = () => {
   const [selectedDateForModal, setSelectedDateForModal] = useState<Date | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
   const [mobileViewMode, setMobileViewMode] = useState<"projected" | "simulated">("simulated");
+
+  // Billing Period state & config modal
+  const [billingConfig, setBillingConfig] = useState<BillingPeriodConfig>(getStoredBillingPeriodConfig());
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
 
   // Modals state
   const [isRoutineAutofillOpen, setIsRoutineAutofillOpen] = useState(false);
@@ -85,35 +101,35 @@ export const SmartCalendar: React.FC = () => {
     return map;
   }, [dailyUsageList]);
 
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayIndex = new Date(year, month, 1).getDay();
-
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
+  const handleSaveBillingConfig = (newConfig: BillingPeriodConfig) => {
+    setBillingConfig(newConfig);
+    setStoredBillingPeriodConfig(newConfig);
   };
 
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
+  // Active Billing Window resolution
+  const billingWindow: BillingPeriodWindow = useMemo(() => {
+    return resolveBillingPeriodWindow(currentDate, billingConfig);
+  }, [currentDate, billingConfig]);
+
+  const firstDayIndex = billingWindow.startDate.getDay();
+
+  const handlePrevPeriod = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   };
 
-  // Month aggregations: Baseline Projected vs Simulated Scenario
-  const monthSummary = useMemo(() => {
-    let baselineMonthKwh = 0;
-    let baselineMonthCost = 0;
-    let simulatedMonthKwh = 0;
-    let simulatedMonthCost = 0;
+  const handleNextPeriod = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  // Billing Period / Month aggregations: Baseline Projected vs Simulated Scenario
+  const periodSummary = useMemo(() => {
+    let baselinePeriodKwh = 0;
+    let baselinePeriodCost = 0;
+    let simulatedPeriodKwh = 0;
+    let simulatedPeriodCost = 0;
     let simulatedDaysCount = 0;
 
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dayDate = new Date(year, month, d);
+    billingWindow.days.forEach((dayDate) => {
       const dateKey = formatDateToKey(dayDate);
       const metrics = computeDayMetrics(
         dateKey,
@@ -124,30 +140,30 @@ export const SmartCalendar: React.FC = () => {
         DEFAULT_EFFECTIVE_RATE
       );
 
-      baselineMonthKwh += metrics.baselineKwh;
-      baselineMonthCost += metrics.baselineCost;
-      simulatedMonthKwh += metrics.kwh;
-      simulatedMonthCost += metrics.cost;
+      baselinePeriodKwh += metrics.baselineKwh;
+      baselinePeriodCost += metrics.baselineCost;
+      simulatedPeriodKwh += metrics.kwh;
+      simulatedPeriodCost += metrics.cost;
 
       if (metrics.isSimulated || metrics.isLogged) {
         simulatedDaysCount += 1;
       }
-    }
+    });
 
-    const monthlySavings = baselineMonthCost - simulatedMonthCost;
-    const monthlySavingsPct = baselineMonthCost > 0 ? (monthlySavings / baselineMonthCost) * 100 : 0;
+    const periodSavings = baselinePeriodCost - simulatedPeriodCost;
+    const periodSavingsPct = baselinePeriodCost > 0 ? (periodSavings / baselinePeriodCost) * 100 : 0;
 
     return {
-      baselineMonthKwh: Number(baselineMonthKwh.toFixed(1)),
-      baselineMonthCost: Number(baselineMonthCost.toFixed(2)),
-      simulatedMonthKwh: Number(simulatedMonthKwh.toFixed(1)),
-      simulatedMonthCost: Number(simulatedMonthCost.toFixed(2)),
+      baselinePeriodKwh: Number(baselinePeriodKwh.toFixed(1)),
+      baselinePeriodCost: Number(baselinePeriodCost.toFixed(2)),
+      simulatedPeriodKwh: Number(simulatedPeriodKwh.toFixed(1)),
+      simulatedPeriodCost: Number(simulatedPeriodCost.toFixed(2)),
       simulatedDaysCount,
-      daysInMonth,
-      monthlySavings: Number(monthlySavings.toFixed(2)),
-      monthlySavingsPct: Number(monthlySavingsPct.toFixed(1)),
+      totalDays: billingWindow.days.length,
+      periodSavings: Number(periodSavings.toFixed(2)),
+      periodSavingsPct: Number(periodSavingsPct.toFixed(1)),
     };
-  }, [daysInMonth, year, month, dailyUsageMap, appliances, events]);
+  }, [billingWindow, dailyUsageMap, appliances, events]);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2.5, sm: 3 } }}>
@@ -178,6 +194,37 @@ export const SmartCalendar: React.FC = () => {
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap" }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<DateRangeIcon sx={{ color: billingConfig.mode !== "calendar_month" ? "primary.main" : "#ffd54f" }} />}
+            onClick={() => setIsBillingModalOpen(true)}
+            sx={{
+              borderRadius: 1.25,
+              fontWeight: 800,
+              px: 2,
+              py: 0.85,
+              borderColor: billingConfig.mode !== "calendar_month" ? "primary.main" : "divider",
+              bgcolor: billingConfig.mode !== "calendar_month"
+                ? (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.12)" : "rgba(13, 148, 136, 0.08)"
+                : (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
+              color: billingConfig.mode !== "calendar_month" ? "primary.main" : "text.primary",
+              boxShadow: billingConfig.mode !== "calendar_month" ? "0 2px 8px rgba(0, 229, 201, 0.2)" : "none",
+              "&:hover": {
+                borderColor: "primary.light",
+                bgcolor: billingConfig.mode !== "calendar_month"
+                  ? (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.2)" : "rgba(13, 148, 136, 0.15)"
+                  : (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9",
+              },
+            }}
+          >
+            {billingConfig.mode === "recurring_cycle"
+              ? `Billing Cycle (Day ${billingConfig.cycleStartDay})`
+              : billingConfig.mode === "custom_range"
+              ? "Custom Range"
+              : "Billing Period: Month"}
+          </Button>
+
           <Button
             variant="contained"
             size="small"
@@ -343,7 +390,7 @@ export const SmartCalendar: React.FC = () => {
 
       {/* 2. TOP KPI CARDS: BASELINE VS SIMULATED TELEMETRY */}
       <Grid container spacing={{ xs: 1.5, sm: 2 }}>
-        {/* Card 1: Baseline Projected Month */}
+        {/* Card 1: Baseline Projected Period */}
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper
             sx={{
@@ -359,7 +406,8 @@ export const SmartCalendar: React.FC = () => {
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <ClockIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#818cf8" : "#6366f1" }} /> Baseline Month
+              <ClockIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#818cf8" : "#6366f1" }} />
+              Baseline {billingConfig.mode === "calendar_month" ? "Month" : "Cycle"}
             </Typography>
             <Typography
               variant="h6"
@@ -370,15 +418,15 @@ export const SmartCalendar: React.FC = () => {
                 fontFamily: "monospace",
               }}
             >
-              ~₱{monthSummary.baselineMonthCost.toFixed(2)}
+              ~₱{periodSummary.baselinePeriodCost.toFixed(2)}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              Full-month quota ({monthSummary.baselineMonthKwh} kWh)
+              {billingConfig.mode === "calendar_month" ? "Full-month" : "Billing cycle"} quota ({periodSummary.baselinePeriodKwh} kWh)
             </Typography>
           </Paper>
         </Grid>
 
-        {/* Card 2: Simulated Month Bill */}
+        {/* Card 2: Simulated Period Bill */}
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper
             sx={{
@@ -394,7 +442,8 @@ export const SmartCalendar: React.FC = () => {
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <BoltIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488" }} /> Simulated Month
+              <BoltIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488" }} />
+              Simulated {billingConfig.mode === "calendar_month" ? "Month" : "Cycle"}
             </Typography>
             <Typography
               variant="h6"
@@ -405,10 +454,10 @@ export const SmartCalendar: React.FC = () => {
                 fontFamily: "monospace",
               }}
             >
-              ₱{monthSummary.simulatedMonthCost.toFixed(2)}
+              ₱{periodSummary.simulatedPeriodCost.toFixed(2)}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              With planned routines ({monthSummary.simulatedMonthKwh} kWh)
+              With planned routines ({periodSummary.simulatedPeriodKwh} kWh)
             </Typography>
           </Paper>
         </Grid>
@@ -429,25 +478,25 @@ export const SmartCalendar: React.FC = () => {
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <SavingsIcon sx={{ fontSize: 16, color: monthSummary.monthlySavings >= 0 ? "#34d399" : "#fbbf24" }} /> Projected Savings
+              <SavingsIcon sx={{ fontSize: 16, color: periodSummary.periodSavings >= 0 ? "#34d399" : "#fbbf24" }} /> Projected Savings
             </Typography>
             <Typography
               variant="h6"
               sx={{
                 fontWeight: 900,
-                color: monthSummary.monthlySavings >= 0 ? "#34d399" : "#f59e0b",
+                color: periodSummary.periodSavings >= 0 ? "#34d399" : "#f59e0b",
                 mt: 0.5,
                 fontFamily: "monospace",
               }}
             >
-              {monthSummary.monthlySavings >= 0
-                ? `-₱${monthSummary.monthlySavings.toFixed(2)}`
-                : `+₱${Math.abs(monthSummary.monthlySavings).toFixed(2)}`}
+              {periodSummary.periodSavings >= 0
+                ? `-₱${periodSummary.periodSavings.toFixed(2)}`
+                : `+₱${Math.abs(periodSummary.periodSavings).toFixed(2)}`}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              {monthSummary.monthlySavings >= 0
-                ? `${monthSummary.monthlySavingsPct}% reduction vs baseline`
-                : `${Math.abs(monthSummary.monthlySavingsPct)}% higher vs baseline`}
+              {periodSummary.periodSavings >= 0
+                ? `${periodSummary.periodSavingsPct}% reduction vs baseline`
+                : `${Math.abs(periodSummary.periodSavingsPct)}% higher vs baseline`}
             </Typography>
           </Paper>
         </Grid>
@@ -468,7 +517,8 @@ export const SmartCalendar: React.FC = () => {
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <CheckCircleIcon sx={{ fontSize: 16, color: "#ffd54f" }} /> Simulation Coverage
+              <CheckCircleIcon sx={{ fontSize: 16, color: "#ffd54f" }} />
+              {billingConfig.mode === "calendar_month" ? "Simulation Coverage" : "Cycle Coverage"}
             </Typography>
             <Typography
               variant="h6"
@@ -479,28 +529,53 @@ export const SmartCalendar: React.FC = () => {
                 fontFamily: "monospace",
               }}
             >
-              {monthSummary.simulatedDaysCount} / {monthSummary.daysInMonth} Days
+              {periodSummary.simulatedDaysCount} / {periodSummary.totalDays} Days
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              {Math.round((monthSummary.simulatedDaysCount / monthSummary.daysInMonth) * 100)}% of month tailored
+              {Math.round((periodSummary.simulatedDaysCount / periodSummary.totalDays) * 100)}% of timeframe tailored
             </Typography>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* 3. Calendar Controls & Month Navigator Card */}
+      {/* 3. Calendar Controls & Month/Cycle Navigator Card */}
       <Card sx={{ p: 2, borderRadius: 1.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <IconButton onClick={handlePrevMonth} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
+            <IconButton onClick={handlePrevPeriod} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
               <ChevronLeftIcon />
             </IconButton>
 
-            <Typography variant="h5" sx={{ fontWeight: 800, minWidth: 200, textAlign: "center", letterSpacing: "-0.01em" }}>
-              {monthNames[month]} {year}
-            </Typography>
+            <Box sx={{ textAlign: "center", minWidth: { xs: 180, sm: 240 } }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+                {billingWindow.label}
+              </Typography>
+              {billingWindow.subLabel && (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75, mt: 0.25 }}>
+                  <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700, fontSize: "0.7rem" }}>
+                    {billingWindow.subLabel}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label="Edit"
+                    onClick={() => setIsBillingModalOpen(true)}
+                    sx={{
+                      height: 18,
+                      fontSize: "0.625rem",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.15)" : "rgba(13, 148, 136, 0.1)",
+                      color: "primary.main",
+                      "&:hover": {
+                        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.2)",
+                      }
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
 
-            <IconButton onClick={handleNextMonth} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
+            <IconButton onClick={handleNextPeriod} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
               <ChevronRightIcon />
             </IconButton>
           </Box>
@@ -616,11 +691,13 @@ export const SmartCalendar: React.FC = () => {
           ))}
 
           {/* Actual day cells */}
-          {Array.from({ length: daysInMonth }).map((_, idx) => {
-            const dayNum = idx + 1;
+          {billingWindow.days.map((dayDate, idx) => {
+            const dayNum = dayDate.getDate();
             const realToday = new Date();
-            const isCurrentToday = dayNum === realToday.getDate() && month === realToday.getMonth() && year === realToday.getFullYear();
-            const dayDate = new Date(year, month, dayNum);
+            const isCurrentToday =
+              dayNum === realToday.getDate() &&
+              dayDate.getMonth() === realToday.getMonth() &&
+              dayDate.getFullYear() === realToday.getFullYear();
             const dateKey = formatDateToKey(dayDate);
             const metrics = computeDayMetrics(
               dateKey,
@@ -632,7 +709,7 @@ export const SmartCalendar: React.FC = () => {
             );
 
             return (
-              <Grid size={1} key={`day-${dayNum}`}>
+              <Grid size={1} key={`day-${dateKey}-${idx}`}>
                 <Paper
                   data-tour={isCurrentToday ? "calendar-day-click" : undefined}
                   variant="outlined"
@@ -720,7 +797,21 @@ export const SmartCalendar: React.FC = () => {
                   )}
 
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: isCurrentToday ? 0.75 : 0 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
+                      {billingWindow.isCrossMonth && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: { xs: "0.55rem", sm: "0.625rem" },
+                            fontWeight: 800,
+                            color: isCurrentToday ? "primary.main" : "text.secondary",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          {dayDate.toLocaleDateString("en-US", { month: "short" })}
+                        </Typography>
+                      )}
                       <Typography
                         variant="body2"
                         sx={{
@@ -884,12 +975,22 @@ export const SmartCalendar: React.FC = () => {
         currentSelectedDate={currentDate}
         appliances={appliances}
         spaces={spaces}
+        billingWindow={billingWindow}
         onApplyToCurrentDay={() => {
           if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
         }}
         onBatchSaved={() => {
           if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
         }}
+      />
+
+      {/* Billing Period & Cutoff Settings Modal */}
+      <BillingPeriodModal
+        isOpen={isBillingModalOpen}
+        onClose={() => setIsBillingModalOpen(false)}
+        currentSelectedDate={currentDate}
+        currentConfig={billingConfig}
+        onSaveConfig={handleSaveBillingConfig}
       />
     </Box>
   );

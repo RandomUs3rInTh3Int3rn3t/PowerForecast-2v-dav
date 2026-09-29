@@ -25,7 +25,7 @@ import {
   Save as SaveIcon,
   CheckCircle as CheckCircleIcon,
 } from "@mui/icons-material";
-import { UserAppliance, ApplianceList } from "../../types";
+import { UserAppliance, ApplianceList, BillingPeriodWindow } from "../../types";
 import {
   formatDateToKey,
   parseKeyToDate,
@@ -36,7 +36,7 @@ import {
 } from "../../lib/dailyUsageService";
 import { useToast } from "../common/ToastProvider";
 
-export type AutofillRangeType = "month_to_today" | "full_month" | "custom" | "single_day";
+export type AutofillRangeType = "month_to_today" | "full_month" | "billing_period" | "custom" | "single_day";
 
 interface RoutineAutofillModalProps {
   isOpen: boolean;
@@ -44,6 +44,7 @@ interface RoutineAutofillModalProps {
   currentSelectedDate: Date;
   appliances: UserAppliance[];
   spaces?: ApplianceList[];
+  billingWindow?: BillingPeriodWindow;
   onApplyToCurrentDay: () => void;
   onBatchSaved: () => void;
 }
@@ -53,10 +54,13 @@ export const RoutineAutofillModal: React.FC<RoutineAutofillModalProps> = ({
   onClose,
   currentSelectedDate,
   appliances,
+  billingWindow,
   onApplyToCurrentDay,
   onBatchSaved,
 }) => {
-  const [rangeType, setRangeType] = useState<AutofillRangeType>("month_to_today");
+  const [rangeType, setRangeType] = useState<AutofillRangeType>(
+    billingWindow && billingWindow.isCrossMonth ? "billing_period" : "month_to_today"
+  );
   const [selectedSpaceFilter, setSelectedSpaceFilter] = useState<string>("all");
   const [overwriteExisting, setOverwriteExisting] = useState<boolean>(true);
   const [excludeToday, setExcludeToday] = useState<boolean>(true);
@@ -117,6 +121,10 @@ export const RoutineAutofillModal: React.FC<RoutineAutofillModalProps> = ({
       start = new Date(year, month, 1);
       end = new Date(year, month + 1, 0);
       label = `Entire Month (${monthName} 1 – ${monthName} ${end.getDate()})`;
+    } else if (rangeType === "billing_period" && billingWindow) {
+      start = billingWindow.startDate;
+      end = billingWindow.endDate;
+      label = `Active Cycle (${billingWindow.label})`;
     } else if (rangeType === "custom") {
       start = parseKeyToDate(customStartDate || firstOfMonthStr);
       end = parseKeyToDate(customEndDate || lastOfMonthStr);
@@ -322,6 +330,34 @@ export const RoutineAutofillModal: React.FC<RoutineAutofillModalProps> = ({
                 Fills all days (Day 1 to 31) for this month
               </Typography>
             </Paper>
+
+            {/* Option 2.5: Active Billing Cycle (if available) */}
+            {billingWindow && (
+              <Paper
+                variant="outlined"
+                onClick={() => setRangeType("billing_period")}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 1,
+                  cursor: "pointer",
+                  border: "1px solid",
+                  borderColor: rangeType === "billing_period" ? "primary.main" : "divider",
+                  bgcolor: rangeType === "billing_period" ? "rgba(0, 229, 201, 0.12)" : "rgba(24, 27, 32, 0.65)",
+                  transition: "all 0.15s ease",
+                  "&:hover": { borderColor: "primary.light" },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                  <DateRangeIcon sx={{ fontSize: 18, color: rangeType === "billing_period" ? "primary.main" : "text.secondary" }} />
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: rangeType === "billing_period" ? "primary.light" : "text.primary" }}>
+                    Active Billing Cycle
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                  {billingWindow.label} ({billingWindow.days.length} days)
+                </Typography>
+              </Paper>
+            )}
 
             {/* Option 3: Custom Range */}
             <Paper

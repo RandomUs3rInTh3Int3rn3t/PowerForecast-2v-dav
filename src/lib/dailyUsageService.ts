@@ -1,5 +1,13 @@
 import { supabaseClient } from "./supabaseClient";
-import { DailyApplianceUsage, UserAppliance, UserCalendarEvent } from "../types";
+import {
+  DailyApplianceUsage,
+  UserAppliance,
+  UserCalendarEvent,
+  BillingPeriodConfig,
+  BillingPeriodWindow,
+  BillingPeriodMode,
+  CycleEndOffset,
+} from "../types";
 import { devLog } from "./devLogger";
 
 export const DEFAULT_EFFECTIVE_RATE = 14.8261;
@@ -1170,5 +1178,158 @@ export function computeDayMetrics(
     isPeak: projectedKwh > 18 || projectedCost > 270,
     applianceCount: activeAppliances.length,
     source: dayEvents.length > 0 ? "projected_schedule" : "projected_routine",
+  };
+}
+
+export const BILLING_PERIOD_STORAGE_KEY = "powerforecast_calendar_billing_period_config";
+
+export const DEFAULT_BILLING_PERIOD_CONFIG: BillingPeriodConfig = {
+  mode: "calendar_month",
+  cycleStartDay: 15,
+  cycleEndOffset: "same_day",
+};
+
+export function getStoredBillingPeriodConfig(): BillingPeriodConfig {
+  if (typeof window === "undefined") return DEFAULT_BILLING_PERIOD_CONFIG;
+  try {
+    const raw = localStorage.getItem(BILLING_PERIOD_STORAGE_KEY);
+    if (!raw) return DEFAULT_BILLING_PERIOD_CONFIG;
+    const parsed = JSON.parse(raw);
+    return {
+      mode: (parsed.mode as BillingPeriodMode) || "calendar_month",
+      cycleStartDay: Number(parsed.cycleStartDay) || 15,
+      cycleEndOffset: (parsed.cycleEndOffset as CycleEndOffset) || "same_day",
+      customStartDate: parsed.customStartDate,
+      customEndDate: parsed.customEndDate,
+    };
+  } catch (err) {
+    return DEFAULT_BILLING_PERIOD_CONFIG;
+  }
+}
+
+export function setStoredBillingPeriodConfig(config: BillingPeriodConfig): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(BILLING_PERIOD_STORAGE_KEY, JSON.stringify(config));
+  } catch (err) {
+    // ignore
+  }
+}
+
+/**
+ * Resolves a date window and array of Date objects based on the user's Billing Period settings.
+ */
+export function resolveBillingPeriodWindow(
+  anchorDate: Date,
+  config: BillingPeriodConfig = DEFAULT_BILLING_PERIOD_CONFIG
+): BillingPeriodWindow {
+  const monthNamesShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthNamesLong = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const year = anchorDate.getFullYear();
+  const month = anchorDate.getMonth();
+
+  if (config.mode === "custom_range" && config.customStartDate && config.customEndDate) {
+    const start = parseKeyToDate(config.customStartDate);
+    const end = parseKeyToDate(config.customEndDate);
+
+    const safeStart = start <= end ? start : end;
+    const safeEnd = start <= end ? end : start;
+
+    const days: Date[] = [];
+    const cur = new Date(safeStart.getFullYear(), safeStart.getMonth(), safeStart.getDate());
+    const endD = new Date(safeEnd.getFullYear(), safeEnd.getMonth(), safeEnd.getDate());
+
+    let guard = 0;
+    while (cur <= endD && guard < 90) {
+      days.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+      guard++;
+    }
+
+    const startLabel = `${monthNamesShort[safeStart.getMonth()]} ${safeStart.getDate()}, ${safeStart.getFullYear()}`;
+    const endLabel = `${monthNamesShort[safeEnd.getMonth()]} ${safeEnd.getDate()}, ${safeEnd.getFullYear()}`;
+    const isCrossMonth = safeStart.getMonth() !== safeEnd.getMonth() || safeStart.getFullYear() !== safeEnd.getFullYear();
+
+    return {
+      startDate: safeStart,
+      endDate: safeEnd,
+      days,
+      label: `${startLabel} – ${endLabel}`,
+      subLabel: `Custom Window • ${days.length} Days`,
+      isCrossMonth,
+    };
+  }
+
+  if (config.mode === "recurring_cycle") {
+    const startDayReq = Math.max(1, Math.min(31, config.cycleStartDay || 15));
+
+    // Previous month anchor
+    const prevMonthDate = new Date(year, month - 1, 1);
+    const prevYear = prevMonthDate.getFullYear();
+    const prevMonth = prevMonthDate.getMonth();
+    const maxDaysPrev = new Date(prevYear, prevMonth + 1, 0).getDate();
+    const safeStartDay = Math.min(startDayReq, maxDaysPrev);
+    const startDate = new Date(prevYear, prevMonth, safeStartDay);
+
+    // Target end date with cycleEndOffset
+    // 'same_day' => offset 0 (e.g. Sep 15 to Oct 15)
+    // 'day_before' => offset -1 (e.g. Sep 15 to Oct 14)
+    // 'day_after' => offset +1 (e.g. Sep 15 to Oct 16)
+    let dayOffset = 0;
+    if (config.cycleEndOffset === "day_before") dayOffset = -1;
+    else if (config.cycleEndOffset === "day_after") dayOffset = 1;
+
+    const endDate = new Date(year, month, startDayReq + dayOffset);
+
+    const days: Date[] = [];
+    const cur = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const endD = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+    let guard = 0;
+    while (cur <= endD && guard < 60) {
+      days.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+      guard++;
+    }
+
+    const startLabel = `${monthNamesShort[startDate.getMonth()]} ${startDate.getDate()}`;
+    const endYearStr = endDate.getFullYear() !== startDate.getFullYear() ? `, ${startDate.getFullYear()}` : "";
+    const endLabel = `${monthNamesShort[endDate.getMonth()]} ${endDate.getDate()}, ${endDate.getFullYear()}`;
+
+    let offsetText = "Exact Day Parity";
+    if (config.cycleEndOffset === "day_before") offsetText = "Cutoff Day Before";
+    if (config.cycleEndOffset === "day_after") offsetText = "Cutoff Day After";
+
+    return {
+      startDate,
+      endDate,
+      days,
+      label: `${startLabel}${endYearStr} – ${endLabel}`,
+      subLabel: `Billing Cycle (Day ${startDayReq} • ${offsetText}) • ${days.length} Days`,
+      isCrossMonth: true,
+    };
+  }
+
+  // Default: Calendar Month (1st to last day)
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDate = new Date(year, month, 1);
+  const endDate = new Date(year, month, daysInMonth);
+  const days: Date[] = [];
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push(new Date(year, month, d));
+  }
+
+  return {
+    startDate,
+    endDate,
+    days,
+    label: `${monthNamesLong[month]} ${year}`,
+    subLabel: `Standard Month • ${days.length} Days`,
+    isCrossMonth: false,
   };
 }
