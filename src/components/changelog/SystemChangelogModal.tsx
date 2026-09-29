@@ -41,6 +41,16 @@ export interface SystemChangelogEntry {
 // Master compiled GitHub deployment history covering all releases
 const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.3v",
+    version: "3.4.3v",
+    git_commit_tag: "3.4.3v",
+    created_at: "2026-09-29T22:30:00.000Z",
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.3v - Branded HTML Email Templates: Modern PowerForecast dark theme with official logo, emerald accents, and responsive layout for Supabase Auth and transactional alerts",
+  },
+  {
     id: "3.4.2v",
     version: "3.4.2v",
     git_commit_tag: "3.4.2v",

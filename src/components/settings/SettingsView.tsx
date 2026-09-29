@@ -29,6 +29,14 @@ import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import InputAdornment from "@mui/material/InputAdornment";
 import Switch from "@mui/material/Switch";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import {
+  getSupabaseResetPasswordTemplate,
+  getSupabaseConfirmSignupTemplate,
+  getSupabaseMagicLinkTemplate,
+  getSupabaseInviteUserTemplate,
+} from "../../lib/emailTemplates";
 import {
   Settings as SettingsIcon,
   Translate as LanguageIcon,
@@ -356,6 +364,9 @@ export const SettingsView: React.FC = () => {
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailResult, setTestEmailResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isSmtpGuideOpen, setIsSmtpGuideOpen] = useState(false);
+  const [smtpModalTab, setSmtpModalTab] = useState<number>(0);
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<"reset_password" | "confirm_signup" | "magic_link" | "invite_user">("reset_password");
+  const [templateCopiedKey, setTemplateCopiedKey] = useState<string | null>(null);
 
   // Notification Email Alerts Preference
   const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(() => {
@@ -1097,15 +1108,26 @@ export const SettingsView: React.FC = () => {
               </Typography>
             </Box>
           </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<KeyIcon />}
-            onClick={() => setIsSmtpGuideOpen(true)}
-            sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem", textTransform: "none" }}
-          >
-            {language === "tl" ? "Supabase SMTP Guide" : "Supabase SMTP Setup Guide"}
-          </Button>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<KeyIcon />}
+              onClick={() => { setSmtpModalTab(0); setIsSmtpGuideOpen(true); }}
+              sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem", textTransform: "none" }}
+            >
+              {language === "tl" ? "Supabase SMTP Setup" : "Supabase SMTP Setup"}
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<EmailIcon />}
+              onClick={() => { setSmtpModalTab(1); setIsSmtpGuideOpen(true); }}
+              sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem", textTransform: "none" }}
+            >
+              {language === "tl" ? "Branded Email Templates" : "Branded Email Templates"}
+            </Button>
+          </Box>
         </Box>
 
         {/* Status Chips */}
@@ -1531,71 +1553,181 @@ export const SettingsView: React.FC = () => {
           },
         }}
       >
-        <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1.25 }}>
-          <KeyIcon sx={{ color: "primary.main" }} />
-          Supabase Custom SMTP with Resend Guide
-        </DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: 1 }}>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Configure Resend as your custom SMTP provider in the Supabase Dashboard to eliminate rate limits (3 emails/hour) and guarantee email delivery for registration, resend verification, and password resets.
-          </Typography>
-
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "#f8fafc" }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5, color: "primary.main" }}>
-              Resend SMTP Credentials for Supabase Dashboard:
-            </Typography>
-            <Grid container spacing={1.5}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>SMTP Host</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>smtp.resend.com</Typography>
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Port & Security</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>465 (SSL) or 587 (TLS)</Typography>
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Username</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>resend</Typography>
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Password</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>re_... (Your Resend API Key)</Typography>
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Sender Email</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace", color: "primary.main" }}>noreply@comugallery.me</Typography>
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Sender Name</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>PowerForecast Refine</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Quick 3-Step Setup Instructions:</Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              1. Open <strong>Supabase Dashboard</strong> ➔ <strong>Project Settings</strong> ➔ <strong>Authentication</strong> ➔ <strong>SMTP Settings</strong>.
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              2. Toggle <strong>Enable Custom SMTP</strong> to <strong>ON</strong> and enter the Resend credentials above.
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              3. In <strong>Authentication ➔ Providers ➔ Email</strong>, toggle <strong>Confirm email</strong> to <strong>ON</strong>.
-            </Typography>
+        <DialogTitle sx={{ pb: 1, pt: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+              <EmailIcon sx={{ color: "primary.main" }} />
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Supabase SMTP & Branded Email Templates
+              </Typography>
+            </Box>
+            <Chip
+              label="v3.4.3v Branded"
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ fontWeight: 700, fontSize: "0.7rem" }}
+            />
           </Box>
+          <Tabs
+            value={smtpModalTab}
+            onChange={(_, val) => setSmtpModalTab(val)}
+            textColor="primary"
+            indicatorColor="primary"
+            sx={{
+              minHeight: 36,
+              "& .MuiTab-root": { minHeight: 36, fontWeight: 700, fontSize: "0.85rem", textTransform: "none", py: 0.5 },
+            }}
+          >
+            <Tab label="1. SMTP Setup & Credentials" />
+            <Tab label="2. Branded HTML Email Templates (Supabase)" />
+          </Tabs>
+        </DialogTitle>
+
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: 2 }}>
+          {smtpModalTab === 0 ? (
+            <>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Configure Resend as your custom SMTP provider in the Supabase Dashboard to eliminate rate limits (3 emails/hour) and guarantee email delivery for registration, resend verification, and password resets.
+              </Typography>
+
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "#f8fafc" }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5, color: "primary.main" }}>
+                  Resend SMTP Credentials for Supabase Dashboard:
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>SMTP Host</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>smtp.resend.com</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Port & Security</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>465 (SSL) or 587 (TLS)</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Username</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>resend</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Password</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>re_... (Your Resend API Key)</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Sender Email</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace", color: "primary.main" }}>noreply@comugallery.me</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Sender Name</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>PowerForecast</Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Quick 3-Step Setup Instructions:</Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  1. Open <strong>Supabase Dashboard</strong> ➔ <strong>Project Settings</strong> ➔ <strong>Authentication</strong> ➔ <strong>SMTP Settings</strong>.
+                </Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  2. Toggle <strong>Enable Custom SMTP</strong> to <strong>ON</strong> and enter the Resend credentials above.
+                </Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  3. In <strong>Authentication ➔ Providers ➔ Email</strong>, toggle <strong>Confirm email</strong> to <strong>ON</strong>.
+                </Typography>
+              </Box>
+            </>
+          ) : (
+            <>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Select an email template below to inspect its live preview. Click <strong>Copy HTML Code for Supabase</strong> to copy the responsive, branded HTML with the <strong>PowerForecast logo</strong> and <strong>electric teal theme</strong>, then paste it directly into your <strong>Supabase Dashboard ➔ Authentication ➔ Email Templates</strong>.
+              </Typography>
+
+              {/* Template Selector Chips */}
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                {[
+                  { key: "reset_password", label: "🔑 Reset Password" },
+                  { key: "confirm_signup", label: "✉️ Confirm Signup" },
+                  { key: "magic_link", label: "🪄 Magic Link" },
+                  { key: "invite_user", label: "👥 Invite User" },
+                ].map((tpl) => (
+                  <Chip
+                    key={tpl.key}
+                    label={tpl.label}
+                    clickable
+                    color={selectedTemplateKey === tpl.key ? "primary" : "default"}
+                    variant={selectedTemplateKey === tpl.key ? "filled" : "outlined"}
+                    onClick={() => setSelectedTemplateKey(tpl.key as any)}
+                    sx={{ fontWeight: 700, borderRadius: 2 }}
+                  />
+                ))}
+              </Box>
+
+              {/* Action Bar for Selected Template */}
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "#f1f5f9", border: "1px solid", borderColor: "divider" }}>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    {selectedTemplateKey === "reset_password" && "Reset Password Template (GoTrue: {{ .ConfirmationURL }})"}
+                    {selectedTemplateKey === "confirm_signup" && "Confirm Signup Template (GoTrue: {{ .ConfirmationURL }})"}
+                    {selectedTemplateKey === "magic_link" && "Magic Link Template (GoTrue: {{ .ConfirmationURL }})"}
+                    {selectedTemplateKey === "invite_user" && "Invite User Template (GoTrue: {{ .ConfirmationURL }})"}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Supabase Path: <strong>Authentication ➔ Email Templates ➔ {selectedTemplateKey.replace('_', ' ').toUpperCase()}</strong>
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={templateCopiedKey === selectedTemplateKey ? <CheckIcon /> : <CopyIcon />}
+                  color={templateCopiedKey === selectedTemplateKey ? "success" : "primary"}
+                  onClick={() => {
+                    let htmlContent = "";
+                    if (selectedTemplateKey === "reset_password") htmlContent = getSupabaseResetPasswordTemplate();
+                    else if (selectedTemplateKey === "confirm_signup") htmlContent = getSupabaseConfirmSignupTemplate();
+                    else if (selectedTemplateKey === "magic_link") htmlContent = getSupabaseMagicLinkTemplate();
+                    else if (selectedTemplateKey === "invite_user") htmlContent = getSupabaseInviteUserTemplate();
+
+                    navigator.clipboard.writeText(htmlContent);
+                    setTemplateCopiedKey(selectedTemplateKey);
+                    showSuccess("Branded HTML copied to clipboard! Paste into Supabase Email Templates.");
+                    setTimeout(() => setTemplateCopiedKey(null), 3000);
+                  }}
+                  sx={{ fontWeight: 800, textTransform: "none", borderRadius: 1.5 }}
+                >
+                  {templateCopiedKey === selectedTemplateKey ? "Copied to Clipboard!" : "Copy HTML Code for Supabase"}
+                </Button>
+              </Box>
+
+              {/* Live Preview Frame */}
+              <Box sx={{ borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider", maxHeight: 380, bgcolor: "#0b0e14" }}>
+                <iframe
+                  title="Branded Email Preview"
+                  srcDoc={
+                    selectedTemplateKey === "reset_password"
+                      ? getSupabaseResetPasswordTemplate().replace(/{{ \.ConfirmationURL }}/g, "https://bsentrep.vercel.app/reset-password#preview").replace(/{{ \.Email }}/g, identity?.email || "user@example.com")
+                      : selectedTemplateKey === "confirm_signup"
+                      ? getSupabaseConfirmSignupTemplate().replace(/{{ \.ConfirmationURL }}/g, "https://bsentrep.vercel.app/login#preview").replace(/{{ \.Email }}/g, identity?.email || "newuser@example.com")
+                      : selectedTemplateKey === "magic_link"
+                      ? getSupabaseMagicLinkTemplate().replace(/{{ \.ConfirmationURL }}/g, "https://bsentrep.vercel.app/#preview").replace(/{{ \.Email }}/g, identity?.email || "user@example.com")
+                      : getSupabaseInviteUserTemplate().replace(/{{ \.ConfirmationURL }}/g, "https://bsentrep.vercel.app/#preview").replace(/{{ \.Email }}/g, identity?.email || "user@example.com")
+                  }
+                  style={{ width: "100%", height: "360px", border: "none" }}
+                />
+              </Box>
+            </>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button

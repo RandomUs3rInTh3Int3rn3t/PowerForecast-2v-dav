@@ -1,4 +1,5 @@
 import { devLog } from './devLogger';
+import { buildBrandedEmailHtml } from './emailTemplates';
 
 export type EmailTemplateType = 'household_invite' | 'budget_alert' | 'surge_alert' | 'test_email' | 'custom';
 
@@ -152,10 +153,57 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
 
       if (html) {
         payload.html = html;
+      } else if (type === 'household_invite') {
+        payload.html = buildBrandedEmailHtml({
+          headline: 'Household Energy Team Invitation',
+          bodyParagraphs: [`<strong>${data?.inviterName || 'A household member'}</strong> has invited you to join their smart household energy profile on PowerForecast.`],
+          highlightBox: { label: 'Household Join Code', value: data?.inviteCode || 'PF-HH-0000' },
+          buttonText: 'Accept Invitation & Join',
+          buttonUrl: data?.inviteLink,
+        });
+      } else if (type === 'budget_alert') {
+        payload.html = buildBrandedEmailHtml({
+          badge: 'BUDGET ALERT',
+          badgeColor: '#ef4444',
+          headline: `Hello ${data?.userName || 'User'},`,
+          bodyParagraphs: [`Your household electricity consumption has reached <strong style="color: #f87171;">${data?.percentConsumed || '80%'}</strong> of your monthly target.`],
+          metricsTable: [
+            { label: 'Current Usage', value: `${data?.currentKwh || 0} kWh` },
+            { label: 'Target Budget', value: `${data?.budgetLimitKwh || 0} kWh` },
+            { label: 'Projected Bill', value: data?.projectedBill || '₱0.00', highlight: true },
+          ],
+        });
+      } else if (type === 'surge_alert') {
+        payload.html = buildBrandedEmailHtml({
+          badge: 'SURGE WARNING',
+          badgeColor: '#f59e0b',
+          headline: 'Active Load Warning',
+          bodyParagraphs: [
+            `Your active telemetry monitor registered concurrent appliance wattage of <strong style="color: #fbbf24;">${data?.currentWatts} Watts</strong> at ${data?.timestamp || 'just now'}, exceeding your safety threshold limit of ${data?.thresholdWatts} Watts.`,
+            'Please check active high-draw equipment such as air conditioning units, induction cookers, or electric water heaters running concurrently.',
+          ],
+        });
+      } else if (type === 'test_email') {
+        payload.html = buildBrandedEmailHtml({
+          badge: 'SMTP DIAGNOSTICS',
+          badgeColor: '#22c55e',
+          headline: 'Connection Verified!',
+          bodyParagraphs: [
+            'This test email confirms that your PowerForecast Resend Delivery Engine and Custom Domain SMTP (<strong>noreply@comugallery.me</strong>) are operational and delivering worldwide.',
+          ],
+          metricsTable: [
+            { label: 'Target Recipient', value: data?.recipient || (Array.isArray(to) ? to[0] : to) },
+            { label: 'Dispatched At', value: data?.timestamp || new Date().toLocaleString() },
+            { label: 'Diagnostics Note', value: data?.note || 'Operational check passed', highlight: true },
+          ],
+        });
       } else if (text) {
         payload.text = text;
       } else {
-        payload.html = `<p>${data?.note || 'Notification from PowerForecast.'}</p>`;
+        payload.html = buildBrandedEmailHtml({
+          headline: payload.subject,
+          bodyParagraphs: [data?.note || data?.content || 'Notification from PowerForecast.'],
+        });
       }
 
       const res = await fetch('https://api.resend.com/emails', {

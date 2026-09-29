@@ -25,28 +25,88 @@ def render_template(template_type, data):
     """
     Renders responsive, branded PowerForecast HTML emails for supported transactional types.
     """
-    brand_blue = "#00d2ff"
-    brand_dark = "#0b0f17"
-    card_bg = "#131b26"
-    border_color = "#1e293b"
+    brand_teal = "#00e5c9"
+    brand_dark = "#0b0e14"
+    card_bg = "#141a24"
+    border_color = "#222d3d"
     text_muted = "#94a3b8"
+    logo_url = "https://raw.githubusercontent.com/hAizen-Nibba/PowerForecast-2v/main/public/Assets/LOGO.png"
 
     base_header = f"""
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: {brand_dark}; color: #e2e8f0; margin: 0; padding: 28px 16px;">
-      <div style="max-width: 540px; margin: 0 auto; background: {card_bg}; border: 1px solid {border_color}; border-radius: 14px; padding: 36px 28px; box-shadow: 0 12px 30px rgba(0,0,0,0.5);">
-        <div style="display: flex; align-items: center; margin-bottom: 24px;">
-          <span style="font-size: 22px; font-weight: 800; color: {brand_blue}; letter-spacing: 0.5px;">⚡ PowerForecast</span>
-          <span style="font-size: 11px; background: rgba(0,210,255,0.12); color: {brand_blue}; padding: 3px 8px; border-radius: 999px; margin-left: 10px; font-weight: 700;">Energy Intelligence</span>
-        </div>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body, table, td {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important; }}
+      </style>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: {brand_dark}; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: {brand_dark}; padding: 32px 12px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: {card_bg}; border: 1px solid {border_color}; border-radius: 16px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.6);">
+              
+              <!-- Header with Logo and Brand -->
+              <tr>
+                <td style="padding: 28px 32px 20px 32px; border-bottom: 1px solid #1c2635; background: linear-gradient(180deg, #18202d 0%, {card_bg} 100%);">
+                  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                    <tr>
+                      <td style="vertical-align: middle; width: 44px;">
+                        <img src="{logo_url}" alt="PowerForecast Logo" width="40" height="40" style="display: block; border-radius: 10px; border: 0;" />
+                      </td>
+                      <td style="vertical-align: middle; padding-left: 14px;">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="font-size: 20px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px;">
+                              Power<span style="color: {brand_teal};">Forecast</span>
+                            </td>
+                            <td style="padding-left: 10px;">
+                              <span style="font-size: 10px; font-weight: 800; background: rgba(0, 229, 201, 0.12); color: {brand_teal}; padding: 3px 8px; border-radius: 999px; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid rgba(0, 229, 201, 0.25);">
+                                Energy Intelligence
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td colspan="2" style="font-size: 11px; font-weight: 500; color: #8b949e; letter-spacing: 0.3px; padding-top: 2px;">
+                              Smart Energy Monitoring & Bill Forecasting
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Content Body -->
+              <tr>
+                <td style="padding: 32px 32px 24px 32px; color: #e2e8f0;">
     """
 
     base_footer = f"""
-        <div style="border-top: 1px solid {border_color}; margin-top: 28px; padding-top: 20px; font-size: 12px; color: #64748b; line-height: 1.5;">
-          This is an automated operational notification dispatched via PowerForecast SMTP & Resend Delivery Engine.<br>
-          © 2026 PowerForecast Refine. Energy Optimization & Telemetry.
-        </div>
-      </div>
-    </div>
+                </td>
+              </tr>
+
+              <!-- Footer with Security Notice -->
+              <tr>
+                <td style="padding: 20px 32px 28px 32px; border-top: 1px solid #1c2635; background-color: #0f141d;">
+                  <div style="font-size: 12px; line-height: 1.5; color: #64748b; margin-bottom: 8px;">
+                    🛡️ This operational notification was dispatched via PowerForecast SMTP & Resend Delivery Engine.
+                  </div>
+                  <div style="font-size: 11px; line-height: 1.5; color: #475569;">
+                    Sender: <strong style="color: #64748b;">noreply@comugallery.me</strong> &bull; © 2026 PowerForecast Refine. All rights reserved.
+                  </div>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
     """
 
     if template_type == 'household_invite':
@@ -56,23 +116,39 @@ def render_template(template_type, data):
         
         subject = f"⚡ You've been invited by {inviter_name} to join PowerForecast Household"
         content = f"""
-          <h2 style="font-size: 22px; font-weight: 700; color: #ffffff; margin-top: 0; margin-bottom: 12px;">Household Energy Team Invitation</h2>
+          <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin-top: 0; margin-bottom: 12px; letter-spacing: -0.3px;">
+            Household Energy Team Invitation
+          </h1>
           <p style="font-size: 15px; line-height: 1.6; color: {text_muted}; margin-bottom: 20px;">
             <strong style="color: #ffffff;">{inviter_name}</strong> has invited you to join their smart household energy profile on PowerForecast.
           </p>
-          <div style="background: rgba(0, 210, 255, 0.06); border: 1px dashed rgba(0, 210, 255, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center;">
-            <div style="font-size: 12px; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px; margin-bottom: 6px;">Your Household Join Code</div>
-            <div style="font-size: 24px; font-weight: 800; color: {brand_blue}; letter-spacing: 3px;">{invite_code}</div>
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0; background: #0c1017; border: 1px dashed rgba(0, 229, 201, 0.35); border-radius: 10px; padding: 18px 20px;">
+            <tr>
+              <td align="center">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-bottom: 6px;">Your Household Join Code</div>
+                <div style="font-size: 26px; font-weight: 800; letter-spacing: 3px; color: {brand_teal}; font-family: 'Courier New', monospace;">{invite_code}</div>
+              </td>
+            </tr>
+          </table>
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 28px 0 20px 0;">
+            <tr>
+              <td align="center">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" style="border-radius: 8px; background-color: {brand_teal}; background: linear-gradient(135deg, {brand_teal} 0%, #00b4d8 100%);">
+                      <a href="{invite_link}" target="_blank" rel="noopener noreferrer" style="font-size: 15px; font-weight: 800; color: #0a1b18; text-decoration: none; padding: 14px 34px; border-radius: 8px; display: inline-block; letter-spacing: 0.3px; box-shadow: 0 4px 14px rgba(0, 229, 201, 0.35);">
+                        Accept Invitation & Join
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+          <div style="background: #0a0d13; border: 1px solid #1a2330; border-radius: 8px; padding: 12px 16px; margin-top: 20px;">
+            <div style="font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Or copy and paste this link in your browser:</div>
+            <a href="{invite_link}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; color: {brand_teal}; word-break: break-all; text-decoration: underline;">{invite_link}</a>
           </div>
-          <div style="text-align: center; margin-bottom: 24px;">
-            <a href="{invite_link}" style="display: inline-block; background: linear-gradient(135deg, #00d2ff 0%, #0070f3 100%); color: #ffffff; font-weight: 700; font-size: 15px; text-decoration: none; padding: 14px 32px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,210,255,0.3);">
-              Accept Invitation & Join
-            </a>
-          </div>
-          <p style="font-size: 13px; line-height: 1.5; color: #64748b; margin-bottom: 0;">
-            Or navigate to the link below:<br>
-            <a href="{invite_link}" style="color: {brand_blue}; word-break: break-all;">{invite_link}</a>
-          </p>
         """
         return subject, base_header + content + base_footer
 
@@ -85,31 +161,31 @@ def render_template(template_type, data):
 
         subject = f"⚠️ Alert: PowerForecast Monthly Budget Threshold Reached ({percent_consumed})"
         content = f"""
-          <div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px;">
-            <strong style="color: #ef4444; font-size: 14px;">ENERGY BUDGET THRESHOLD WARNING</strong>
+          <div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
+            <strong style="color: #ef4444; font-size: 13px; letter-spacing: 0.5px;">ENERGY BUDGET THRESHOLD WARNING</strong>
           </div>
-          <h2 style="font-size: 22px; font-weight: 700; color: #ffffff; margin-top: 0; margin-bottom: 12px;">Hello {user_name},</h2>
+          <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin-top: 0; margin-bottom: 12px; letter-spacing: -0.3px;">
+            Hello {user_name},
+          </h1>
           <p style="font-size: 15px; line-height: 1.6; color: {text_muted}; margin-bottom: 20px;">
             Your household electricity consumption has reached <strong style="color: #f87171;">{percent_consumed}</strong> of your monthly target.
           </p>
-          <div style="background: #1a2332; border-radius: 8px; padding: 18px; margin-bottom: 24px;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-              <tr>
-                <td style="color: #94a3b8; padding: 6px 0;">Current Accumulated Usage:</td>
-                <td style="color: #ffffff; font-weight: 700; text-align: right;">{current_kwh} kWh</td>
-              </tr>
-              <tr>
-                <td style="color: #94a3b8; padding: 6px 0;">Monthly Target Budget:</td>
-                <td style="color: #ffffff; font-weight: 700; text-align: right;">{budget_limit_kwh} kWh</td>
-              </tr>
-              <tr style="border-top: 1px solid #2d3748;">
-                <td style="color: #94a3b8; padding: 8px 0 2px 0;">Projected End-of-Month Bill:</td>
-                <td style="color: {brand_blue}; font-weight: 800; font-size: 16px; text-align: right; padding-top: 8px;">{projected_bill}</td>
-              </tr>
-            </table>
-          </div>
-          <p style="font-size: 14px; line-height: 1.6; color: {text_muted}; margin-bottom: 20px;">
-            💡 <strong>Smart Tip:</strong> Shifting major inductive loads (air conditioner, washing machine, water heater) away from peak hours (1:00 PM – 4:00 PM) can reduce excess generation charges.
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0; background: #0e131b; border: 1px solid #1f2937; border-radius: 10px; overflow: hidden;">
+            <tr>
+              <td style="padding: 12px 18px; font-size: 14px; color: #94a3b8;">Current Accumulated Usage:</td>
+              <td style="padding: 12px 18px; font-size: 14px; font-weight: 700; text-align: right; color: #ffffff;">{current_kwh} kWh</td>
+            </tr>
+            <tr style="border-top: 1px solid #1f2937;">
+              <td style="padding: 12px 18px; font-size: 14px; color: #94a3b8;">Monthly Target Budget:</td>
+              <td style="padding: 12px 18px; font-size: 14px; font-weight: 700; text-align: right; color: #ffffff;">{budget_limit_kwh} kWh</td>
+            </tr>
+            <tr style="border-top: 1px solid #1f2937;">
+              <td style="padding: 12px 18px; font-size: 14px; color: #94a3b8;">Projected End-of-Month Bill:</td>
+              <td style="padding: 12px 18px; font-size: 16px; font-weight: 800; text-align: right; color: {brand_teal};">{projected_bill}</td>
+            </tr>
+          </table>
+          <p style="font-size: 14px; line-height: 1.6; color: {text_muted}; margin-bottom: 0;">
+            💡 <strong>Smart Tip:</strong> Shifting major inductive loads (air conditioning, washing machine, electric stove) away from peak hours can curb higher tier electricity rates.
           </p>
         """
         return subject, base_header + content + base_footer
@@ -121,15 +197,17 @@ def render_template(template_type, data):
 
         subject = f"⚡ Critical Surge Alert: {current_watts}W Wattage Spike Detected"
         content = f"""
-          <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px;">
-            <strong style="color: #fbbf24; font-size: 14px;">HIGH CONCURRENT POWER SURGE</strong>
+          <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
+            <strong style="color: #fbbf24; font-size: 13px; letter-spacing: 0.5px;">HIGH CONCURRENT POWER SURGE</strong>
           </div>
-          <h2 style="font-size: 22px; font-weight: 700; color: #ffffff; margin-top: 0; margin-bottom: 12px;">Active Load Warning</h2>
+          <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin-top: 0; margin-bottom: 12px; letter-spacing: -0.3px;">
+            Active Load Warning
+          </h1>
           <p style="font-size: 15px; line-height: 1.6; color: {text_muted}; margin-bottom: 20px;">
-            Your active telemetry monitor registered concurrent appliance wattage of <strong style="color: #fbbf24;">{current_watts} Watts</strong> at {timestamp}, exceeding your safety threshold of {threshold_watts} Watts.
+            Your active telemetry monitor registered concurrent appliance wattage of <strong style="color: #fbbf24;">{current_watts} Watts</strong> at {timestamp}, exceeding your threshold limit of {threshold_watts} Watts.
           </p>
-          <div style="background: #1a2332; border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 14px; color: #e2e8f0;">
-            Please check high-draw equipment such as induction stoves, multiple air conditioning units, or electric ovens running simultaneously.
+          <div style="background: #0e131b; border: 1px solid #1f2937; border-radius: 8px; padding: 16px; font-size: 14px; color: #e2e8f0; line-height: 1.6;">
+            Please check active high-draw equipment such as air conditioning units, induction cooktops, or electric water heaters running simultaneously.
           </div>
         """
         return subject, base_header + content + base_footer
@@ -141,25 +219,38 @@ def render_template(template_type, data):
 
         subject = "⚡ PowerForecast SMTP & Resend Delivery Test Successful"
         content = f"""
-          <div style="background: rgba(34, 197, 94, 0.12); border-left: 4px solid #22c55e; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px;">
-            <strong style="color: #22c55e; font-size: 14px;">✓ SMTP DELIVERY TEST PASSED</strong>
+          <div style="background: rgba(34, 197, 94, 0.12); border-left: 4px solid #22c55e; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
+            <strong style="color: #22c55e; font-size: 13px; letter-spacing: 0.5px;">✓ SMTP DELIVERY TEST PASSED</strong>
           </div>
-          <h2 style="font-size: 22px; font-weight: 700; color: #ffffff; margin-top: 0; margin-bottom: 12px;">Connection Verified!</h2>
+          <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin-top: 0; margin-bottom: 12px; letter-spacing: -0.3px;">
+            Connection Verified!
+          </h1>
           <p style="font-size: 15px; line-height: 1.6; color: {text_muted}; margin-bottom: 20px;">
-            This test email confirms that your <strong>PowerForecast Resend Delivery Engine</strong> and <strong>SMTP configurations</strong> are operational and ready for production dispatch.
+            This test email confirms that your <strong>PowerForecast Resend Delivery Engine</strong> and <strong>Custom Domain SMTP</strong> (<code style="color: {brand_teal};">noreply@comugallery.me</code>) are operational and delivering worldwide.
           </p>
-          <div style="background: #1a2332; border-radius: 8px; padding: 18px; margin-bottom: 24px; font-size: 13px;">
-            <div style="margin-bottom: 6px;"><strong style="color: #94a3b8;">Target Recipient:</strong> <span style="color: #ffffff;">{recipient}</span></div>
-            <div style="margin-bottom: 6px;"><strong style="color: #94a3b8;">Dispatched At:</strong> <span style="color: #ffffff;">{timestamp}</span></div>
-            <div><strong style="color: #94a3b8;">Diagnostics Note:</strong> <span style="color: {brand_blue};">{note}</span></div>
-          </div>
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0; background: #0e131b; border: 1px solid #1f2937; border-radius: 10px; overflow: hidden;">
+            <tr>
+              <td style="padding: 12px 18px; font-size: 14px; color: #94a3b8;">Target Recipient:</td>
+              <td style="padding: 12px 18px; font-size: 14px; font-weight: 700; text-align: right; color: #ffffff;">{recipient}</td>
+            </tr>
+            <tr style="border-top: 1px solid #1f2937;">
+              <td style="padding: 12px 18px; font-size: 14px; color: #94a3b8;">Dispatched At:</td>
+              <td style="padding: 12px 18px; font-size: 14px; font-weight: 700; text-align: right; color: #ffffff;">{timestamp}</td>
+            </tr>
+            <tr style="border-top: 1px solid #1f2937;">
+              <td style="padding: 12px 18px; font-size: 14px; color: #94a3b8;">Diagnostics Note:</td>
+              <td style="padding: 12px 18px; font-size: 14px; font-weight: 700; text-align: right; color: {brand_teal};">{note}</td>
+            </tr>
+          </table>
         """
         return subject, base_header + content + base_footer
 
     # Default fallback
     subject = data.get('subject', 'PowerForecast Notification')
     content = f"""
-      <h2 style="font-size: 20px; font-weight: 700; color: #ffffff; margin-top: 0; margin-bottom: 12px;">{subject}</h2>
+      <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin-top: 0; margin-bottom: 12px; letter-spacing: -0.3px;">
+        {subject}
+      </h1>
       <div style="font-size: 15px; line-height: 1.6; color: {text_muted};">
         {data.get('content', 'Notification from PowerForecast.')}
       </div>
