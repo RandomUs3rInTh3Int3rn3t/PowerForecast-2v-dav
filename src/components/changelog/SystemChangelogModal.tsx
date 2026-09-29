@@ -41,6 +41,16 @@ export interface SystemChangelogEntry {
 // Master compiled GitHub deployment history covering all releases
 const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.4v",
+    version: "3.4.4v",
+    git_commit_tag: "3.4.4v",
+    created_at: "2026-09-29T22:45:00.000Z",
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.4v - Fix Auth Session Missing: Automatically extract and initialize Supabase session from recovery tokens across single and double-hash URLs in HashRouter",
+  },
+  {
     id: "3.4.3v",
     version: "3.4.3v",
     git_commit_tag: "3.4.3v",

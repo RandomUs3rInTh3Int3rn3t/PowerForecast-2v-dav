@@ -28,7 +28,7 @@ import {
   MarkEmailRead as EmailSentIcon,
   Shield as ShieldIcon,
 } from "@mui/icons-material";
-import { supabaseClient } from "../lib/supabaseClient";
+import { supabaseClient, initializeUrlAuthSession } from "../lib/supabaseClient";
 import { useColorMode } from "../theme/AppTheme";
 import { devLog } from "../lib/devLogger";
 
@@ -55,21 +55,52 @@ export const ForgotPasswordPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Check URL query parameters or Supabase PASSWORD_RECOVERY event
+  // Check URL query parameters, double-hash recovery tokens, or Supabase PASSWORD_RECOVERY event
   useEffect(() => {
-    if (searchParams.get("mode") === "update" || window.location.hash.includes("type=recovery")) {
-      devLog.info("Auth", "Password recovery link detected. Switching to password update step.");
-      setStep("update_new");
-    }
+    let isMounted = true;
 
-    const { data: authListener } = supabaseClient.auth.onAuthStateChange(async (event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        devLog.info("Auth", "Supabase PASSWORD_RECOVERY event received.");
+    const syncAuthSession = async () => {
+      const urlHasTokens =
+        window.location.href.includes("access_token=") ||
+        window.location.href.includes("code=") ||
+        window.location.href.includes("type=recovery") ||
+        searchParams.get("mode") === "update" ||
+        window.location.hash.includes("mode=update");
+
+      if (urlHasTokens) {
+        devLog.info("Auth", "Password recovery token or update mode detected in URL. Initializing session...");
+        setIsLoading(true);
+        const { hasSession } = await initializeUrlAuthSession();
+        if (!isMounted) return;
+        setIsLoading(false);
+
+        if (hasSession) {
+          devLog.info("Auth", "Supabase recovery session successfully validated.");
+          setStep("update_new");
+          setErrorMessage(null);
+        } else if (searchParams.get("mode") === "update" || window.location.hash.includes("mode=update")) {
+          setStep("update_new");
+        }
+      }
+    };
+
+    syncAuthSession();
+
+    const { data: authListener } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      devLog.info("Auth", `onAuthStateChange event: ${event}`, { hasSession: Boolean(session) });
+      if (
+        event === "PASSWORD_RECOVERY" ||
+        (event === "SIGNED_IN" && (searchParams.get("mode") === "update" || window.location.hash.includes("mode=update")))
+      ) {
+        devLog.info("Auth", "Supabase PASSWORD_RECOVERY or signed-in event received.");
         setStep("update_new");
+        setErrorMessage(null);
       }
     });
 
     return () => {
+      isMounted = false;
       authListener.subscription.unsubscribe();
     };
   }, [searchParams]);
@@ -238,6 +269,25 @@ export const ForgotPasswordPage: React.FC = () => {
 
     setIsLoading(true);
     try {
+      devLog.info("Auth", "Verifying active Supabase session before password update...");
+      let { data: sessionData } = await supabaseClient.auth.getSession();
+
+      // If session is missing in memory/storage, attempt recovery from URL tokens
+      if (!sessionData?.session) {
+        devLog.warn("Auth", "No active session in memory, attempting to restore from URL tokens...");
+        const recoveryResult = await initializeUrlAuthSession();
+        if (recoveryResult.hasSession) {
+          const refreshed = await supabaseClient.auth.getSession();
+          sessionData = refreshed.data;
+        }
+      }
+
+      if (!sessionData?.session) {
+        throw new Error(
+          "Your password reset link is invalid or has expired. Please click the reset link in your email again or request a new one."
+        );
+      }
+
       devLog.info("Auth", "Updating user password via Supabase recovery session...");
       const { error } = await supabaseClient.auth.updateUser({
         password: newPassword.trim(),
@@ -251,7 +301,14 @@ export const ForgotPasswordPage: React.FC = () => {
       setStep("success");
     } catch (err: any) {
       devLog.error("Auth", "Failed to update password via email token:", err);
-      setErrorMessage(err?.message || "Failed to update password. The reset link may have expired.");
+      const rawMsg = err?.message || "";
+      if (rawMsg.toLowerCase().includes("auth session missing") || rawMsg.toLowerCase().includes("session")) {
+        setErrorMessage(
+          "Your password reset session has expired or is invalid. Please request a new password reset email below."
+        );
+      } else {
+        setErrorMessage(rawMsg || "Failed to update password. The reset link may have expired.");
+      }
     } finally {
       setIsLoading(false);
     }
