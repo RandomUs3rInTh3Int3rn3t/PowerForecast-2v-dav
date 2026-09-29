@@ -41,6 +41,16 @@ export interface SystemChangelogEntry {
 // Master compiled GitHub deployment history covering all releases
 const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.2v",
+    version: "3.4.2v",
+    git_commit_tag: "3.4.2v",
+    created_at: "2026-09-29T21:50:00.000Z",
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.2v - Production Custom Domain SMTP: Connect verified comugallery.me domain to Resend & Supabase Auth, lifting sandbox restrictions for worldwide recipient delivery and smart energy alerts",
+  },
+  {
     id: "3.4.0 - BETAv",
     version: "3.4.0 - BETAv",
     git_commit_tag: "3.4.0-BETAv",
