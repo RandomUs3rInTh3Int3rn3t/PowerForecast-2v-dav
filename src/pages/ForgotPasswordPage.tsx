@@ -10,14 +10,10 @@ import InputAdornment from "@mui/material/InputAdornment";
 import Alert from "@mui/material/Alert";
 import Tooltip from "@mui/material/Tooltip";
 import IconButton from "@mui/material/IconButton";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
 import CircularProgress from "@mui/material/CircularProgress";
 import {
   Email as EmailIcon,
   Lock as LockIcon,
-  HelpOutlined as QuestionIcon,
-  Key as KeyIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   ArrowBack as ArrowBackIcon,
@@ -38,19 +34,13 @@ export const ForgotPasswordPage: React.FC = () => {
   const { mode, toggleColorMode } = useColorMode();
   const isDark = mode === "dark";
 
-  // Recovery modes: 'email' (Supabase SMTP via Resend) vs 'question' (Security Challenge)
-  const [recoveryMethod, setRecoveryMethod] = useState<"email" | "question">("email");
-
-  // Step states: 'input' | 'email_sent' | 'question' | 'update_new' | 'success'
-  const [step, setStep] = useState<"input" | "email_sent" | "question" | "update_new" | "success">("input");
+  // Step states: 'input' | 'email_sent' | 'update_new' | 'success'
+  const [step, setStep] = useState<"input" | "email_sent" | "update_new" | "success">("input");
   const [email, setEmail] = useState("");
-  const [securityQuestion, setSecurityQuestion] = useState("");
-  const [securityAnswer, setSecurityAnswer] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showSecurityAnswer, setShowSecurityAnswer] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -145,103 +135,7 @@ export const ForgotPasswordPage: React.FC = () => {
       setResendCooldown(60);
     } catch (err: any) {
       devLog.error("Auth", "Failed to dispatch reset email:", err);
-      setErrorMessage(err?.message || "Failed to send password reset email. Please try again or use the Security Question option.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ── Step 1B: Retrieve Security Question ──
-  const handleFindAccountForQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail) {
-      setErrorMessage("Please enter your registered email address.");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
-      setErrorMessage("Please enter a valid email address (e.g. name@domain.com).");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      devLog.info("Auth", `Querying security challenge for ${trimmedEmail}`);
-      const { data, error } = await supabaseClient.rpc("get_security_question", {
-        p_email: trimmedEmail,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data || data.success === false) {
-        setErrorMessage(data?.error || "No security challenge configured for this account. Try the Email Reset Link option.");
-        return;
-      }
-
-      setSecurityQuestion(data.question);
-      setStep("question");
-    } catch (err: any) {
-      devLog.error("Auth", "Failed to retrieve security question:", err);
-      setErrorMessage(err?.message || "Failed to locate account. Please verify your email address.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ── Step 2A: Answer Security Question & Reset Password ──
-  const handleResetWithQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    if (!securityAnswer.trim()) {
-      setErrorMessage("Please answer the security question.");
-      return;
-    }
-
-    if (!newPassword.trim() || !confirmPassword.trim()) {
-      setErrorMessage("Please enter and confirm your new password.");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setErrorMessage("Passwords do not match. Please verify and try again.");
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setErrorMessage("Password must be at least 6 characters long.");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      devLog.info("Auth", `Verifying security answer and resetting password for ${email.trim()}`);
-      const { data, error } = await supabaseClient.rpc("reset_password_with_security_answer", {
-        p_email: email.trim().toLowerCase(),
-        p_answer: securityAnswer.trim(),
-        p_new_password: newPassword.trim(),
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data || data.success === false) {
-        setErrorMessage(data?.error || "Failed to reset password. Please check your answer.");
-        return;
-      }
-
-      devLog.info("Auth", `Password successfully reset for ${email.trim()}`);
-      setStep("success");
-    } catch (err: any) {
-      devLog.error("Auth", "Password reset failed:", err);
-      setErrorMessage(err?.message || "Failed to update password. Please try again.");
+      setErrorMessage(err?.message || "Failed to send password reset email. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -427,9 +321,8 @@ export const ForgotPasswordPage: React.FC = () => {
                 : "Reset Your Password"}
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-              {step === "input" && (recoveryMethod === "email" ? "We'll send a secure password reset link via Resend SMTP" : "Answer your registered security question to reset password")}
+              {step === "input" && "We'll send a secure password reset link to your email via Resend SMTP"}
               {step === "email_sent" && "A reset link has been dispatched to your email address"}
-              {step === "question" && "Answer your registered security question to set a new password"}
               {step === "update_new" && "Enter and confirm your new account password"}
               {step === "success" && "Your account password has been safely updated"}
             </Typography>
@@ -441,112 +334,39 @@ export const ForgotPasswordPage: React.FC = () => {
             </Alert>
           )}
 
-          {/* STEP: INPUT - Choose Method */}
+          {/* STEP: INPUT */}
           {step === "input" && (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-              <Tabs
-                value={recoveryMethod}
-                onChange={(_, val) => {
-                  setRecoveryMethod(val);
-                  setErrorMessage(null);
-                }}
-                variant="fullWidth"
-                sx={{
-                  mb: 1,
-                  bgcolor: isDark ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.03)",
-                  borderRadius: 1.5,
-                  p: 0.5,
-                  "& .MuiTab-root": {
-                    borderRadius: 1,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    fontSize: "0.875rem",
-                    minHeight: 40,
+            <Box component="form" onSubmit={handleSendResetEmail} sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+              <TextField
+                label="Registered Email Address"
+                type="email"
+                required
+                fullWidth
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="user@powerforecast.ph"
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <EmailIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                      </InputAdornment>
+                    ),
                   },
                 }}
+              />
+
+              <Button
+                type="submit"
+                variant="contained"
+                fullWidth
+                size="large"
+                disabled={isLoading}
+                startIcon={isLoading ? <CircularProgress size={18} color="inherit" /> : <SendIcon />}
+                sx={{ py: 1.25, borderRadius: 1.5, fontWeight: 800 }}
               >
-                <Tab
-                  value="email"
-                  label="Email Link (Resend SMTP)"
-                  icon={<EmailIcon fontSize="small" />}
-                  iconPosition="start"
-                />
-                <Tab
-                  value="question"
-                  label="Security Question"
-                  icon={<QuestionIcon fontSize="small" />}
-                  iconPosition="start"
-                />
-              </Tabs>
-
-              {/* Email Reset Form */}
-              {recoveryMethod === "email" ? (
-                <Box component="form" onSubmit={handleSendResetEmail} sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-                  <TextField
-                    label="Registered Email Address"
-                    type="email"
-                    required
-                    fullWidth
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="user@powerforecast.ph"
-                    slotProps={{
-                      input: {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <EmailIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                  />
-
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    disabled={isLoading}
-                    startIcon={isLoading ? <CircularProgress size={18} color="inherit" /> : <SendIcon />}
-                    sx={{ py: 1.25, borderRadius: 1.5, fontWeight: 800 }}
-                  >
-                    {isLoading ? "Dispatching Reset Link..." : "Send Reset Link via Email"}
-                  </Button>
-                </Box>
-              ) : (
-                /* Security Question Lookup Form */
-                <Box component="form" onSubmit={handleFindAccountForQuestion} sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-                  <TextField
-                    label="Registered Email Address"
-                    type="email"
-                    required
-                    fullWidth
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="user@powerforecast.ph"
-                    slotProps={{
-                      input: {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <EmailIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                  />
-
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    disabled={isLoading}
-                    sx={{ py: 1.25, borderRadius: 1.5, fontWeight: 800 }}
-                  >
-                    {isLoading ? "Searching Account..." : "Continue to Security Question"}
-                  </Button>
-                </Box>
-              )}
+                {isLoading ? "Dispatching Reset Link..." : "Send Reset Link via Email"}
+              </Button>
 
               <Box sx={{ textAlign: "center", mt: 1 }}>
                 <Typography
@@ -578,7 +398,7 @@ export const ForgotPasswordPage: React.FC = () => {
               </Alert>
 
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Didn't receive the email? Wait for the timer to resend, or try using your security challenge.
+                Didn't receive the email? Check your spam folder or click below to resend.
               </Typography>
 
               <Box sx={{ display: "flex", gap: 1.5, width: "100%", mt: 1 }}>
@@ -591,17 +411,6 @@ export const ForgotPasswordPage: React.FC = () => {
                 >
                   {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : "Resend Email"}
                 </Button>
-                <Button
-                  variant="text"
-                  fullWidth
-                  onClick={() => {
-                    setRecoveryMethod("question");
-                    setStep("input");
-                  }}
-                  sx={{ py: 1, borderRadius: 1.5, fontWeight: 700 }}
-                >
-                  Use Security Question
-                </Button>
               </Box>
 
               <Box sx={{ mt: 2 }}>
@@ -612,141 +421,6 @@ export const ForgotPasswordPage: React.FC = () => {
             </Box>
           )}
 
-          {/* STEP: ANSWER QUESTION */}
-          {step === "question" && (
-            <Box component="form" onSubmit={handleResetWithQuestion} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 1.25,
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.08)" : "rgba(0, 158, 136, 0.06)",
-                  border: "1px solid",
-                  borderColor: (theme) =>
-                    theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(0, 158, 136, 0.2)",
-                }}
-              >
-                <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 800, textTransform: "uppercase" }}>
-                  Registered Security Question
-                </Typography>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 0.5 }}>
-                  {securityQuestion}
-                </Typography>
-              </Box>
-
-              <TextField
-                label="Security Answer"
-                type={showSecurityAnswer ? "text" : "password"}
-                required
-                fullWidth
-                value={securityAnswer}
-                onChange={(e) => setSecurityAnswer(e.target.value)}
-                placeholder="Enter your security answer"
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <KeyIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          size="small"
-                          onClick={() => setShowSecurityAnswer(!showSecurityAnswer)}
-                          edge="end"
-                        >
-                          {showSecurityAnswer ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-
-              <TextField
-                label="New Password"
-                type={showNewPassword ? "text" : "password"}
-                required
-                fullWidth
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          size="small"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          edge="end"
-                        >
-                          {showNewPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-
-              <TextField
-                label="Confirm New Password"
-                type={showConfirmPassword ? "text" : "password"}
-                required
-                fullWidth
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                error={!passwordsMatch}
-                helperText={!passwordsMatch ? "Passwords do not match" : ""}
-                placeholder="••••••••"
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          size="small"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          edge="end"
-                        >
-                          {showConfirmPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
-                disabled={isLoading || !passwordsMatch}
-                sx={{ py: 1.25, borderRadius: 1.5, fontWeight: 800, mt: 0.5 }}
-              >
-                {isLoading ? "Updating Password..." : "Confirm & Reset Password"}
-              </Button>
-
-              <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}>
-                <Button size="small" onClick={() => setStep("input")} startIcon={<ArrowBackIcon />}>
-                  Back
-                </Button>
-                <Button component={Link} to="/login" size="small">
-                  Back to Sign In
-                </Button>
-              </Box>
-            </Box>
-          )}
 
           {/* STEP: UPDATE NEW PASSWORD (FROM EMAIL RECOVERY TOKEN) */}
           {step === "update_new" && (

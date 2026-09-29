@@ -7,7 +7,6 @@ import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
-import MenuItem from "@mui/material/MenuItem";
 import InputAdornment from "@mui/material/InputAdornment";
 import IconButton from "@mui/material/IconButton";
 import Alert from "@mui/material/Alert";
@@ -16,8 +15,6 @@ import {
   Person as PersonIcon,
   Email as EmailIcon,
   Lock as LockIcon,
-  HelpOutlined as QuestionIcon,
-  Key as KeyIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   LightMode as SunIcon,
@@ -25,14 +22,6 @@ import {
 } from "@mui/icons-material";
 import { useColorMode } from "../theme/AppTheme";
 import { useToast } from "../components/common/ToastProvider";
-
-const SECURITY_QUESTION_PRESETS = [
-  "What is your primary household electricity meter number?",
-  "What is the name of your first pet?",
-  "What city were you born in?",
-  "What was the brand of your first major electrical appliance?",
-  "What is your favorite childhood street name?",
-];
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
@@ -45,11 +34,8 @@ export const SignupPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [securityQuestion, setSecurityQuestion] = useState(SECURITY_QUESTION_PRESETS[0]);
-  const [securityAnswer, setSecurityAnswer] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showSecurityAnswer, setShowSecurityAnswer] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -60,7 +46,6 @@ export const SignupPage: React.FC = () => {
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
     const trimmedConfirmPassword = confirmPassword.trim();
-    const trimmedAnswer = securityAnswer.trim();
 
     if (!trimmedName) {
       const msg = "Please enter your full name.";
@@ -114,27 +99,11 @@ export const SignupPage: React.FC = () => {
       return;
     }
 
-    if (!trimmedAnswer) {
-      const msg = "Please provide an answer for the security question.";
-      setErrorMessage(msg);
-      showError(msg);
-      return;
-    }
-
-    if (trimmedAnswer.toLowerCase() === trimmedEmail) {
-      const msg = "Security answer cannot be your email address.";
-      setErrorMessage(msg);
-      showError(msg);
-      return;
-    }
-
     register(
       {
         name: trimmedName,
         email: trimmedEmail,
         password: trimmedPassword,
-        securityQuestion,
-        securityAnswer: trimmedAnswer,
       },
       {
         onSuccess: (data: any) => {
@@ -430,60 +399,6 @@ export const SignupPage: React.FC = () => {
                         edge="end"
                       >
                         {showConfirmPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-
-            <TextField
-              select
-              label="Security Question (for Password Recovery)"
-              required
-              fullWidth
-              value={securityQuestion}
-              onChange={(e) => setSecurityQuestion(e.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <QuestionIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            >
-              {SECURITY_QUESTION_PRESETS.map((q) => (
-                <MenuItem key={q} value={q}>
-                  {q}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
-              label="Security Answer"
-              type={showSecurityAnswer ? "text" : "password"}
-              required
-              fullWidth
-              value={securityAnswer}
-              onChange={(e) => setSecurityAnswer(e.target.value)}
-              placeholder="Enter your security answer"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <KeyIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setShowSecurityAnswer(!showSecurityAnswer)}
-                        edge="end"
-                      >
-                        {showSecurityAnswer ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
                   ),

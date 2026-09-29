@@ -48,8 +48,6 @@ import {
   Security as SecurityIcon,
   Lock as LockIcon,
   Key as KeyIcon,
-  VpnKey as VpnKeyIcon,
-  HelpOutlined as QuestionIcon,
   Save as SaveIcon,
   Bolt as BoltIcon,
   Shield as ShieldIcon,
@@ -93,13 +91,6 @@ interface HouseholdMember {
   joinedAt: string;
 }
 
-const SECURITY_QUESTION_PRESETS = [
-  "What is your primary household electricity meter number?",
-  "What is the name of your first pet?",
-  "What city were you born in?",
-  "What was the brand of your first major electrical appliance?",
-  "What is your favorite childhood street name?",
-];
 
 export const SettingsView: React.FC = () => {
   const { data: identity } = useGetIdentity<any>();
@@ -118,28 +109,6 @@ export const SettingsView: React.FC = () => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
-  // ── 2. Security Recovery Challenge State ──────────────────
-  const [secQuestion, setSecQuestion] = useState(SECURITY_QUESTION_PRESETS[0]);
-  const [secAnswer, setSecAnswer] = useState("");
-  const [secVerifyPassword, setSecVerifyPassword] = useState("");
-  const [showSecAnswer, setShowSecAnswer] = useState(false);
-  const [showSecVerifyPassword, setShowSecVerifyPassword] = useState(false);
-  const [isUpdatingSec, setIsUpdatingSec] = useState(false);
-  const [secError, setSecError] = useState("");
-
-  useEffect(() => {
-    const fetchCurrentSecQuestion = async () => {
-      try {
-        const { data: userData } = await supabaseClient.auth.getUser();
-        if (userData?.user?.user_metadata?.security_question) {
-          setSecQuestion(userData.user.user_metadata.security_question);
-        }
-      } catch (e) {
-        devLog.warn("Settings", "Could not preload security question:", e);
-      }
-    };
-    fetchCurrentSecQuestion();
-  }, []);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,91 +192,6 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleUpdateSecurityQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSecError("");
-
-    const trimmedAnswer = secAnswer.trim();
-    const trimmedVerifyPassword = secVerifyPassword.trim();
-
-    if (!trimmedAnswer) {
-      setSecError(
-        language === "tl"
-          ? "Pakilagay ang iyong sagot sa security question."
-          : "Please provide an answer for the security question."
-      );
-      return;
-    }
-
-    if (!trimmedVerifyPassword) {
-      setSecError(
-        language === "tl"
-          ? "Pakilagay ang password ng iyong account upang makumpirma ang pagbabago."
-          : "Please enter your account password to authorize this security update."
-      );
-      return;
-    }
-
-    setIsUpdatingSec(true);
-    try {
-      const userEmail = identity?.email;
-      if (!userEmail) throw new Error("Could not detect active user email.");
-
-      // 1. Authenticate password
-      const { error: authErr } = await supabaseClient.auth.signInWithPassword({
-        email: userEmail,
-        password: trimmedVerifyPassword,
-      });
-
-      if (authErr) {
-        setSecError(
-          language === "tl"
-            ? "Maling password ng account. Hindi ma-update ang security question."
-            : "Incorrect account password. Security question update was not authorized."
-        );
-        setIsUpdatingSec(false);
-        return;
-      }
-
-      // 2. Update user metadata in Supabase
-      const { error: updateErr } = await supabaseClient.auth.updateUser({
-        data: {
-          security_question: secQuestion,
-          security_answer: trimmedAnswer.toLowerCase(),
-        },
-      });
-
-      if (updateErr) {
-        throw updateErr;
-      }
-
-      // Sync local cache
-      try {
-        const secDir = JSON.parse(localStorage.getItem("powerforecast_sec_dir") || "{}");
-        secDir[userEmail.toLowerCase()] = {
-          question: secQuestion,
-          answer: trimmedAnswer.toLowerCase(),
-        };
-        localStorage.setItem("powerforecast_sec_dir", JSON.stringify(secDir));
-      } catch (e) {
-        devLog.warn("Settings", "Failed to cache security directory locally:", e);
-      }
-
-      showSuccess(
-        language === "tl"
-          ? "Na-update ang iyong security recovery question at sagot!"
-          : "Security recovery question & answer updated successfully!",
-        language === "tl" ? "Na-update ang Seguridad" : "Security Updated"
-      );
-
-      setSecAnswer("");
-      setSecVerifyPassword("");
-    } catch (err: any) {
-      setSecError(err?.message || "Failed to update security challenge.");
-    } finally {
-      setIsUpdatingSec(false);
-    }
-  };
 
   const passwordsMatch = !confirmNewPassword || newPassword === confirmNewPassword;
 
@@ -840,7 +724,7 @@ export const SettingsView: React.FC = () => {
         </Box>
       </Card>
 
-      {/* 3. Account Security & Credentials Section (Change Password & Security Question) - Placed Above Danger Zone */}
+      {/* 3. Account Security & Credentials Section (Change Password) - Placed Above Danger Zone */}
       <Card
         sx={{
           p: { xs: 2.5, sm: 3 },
@@ -858,22 +742,18 @@ export const SettingsView: React.FC = () => {
         </Box>
         <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2.5 }}>
           {language === "tl"
-            ? "I-update ang password ng iyong account at ang security challenge para sa mabilis na password recovery."
-            : "Update your master login password and your backup security challenge for password recovery."}
+            ? "I-update ang password ng iyong account upang mapanatiling ligtas ang iyong access."
+            : "Update your master login password to keep your account secure."}
         </Typography>
 
         <Grid container spacing={3}>
-          {/* Sub-form A: Change Password */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          {/* Change Password Form */}
+          <Grid size={{ xs: 12, md: 8, lg: 6 }}>
             <Paper
               variant="outlined"
               sx={{
                 p: 2.5,
                 borderRadius: 1.25,
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
                 bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.25)" : "rgba(248, 250, 252, 0.8)"),
               }}
             >
@@ -968,112 +848,6 @@ export const SettingsView: React.FC = () => {
                     {isChangingPassword
                       ? (language === "tl" ? "Ina-update..." : "Updating...")
                       : (language === "tl" ? "I-save ang Bagong Password" : "Update Password")}
-                  </Button>
-                </Box>
-              </Box>
-            </Paper>
-          </Grid>
-
-          {/* Sub-form B: Update Security Question & Answer */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2.5,
-                borderRadius: 1.25,
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.25)" : "rgba(248, 250, 252, 0.8)"),
-              }}
-            >
-              <Box component="form" onSubmit={handleUpdateSecurityQuestion}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-                  <QuestionIcon sx={{ fontSize: 18, color: "secondary.main" }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                    {language === "tl" ? "Security Recovery Challenge" : "Security Recovery Challenge"}
-                  </Typography>
-                </Box>
-
-                {secError && (
-                  <Alert severity="error" sx={{ mb: 2, borderRadius: 1, py: 0.5 }}>
-                    {secError}
-                  </Alert>
-                )}
-
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <TextField
-                    select
-                    size="small"
-                    fullWidth
-                    label={language === "tl" ? "Pumili ng Security Question" : "Select Security Question"}
-                    value={secQuestion}
-                    onChange={(e) => setSecQuestion(e.target.value)}
-                  >
-                    {SECURITY_QUESTION_PRESETS.map((q) => (
-                      <MenuItem key={q} value={q} sx={{ fontSize: "0.8125rem" }}>
-                        {q}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-
-                  <TextField
-                    type={showSecAnswer ? "text" : "password"}
-                    size="small"
-                    fullWidth
-                    label={language === "tl" ? "Bagong Sagot sa Security Question" : "New Security Answer"}
-                    value={secAnswer}
-                    onChange={(e) => setSecAnswer(e.target.value)}
-                    placeholder={language === "tl" ? "Ilagay ang iyong sagot..." : "Enter your security answer..."}
-                    required
-                    slotProps={{
-                      input: {
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton size="small" onClick={() => setShowSecAnswer(!showSecAnswer)}>
-                              {showSecAnswer ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                  />
-
-                  <TextField
-                    type={showSecVerifyPassword ? "text" : "password"}
-                    size="small"
-                    fullWidth
-                    label={language === "tl" ? "Kumpirmahin gamit ang Account Password" : "Confirm with Account Password"}
-                    value={secVerifyPassword}
-                    onChange={(e) => setSecVerifyPassword(e.target.value)}
-                    placeholder={language === "tl" ? "Password ng account..." : "Account password..."}
-                    required
-                    helperText={language === "tl" ? "Kailangan ang password upang ma-save ang security key" : "Password required to authorize updating recovery key"}
-                    slotProps={{
-                      input: {
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton size="small" onClick={() => setShowSecVerifyPassword(!showSecVerifyPassword)}>
-                              {showSecVerifyPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                  />
-
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="secondary"
-                    disabled={isUpdatingSec}
-                    startIcon={isUpdatingSec ? <CircularProgress size={16} color="inherit" /> : <VpnKeyIcon />}
-                    sx={{ mt: 1, fontWeight: 700, borderRadius: 1 }}
-                  >
-                    {isUpdatingSec
-                      ? (language === "tl" ? "Ina-update..." : "Updating...")
-                      : (language === "tl" ? "I-save ang Security Challenge" : "Save Security Challenge")}
                   </Button>
                 </Box>
               </Box>

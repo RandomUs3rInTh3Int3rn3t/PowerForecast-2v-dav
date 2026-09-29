@@ -41,6 +41,16 @@ export interface SystemChangelogEntry {
 // Master compiled GitHub deployment history covering all releases
 const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.6v",
+    version: "3.4.6v",
+    git_commit_tag: "3.4.6v",
+    created_at: "2026-09-30T00:10:00.000Z",
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.6v - Streamline Auth & Recovery: Eliminate legacy security question challenges from forgot password, registration, and account settings in favor of direct Resend SMTP email resets",
+  },
+  {
     id: "3.4.5v",
     version: "3.4.5v",
     git_commit_tag: "3.4.5v",
