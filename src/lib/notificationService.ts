@@ -16,6 +16,8 @@ export interface NotificationPreferences {
   peakHourAlert: boolean;
   surgeAlert: boolean; // Alert on high concurrent wattage load
   surgeThresholdWatts: number; // 2500W (proactive), 2000W (strict)
+  emailAlertsEnabled: boolean; // Send critical alerts via Resend SMTP
+  alertEmailAddress?: string;
 }
 
 const PREF_STORAGE_KEY = "powerforecast_notification_preferences";
@@ -33,6 +35,7 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     peakHourAlert: false,
     surgeAlert: false,
     surgeThresholdWatts: 3000,
+    emailAlertsEnabled: false,
   },
   standard: {
     notificationLevel: "standard",
@@ -46,6 +49,7 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     peakHourAlert: true,
     surgeAlert: false,
     surgeThresholdWatts: 2500,
+    emailAlertsEnabled: false,
   },
   proactive: {
     notificationLevel: "proactive",
@@ -59,6 +63,7 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     peakHourAlert: true,
     surgeAlert: true,
     surgeThresholdWatts: 2500,
+    emailAlertsEnabled: true,
   },
   strict: {
     notificationLevel: "strict",
@@ -72,6 +77,7 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     peakHourAlert: true,
     surgeAlert: true,
     surgeThresholdWatts: 2000,
+    emailAlertsEnabled: true,
   },
 };
 
@@ -88,6 +94,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   peakHourAlert: true,
   surgeAlert: false,
   surgeThresholdWatts: 2500,
+  emailAlertsEnabled: false,
 };
 
 /**
@@ -141,13 +148,17 @@ export function getNotificationPreferences(): NotificationPreferences {
 /**
  * Saves updated notification preferences
  */
-export function saveNotificationPreferences(prefs: NotificationPreferences): void {
-  if (typeof window === "undefined") return;
+export function saveNotificationPreferences(prefs: Partial<NotificationPreferences>): NotificationPreferences {
+  if (typeof window === "undefined") return DEFAULT_NOTIFICATION_PREFERENCES;
   try {
-    localStorage.setItem(PREF_STORAGE_KEY, JSON.stringify(prefs));
-    devLog.info("Notifications", "Saved notification preferences", prefs);
+    const current = getNotificationPreferences();
+    const updated = { ...current, ...prefs };
+    localStorage.setItem(PREF_STORAGE_KEY, JSON.stringify(updated));
+    devLog.info("Notifications", "Saved notification preferences", updated);
+    return updated;
   } catch (err: any) {
     devLog.warn("Notifications", `Failed to save preferences: ${err?.message}`);
+    return getNotificationPreferences();
   }
 }
 

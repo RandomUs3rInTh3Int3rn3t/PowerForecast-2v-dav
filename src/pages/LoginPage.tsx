@@ -285,6 +285,17 @@ export const LoginPage: React.FC = () => {
                       >
                         Inspect Error
                       </Button>
+                      {errorMessage.toLowerCase().includes("not confirmed") && (
+                        <Button
+                          component={Link}
+                          to={`/verify-email?email=${encodeURIComponent(email.trim())}`}
+                          color="inherit"
+                          size="small"
+                          sx={{ fontWeight: 700, textDecoration: "underline", textTransform: "none" }}
+                        >
+                          Verify Email
+                        </Button>
+                      )}
                       {(errorMessage.toLowerCase().includes("no account found") ||
                         errorMessage.toLowerCase().includes("does not exist") ||
                         errorMessage.toLowerCase().includes("create an account") ||

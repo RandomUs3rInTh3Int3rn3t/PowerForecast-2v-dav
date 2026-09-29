@@ -28,13 +28,18 @@ export const authProvider: AuthProvider = {
           const { data: secData } = await supabaseClient.rpc("get_security_question", {
             p_email: email.trim().toLowerCase(),
           });
-          if (secData && secData.success === false && secData.error === "No account found with this email address.") {
+          if (error.message?.toLowerCase().includes("email not confirmed")) {
+            formattedMessage = "Your email address has not been confirmed yet. Please check your inbox or resend the verification email.";
+          } else if (secData && secData.success === false && secData.error === "No account found with this email address.") {
             formattedMessage = "No account found with this email address. Please create an account to get started.";
           } else if (error.message?.toLowerCase().includes("invalid login credentials")) {
             formattedMessage = "Incorrect password. Please verify your password or use password recovery.";
           }
         } catch {
           // Fall back to default error
+          if (error.message?.toLowerCase().includes("email not confirmed")) {
+            formattedMessage = "Your email address has not been confirmed yet. Please check your inbox or resend the verification email.";
+          }
         }
 
         return {
@@ -248,7 +253,18 @@ export const authProvider: AuthProvider = {
         }
       }
 
-      devLog.info("Auth", "User registered successfully. Proceeding to dashboard.");
+      // Check if email confirmation is required by Supabase Auth
+      const requiresEmailConfirmation = !userSession && Boolean(data?.user);
+
+      if (requiresEmailConfirmation) {
+        devLog.info("Auth", `Registration requires email verification for ${trimmedEmail}. Redirecting to /verify-email.`);
+        return {
+          success: true,
+          redirectTo: `/verify-email?email=${encodeURIComponent(trimmedEmail)}`,
+        } as any;
+      }
+
+      devLog.info("Auth", "User registered successfully with active session. Proceeding to dashboard.");
       return {
         success: true,
         redirectTo: "/dashboard",

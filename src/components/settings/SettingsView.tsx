@@ -28,6 +28,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import InputAdornment from "@mui/material/InputAdornment";
+import Switch from "@mui/material/Switch";
 import {
   Settings as SettingsIcon,
   Translate as LanguageIcon,
@@ -51,6 +52,11 @@ import {
   Chat as ChatIcon,
   OpenInNew as OpenInNewIcon,
   Verified as VerifiedIcon,
+  Email as EmailIcon,
+  Send as SendIcon,
+  MarkEmailRead as EmailReadIcon,
+  CheckCircle as CheckCircleIcon,
+  MarkEmailUnread as EmailUnreadIcon,
 } from "@mui/icons-material";
 import { useGetIdentity, useLogout } from "@refinedev/core";
 import { useToast } from "../common/ToastProvider";
@@ -58,6 +64,16 @@ import { supabaseClient } from "../../lib/supabaseClient";
 import { useLanguage, Language } from "../../context/LanguageContext";
 import { devLog } from "../../lib/devLogger";
 import { FeedbackModal, FB_PM_LINK } from "../feedback/FeedbackModal";
+import {
+  checkEmailDeliveryHealth,
+  sendSmtpTestEmail,
+  sendHouseholdInvitationEmail,
+  EmailHealthStatus,
+} from "../../lib/emailService";
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+} from "../../lib/notificationService";
 
 interface HouseholdMember {
   id: string;
@@ -331,16 +347,41 @@ export const SettingsView: React.FC = () => {
   const [inviteEmail, setInviteEmail] = useState("");
   const [generatedInvite, setGeneratedInvite] = useState<{ code: string; link: string } | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isSendingInviteEmail, setIsSendingInviteEmail] = useState(false);
+  const [inviteEmailSent, setInviteEmailSent] = useState(false);
+
+  // ── SMTP & Resend Delivery Engine State ──────────────────
+  const [emailHealth, setEmailHealth] = useState<EmailHealthStatus | null>(null);
+  const [testRecipientEmail, setTestRecipientEmail] = useState(identity?.email || "");
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isSmtpGuideOpen, setIsSmtpGuideOpen] = useState(false);
+
+  // Notification Email Alerts Preference
+  const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(() => {
+    return getNotificationPreferences().emailAlertsEnabled ?? false;
+  });
+
+  useEffect(() => {
+    checkEmailDeliveryHealth().then((status) => setEmailHealth(status));
+  }, []);
+
+  useEffect(() => {
+    if (identity?.email && !testRecipientEmail) {
+      setTestRecipientEmail(identity.email);
+    }
+  }, [identity]);
 
   const handleOpenInviteModal = () => {
     setInviteName("");
     setInviteEmail("");
     setGeneratedInvite(null);
     setCopiedLink(false);
+    setInviteEmailSent(false);
     setIsInviteModalOpen(true);
   };
 
-  const handleSendInvite = (e: React.FormEvent) => {
+  const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteName.trim() || !inviteEmail.trim()) {
       showError("Please provide both name and email address.");
@@ -363,9 +404,126 @@ export const SettingsView: React.FC = () => {
 
     setMembers((prev) => [...prev, newMember]);
     setGeneratedInvite({ code, link });
+
+    // Automatically dispatch email invitation via Resend
+    setIsSendingInviteEmail(true);
+    setInviteEmailSent(false);
+
+    try {
+      const emailRes = await sendHouseholdInvitationEmail({
+        toName: inviteName.trim(),
+        toEmail: inviteEmail.trim().toLowerCase(),
+        inviterName: identity?.name || "Household Owner",
+        inviteCode: code,
+        inviteLink: link,
+      });
+
+      if (emailRes.success) {
+        setInviteEmailSent(true);
+        showSuccess(
+          language === "tl"
+            ? `Napadala ang email invitation kay ${inviteEmail} via Resend SMTP!`
+            : `Invitation email sent directly to ${inviteEmail} via Resend!`,
+          language === "tl" ? "Napadala ang Email" : "Email Dispatched"
+        );
+      } else {
+        devLog.warn("Settings", "Email invite could not be sent:", emailRes.error);
+        showInfo(
+          language === "tl"
+            ? `Nagawa ang imbitasyon! Ibahagi ang link sa ibaba.`
+            : `Invitation generated! You can copy and share the link below.`
+        );
+      }
+    } catch (err: any) {
+      devLog.warn("Settings", "Failed to dispatch email invite:", err);
+    } finally {
+      setIsSendingInviteEmail(false);
+    }
+  };
+
+  const handleResendInviteEmail = async () => {
+    if (!generatedInvite || !inviteEmail.trim()) return;
+
+    setIsSendingInviteEmail(true);
+    try {
+      const emailRes = await sendHouseholdInvitationEmail({
+        toName: inviteName.trim(),
+        toEmail: inviteEmail.trim().toLowerCase(),
+        inviterName: identity?.name || "Household Owner",
+        inviteCode: generatedInvite.code,
+        inviteLink: generatedInvite.link,
+      });
+
+      if (emailRes.success) {
+        setInviteEmailSent(true);
+        showSuccess(
+          language === "tl" ? "Muling naipadala ang email!" : "Invitation email re-dispatched via Resend!",
+          "Resend Succeeded"
+        );
+      } else {
+        showError(emailRes.error || "Failed to resend invite email.");
+      }
+    } catch (err: any) {
+      showError(err?.message || "Failed to resend invite email.");
+    } finally {
+      setIsSendingInviteEmail(false);
+    }
+  };
+
+  const handleSendTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = testRecipientEmail.trim();
+    if (!trimmed) {
+      showError("Please enter a valid recipient email.");
+      return;
+    }
+
+    setIsSendingTestEmail(true);
+    setTestEmailResult(null);
+
+    try {
+      const res = await sendSmtpTestEmail({
+        toEmail: trimmed,
+        testNote: `Triggered by ${identity?.name || "Admin"} from PowerForecast Settings Diagnostics`,
+      });
+
+      if (res.success) {
+        setTestEmailResult({
+          success: true,
+          message: `✓ Test email dispatched to ${trimmed} via Resend (ID: ${res.id || "ok"}). Please check your inbox!`,
+        });
+        showSuccess(
+          language === "tl" ? "Napadala ang test email via Resend!" : "Test email successfully dispatched via Resend!",
+          "SMTP Delivery Succeeded"
+        );
+      } else {
+        setTestEmailResult({
+          success: false,
+          message: res.error || "Failed to deliver test email.",
+        });
+        showError(res.error || "Failed to deliver test email.", "Delivery Failed");
+      }
+    } catch (err: any) {
+      setTestEmailResult({
+        success: false,
+        message: err?.message || "An unexpected network error occurred.",
+      });
+      showError(err?.message || "Failed to send test email.");
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
+
+  const handleToggleEmailAlerts = (checked: boolean) => {
+    setEmailAlertsEnabled(checked);
+    saveNotificationPreferences({
+      emailAlertsEnabled: checked,
+      alertEmailAddress: identity?.email,
+    });
     showSuccess(
-      language === "tl" ? `Nagawa ang imbitasyon para kay ${inviteName}!` : `Invitation generated for ${inviteName}! You can now share the invite link.`,
-      language === "tl" ? "Imbitasyon Nagawa" : "Invite Created"
+      checked
+        ? (language === "tl" ? "Aktibo na ang email alerts para sa budget at surges!" : "Email alerts activated for budget milestones and power surges!")
+        : (language === "tl" ? "Nai-off ang email alerts." : "Email alerts disabled.")
     );
   };
 
@@ -913,7 +1071,168 @@ export const SettingsView: React.FC = () => {
         </Grid>
       </Card>
 
-      {/* 4. Developer Direct PM & Feedback Support Card */}
+      {/* 4. SMTP & Resend Email Delivery Engine Card */}
+      <Card
+        sx={{
+          p: { xs: 2.5, sm: 3 },
+          borderRadius: 1.5,
+          border: "1px solid",
+          borderColor: (theme) =>
+            theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.25)",
+          bgcolor: (theme) =>
+            theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.85)" : "#ffffff",
+        }}
+      >
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, mb: 2, flexWrap: "wrap", gap: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <EmailIcon sx={{ color: "primary.main" }} />
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "text.primary" }}>
+                {language === "tl" ? "SMTP & Resend Email Delivery Engine" : "SMTP & Resend Email Delivery Engine"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {language === "tl"
+                  ? "Pamahalaan ang live delivery diagnostics, Supabase custom SMTP integration, at smart alerts."
+                  : "Monitor live delivery diagnostics, Supabase custom SMTP integration, and automated alert notifications."}
+              </Typography>
+            </Box>
+          </Box>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<KeyIcon />}
+            onClick={() => setIsSmtpGuideOpen(true)}
+            sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem", textTransform: "none" }}
+          >
+            {language === "tl" ? "Supabase SMTP Guide" : "Supabase SMTP Setup Guide"}
+          </Button>
+        </Box>
+
+        {/* Status Chips */}
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 3 }}>
+          <Chip
+            icon={emailHealth?.hasApiKey ? <CheckCircleIcon sx={{ fontSize: "14px !important" }} /> : <WarningIcon sx={{ fontSize: "14px !important" }} />}
+            label={emailHealth?.hasApiKey ? "Resend API: Operational" : "Resend API: Key Missing in Env"}
+            size="small"
+            color={emailHealth?.hasApiKey ? "success" : "warning"}
+            variant="outlined"
+            sx={{ fontWeight: 800, fontSize: "0.72rem" }}
+          />
+          <Chip
+            icon={<ShieldIcon sx={{ fontSize: "14px !important" }} />}
+            label="Supabase SMTP: smtp.resend.com (Port 465)"
+            size="small"
+            color="primary"
+            variant="outlined"
+            sx={{ fontWeight: 800, fontSize: "0.72rem" }}
+          />
+          <Chip
+            icon={<EmailReadIcon sx={{ fontSize: "14px !important" }} />}
+            label={`Sender: ${emailHealth?.senderEmail || "PowerForecast <onboarding@resend.dev>"}`}
+            size="small"
+            sx={{ fontWeight: 700, fontSize: "0.72rem", bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)" }}
+          />
+        </Box>
+
+        <Grid container spacing={3}>
+          {/* Sub-form A: Live SMTP Delivery Test */}
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2.5,
+                borderRadius: 1.25,
+                height: "100%",
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.25)" : "rgba(248, 250, 252, 0.8)"),
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5, display: "flex", alignItems: "center", gap: 1 }}>
+                <SendIcon fontSize="small" sx={{ color: "primary.main" }} />
+                {language === "tl" ? "Subukan ang SMTP Delivery (Test Email)" : "Live SMTP Delivery Test Tool"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
+                {language === "tl"
+                  ? "Magpadala ng tunay na test email sa pamamagitan ng Resend upang makumpirma ang mabilis na pagdating sa inbox."
+                  : "Dispatch a live test email through Resend to verify delivery status and measure inbox latency."}
+              </Typography>
+
+              {testEmailResult && (
+                <Alert severity={testEmailResult.success ? "success" : "error"} sx={{ mb: 2, borderRadius: 1, py: 0.5, fontSize: "0.8125rem" }}>
+                  {testEmailResult.message}
+                </Alert>
+              )}
+
+              <Box component="form" onSubmit={handleSendTestEmail} sx={{ display: "flex", gap: 1.25, alignItems: "center", flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label={language === "tl" ? "Email Address ng Tatanggap" : "Recipient Email Address"}
+                  value={testRecipientEmail}
+                  onChange={(e) => setTestRecipientEmail(e.target.value)}
+                  placeholder="name@domain.com"
+                  required
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={isSendingTestEmail}
+                  startIcon={isSendingTestEmail ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+                  sx={{ borderRadius: 1, fontWeight: 800, px: 2.5, flexShrink: 0, height: 40, whiteSpace: "nowrap" }}
+                >
+                  {isSendingTestEmail ? "Sending..." : "Send Test"}
+                </Button>
+              </Box>
+            </Paper>
+          </Grid>
+
+          {/* Sub-form B: Automated Alert Notifications Toggle */}
+          <Grid size={{ xs: 12, md: 5 }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2.5,
+                borderRadius: 1.25,
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.25)" : "rgba(248, 250, 252, 0.8)"),
+              }}
+            >
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5, display: "flex", alignItems: "center", gap: 1 }}>
+                  <BoltIcon fontSize="small" sx={{ color: "warning.main" }} />
+                  {language === "tl" ? "Mga Notification sa Email" : "Automated Smart Email Alerts"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+                  {language === "tl"
+                    ? "Makatanggap ng agarang alerto sa email kapag lumagpas sa 80% ng budget o kapag may biglaang wattage surge."
+                    : "Receive automated email alerts when consumption reaches 80% / 100% of your budget or during high wattage surges."}
+                </Typography>
+              </Box>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={emailAlertsEnabled}
+                    onChange={(e) => handleToggleEmailAlerts(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {emailAlertsEnabled
+                      ? (language === "tl" ? "Aktibo ang Email Alerts" : "Email Alerts Enabled")
+                      : (language === "tl" ? "Naka-off ang Email Alerts" : "Email Alerts Disabled")}
+                  </Typography>
+                }
+              />
+            </Paper>
+          </Grid>
+        </Grid>
+      </Card>
+
+      {/* 5. Developer Direct PM & Feedback Support Card */}
       <Card
         sx={{
           p: { xs: 2.5, sm: 3 },
@@ -1105,8 +1424,17 @@ export const SettingsView: React.FC = () => {
                 <Button onClick={() => setIsInviteModalOpen(false)} sx={{ fontWeight: 700 }}>
                   {t("header.cancel", "Cancel")}
                 </Button>
-                <Button type="submit" variant="contained" color="primary" sx={{ fontWeight: 800, borderRadius: 1 }}>
-                  {t("settings.generateInvite", "Generate Invitation")}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={isSendingInviteEmail}
+                  startIcon={isSendingInviteEmail ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+                  sx={{ fontWeight: 800, borderRadius: 1 }}
+                >
+                  {isSendingInviteEmail
+                    ? (language === "tl" ? "Ipinapadala..." : "Sending...")
+                    : (language === "tl" ? "Magpadala ng Imbitasyon" : "Send & Generate Invite")}
                 </Button>
               </DialogActions>
             </Box>
@@ -1115,6 +1443,16 @@ export const SettingsView: React.FC = () => {
               <Alert severity="success" sx={{ borderRadius: 1 }}>
                 {language === "tl" ? `Matagumpay na nagawa ang imbitasyon para kay ${inviteName}!` : `Invitation successfully created for ${inviteName}!`}
               </Alert>
+
+              {inviteEmailSent && (
+                <Chip
+                  icon={<CheckCircleIcon sx={{ fontSize: "15px !important" }} />}
+                  label={language === "tl" ? `Napadala ang email kay ${inviteEmail} via Resend!` : `Invitation email delivered directly to ${inviteEmail} via Resend!`}
+                  color="success"
+                  variant="outlined"
+                  sx={{ fontWeight: 700, fontSize: "0.75rem", alignSelf: "flex-start" }}
+                />
+              )}
 
               <Box sx={{ p: 2, borderRadius: 1, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.4)" : "rgba(13, 148, 136, 0.08)", border: "1px solid", borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.3)" : "rgba(13, 148, 136, 0.3)" }}>
                 <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, display: "block", mb: 0.5 }}>
@@ -1147,7 +1485,17 @@ export const SettingsView: React.FC = () => {
                 {t("settings.sharePrompt", "Share this link on Messenger or Viber. When they register, they will automatically be joined to your household.")}
               </Typography>
 
-              <DialogActions sx={{ px: 0, pt: 1 }}>
+              <DialogActions sx={{ px: 0, pt: 1, display: "flex", justifyContent: "space-between" }}>
+                <Button
+                  onClick={handleResendInviteEmail}
+                  variant="text"
+                  size="small"
+                  disabled={isSendingInviteEmail}
+                  startIcon={isSendingInviteEmail ? <CircularProgress size={14} color="inherit" /> : <SendIcon fontSize="small" />}
+                  sx={{ fontWeight: 700 }}
+                >
+                  {language === "tl" ? "Ipadala Muli ang Email" : "Resend Invite Email"}
+                </Button>
                 <Button onClick={() => setIsInviteModalOpen(false)} variant="outlined" sx={{ fontWeight: 700, borderRadius: 1 }}>
                   {t("settings.done", "Done")}
                 </Button>
@@ -1155,6 +1503,106 @@ export const SettingsView: React.FC = () => {
             </Box>
           )}
         </DialogContent>
+      </Dialog>
+
+      {/* Supabase Custom SMTP Setup Guide Dialog */}
+      <Dialog
+        open={isSmtpGuideOpen}
+        onClose={() => setIsSmtpGuideOpen(false)}
+        maxWidth="md"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.3)" : "rgba(13, 148, 136, 0.25)",
+              bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(20, 24, 30, 0.98)" : "#ffffff"),
+              backdropFilter: "blur(20px)",
+              p: 1,
+            },
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1.25 }}>
+          <KeyIcon sx={{ color: "primary.main" }} />
+          Supabase Custom SMTP with Resend Guide
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: 1 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Configure Resend as your custom SMTP provider in the Supabase Dashboard to eliminate rate limits (3 emails/hour) and guarantee email delivery for registration, resend verification, and password resets.
+          </Typography>
+
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "#f8fafc" }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5, color: "primary.main" }}>
+              Resend SMTP Credentials for Supabase Dashboard:
+            </Typography>
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>SMTP Host</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>smtp.resend.com</Typography>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Port & Security</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>465 (SSL) or 587 (TLS)</Typography>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Username</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>resend</Typography>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Password</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>re_... (Your Resend API Key)</Typography>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Sender Email</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>noreply@yourdomain.com (or onboarding@resend.dev)</Typography>
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Sender Name</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>PowerForecast Refine</Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Quick 3-Step Setup Instructions:</Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              1. Open <strong>Supabase Dashboard</strong> ➔ <strong>Project Settings</strong> ➔ <strong>Authentication</strong> ➔ <strong>SMTP Settings</strong>.
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              2. Toggle <strong>Enable Custom SMTP</strong> to <strong>ON</strong> and enter the Resend credentials above.
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              3. In <strong>Authentication ➔ Providers ➔ Email</strong>, toggle <strong>Confirm email</strong> to <strong>ON</strong>.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            variant="contained"
+            onClick={() => window.open("https://supabase.com/dashboard", "_blank", "noopener,noreferrer")}
+            endIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />}
+            sx={{ fontWeight: 700, borderRadius: 1 }}
+          >
+            Open Supabase Dashboard
+          </Button>
+          <Button onClick={() => setIsSmtpGuideOpen(false)} sx={{ fontWeight: 700 }}>
+            Close
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Strict 2-Step Account Deletion Security Dialog */}

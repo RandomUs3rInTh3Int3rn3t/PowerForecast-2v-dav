@@ -13,6 +13,7 @@ import {
   playNotificationSound,
   triggerNotificationVibration,
 } from "../lib/notificationService";
+import { sendSurgeAlertEmail, sendEnergyBudgetAlertEmail } from "../lib/emailService";
 import { devLog } from "../lib/devLogger";
 
 interface UseNotificationsProps {
@@ -157,6 +158,23 @@ export function useNotifications({
             tag: "surge-spike",
             urgency: "critical",
           });
+
+          // Dispatch email alert via Resend if enabled
+          if (prefs.emailAlertsEnabled) {
+            try {
+              const activeUser = JSON.parse(localStorage.getItem("powerforecast_active_user") || "{}");
+              const targetEmail = prefs.alertEmailAddress || activeUser?.email;
+              if (targetEmail) {
+                sendSurgeAlertEmail({
+                  toEmail: targetEmail,
+                  currentWatts: totalWatts,
+                  thresholdWatts: limit,
+                });
+              }
+            } catch (emailErr) {
+              devLog.warn("Notifications", "Failed to dispatch surge email alert:", emailErr);
+            }
+          }
         }
       }
     };
@@ -164,7 +182,7 @@ export function useNotifications({
     checkSurge();
     const interval = setInterval(checkSurge, 15000);
     return () => clearInterval(interval);
-  }, [appliances, prefs.enabled, prefs.surgeAlert, prefs.surgeThresholdWatts]);
+  }, [appliances, prefs.enabled, prefs.surgeAlert, prefs.surgeThresholdWatts, prefs.emailAlertsEnabled, prefs.alertEmailAddress]);
 
   // 3. Multi-Tiered Budget Threshold Alert
   useEffect(() => {
@@ -190,10 +208,30 @@ export function useNotifications({
             tag: `budget-tier-${tier}`,
             urgency,
           });
+
+          // Dispatch email alert via Resend if enabled for high tiers (>=80%)
+          if (prefs.emailAlertsEnabled && tier >= 80) {
+            try {
+              const activeUser = JSON.parse(localStorage.getItem("powerforecast_active_user") || "{}");
+              const targetEmail = prefs.alertEmailAddress || activeUser?.email;
+              if (targetEmail) {
+                sendEnergyBudgetAlertEmail({
+                  toEmail: targetEmail,
+                  userName: activeUser?.name || "PowerForecast Member",
+                  currentKwh: monthlyBudget ? Math.round(projectedBill / 12) : 0,
+                  budgetLimitKwh: monthlyBudget ? Math.round(monthlyBudget / 12) : 0,
+                  percentConsumed: percentage,
+                  projectedBill: `₱${projectedBill.toFixed(2)}`,
+                });
+              }
+            } catch (emailErr) {
+              devLog.warn("Notifications", "Failed to dispatch budget email alert:", emailErr);
+            }
+          }
         }
       }
     });
-  }, [monthlyBudget, projectedBill, prefs.enabled, prefs.budgetAlert, prefs.budgetThresholdPercent]);
+  }, [monthlyBudget, projectedBill, prefs.enabled, prefs.budgetAlert, prefs.budgetThresholdPercent, prefs.emailAlertsEnabled, prefs.alertEmailAddress]);
 
   // 4. Schedule Queue Reminders (Every 60s)
   useEffect(() => {
