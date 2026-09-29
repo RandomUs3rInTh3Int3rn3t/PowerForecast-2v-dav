@@ -1,7 +1,7 @@
 {
   "name": "powerforecast-refine",
   "private": true,
-  "version": "3.4.1-beta",
+  "version": "3.4.2-beta",
   "type": "module",
   "scripts": {
     "dev": "vite",

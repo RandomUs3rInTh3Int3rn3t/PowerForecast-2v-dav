@@ -1127,8 +1127,15 @@ export const SettingsView: React.FC = () => {
             sx={{ fontWeight: 800, fontSize: "0.72rem" }}
           />
           <Chip
+            icon={<CheckCircleIcon sx={{ fontSize: "14px !important", color: "#00e5c9 !important" }} />}
+            label="Domain: comugallery.me (Verified)"
+            size="small"
+            variant="outlined"
+            sx={{ fontWeight: 800, fontSize: "0.72rem", color: "#00e5c9", borderColor: "rgba(0, 229, 201, 0.4)" }}
+          />
+          <Chip
             icon={<EmailReadIcon sx={{ fontSize: "14px !important" }} />}
-            label={`Sender: ${emailHealth?.senderEmail || "PowerForecast <onboarding@resend.dev>"}`}
+            label={`Sender: ${emailHealth?.senderEmail || "PowerForecast <noreply@comugallery.me>"}`}
             size="small"
             sx={{ fontWeight: 700, fontSize: "0.72rem", bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)" }}
           />
@@ -1565,7 +1572,7 @@ export const SettingsView: React.FC = () => {
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Sender Email</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace" }}>noreply@yourdomain.com (or onboarding@resend.dev)</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace", color: "primary.main" }}>noreply@comugallery.me</Typography>
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>

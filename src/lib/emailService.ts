@@ -61,7 +61,7 @@ export async function checkEmailDeliveryHealth(): Promise<EmailHealthStatus> {
     return {
       ok: true,
       hasApiKey: true,
-      senderEmail: import.meta.env.VITE_RESEND_FROM_EMAIL || 'PowerForecast <onboarding@resend.dev>',
+      senderEmail: import.meta.env.VITE_RESEND_FROM_EMAIL || 'PowerForecast <noreply@comugallery.me>',
       message: 'Client-side Resend API key configured (VITE_RESEND_API_KEY).',
     };
   }
@@ -142,7 +142,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
   if (clientApiKey) {
     try {
       devLog.info('EmailService', 'Attempting direct client call to https://api.resend.com/emails...');
-      const sender = from || import.meta.env.VITE_RESEND_FROM_EMAIL || 'PowerForecast <onboarding@resend.dev>';
+      const sender = from || import.meta.env.VITE_RESEND_FROM_EMAIL || 'PowerForecast <noreply@comugallery.me>';
       
       const payload: Record<string, any> = {
         from: sender,

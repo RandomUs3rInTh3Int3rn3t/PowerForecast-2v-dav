@@ -18,7 +18,7 @@ def get_sender_email():
     sender = os.environ.get('RESEND_FROM_EMAIL') or os.environ.get('VITE_RESEND_FROM_EMAIL') or ''
     sender = sender.strip().strip('"').strip("'")
     if not sender:
-        return 'PowerForecast <onboarding@resend.dev>'
+        return 'PowerForecast <noreply@comugallery.me>'
     return sender
 
 def render_template(template_type, data):

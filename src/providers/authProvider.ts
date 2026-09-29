@@ -180,13 +180,20 @@ export const authProvider: AuthProvider = {
           error.message?.toLowerCase().includes("already registered") ||
           error.message?.toLowerCase().includes("already in use") ||
           error.message?.toLowerCase().includes("user already exists");
+        const isEmailError = error.message?.toLowerCase().includes("confirmation email") || error.message?.toLowerCase().includes("sending email");
+
+        let formattedMsg = error.message || "Failed to create account.";
+        if (isDuplicate) {
+          formattedMsg = "This email is already registered. Please sign in or use password recovery.";
+        } else if (isEmailError) {
+          formattedMsg = "Unable to dispatch confirmation email. Please ensure 'noreply@comugallery.me' is set as the Sender Email in Supabase SMTP Settings.";
+        }
+
         return {
           success: false,
           error: {
             name: "RegisterError",
-            message: isDuplicate
-              ? "This email is already registered. Please sign in or use password recovery."
-              : error.message || "Failed to create account.",
+            message: formattedMsg,
           },
         };
       }
