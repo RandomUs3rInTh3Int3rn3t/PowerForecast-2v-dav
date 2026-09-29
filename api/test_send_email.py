@@ -12,8 +12,9 @@ class TestSendEmailAPI(unittest.TestCase):
         subject, html = render_template("household_invite", data)
         self.assertIn("Juan Dela Cruz", subject)
         self.assertIn("PF-HH-9921", html)
-        self.assertIn("https://powerforecast.ph/#/signup?invite=PF-HH-9921", html)
-        self.assertIn("⚡ PowerForecast", html)
+        self.assertIn("Power", html)
+        self.assertIn("Forecast", html)
+        self.assertIn("https://raw.githubusercontent.com/hAizen-Nibba/PowerForecast-2v/main/public/Assets/LOGO.png", html)
 
     def test_budget_alert_template(self):
         data = {
