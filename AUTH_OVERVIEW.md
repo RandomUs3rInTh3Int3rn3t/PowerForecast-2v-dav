@@ -11,7 +11,7 @@ The authentication system is built using three primary layers:
 ## 2. The Authentication Flow
 
 ### Registration (`useRegister` -> `authProvider.register`)
-1. The user fills out the form in `SignupPage.tsx` (Email, Password, Name, Household Type, Security Question/Answer).
+1. The user fills out the form in `SignupPage.tsx` (Email, Password, Name, Household Type).
 2. The form calls the `register` function.
 3. In `authProvider.ts`, `supabaseClient.auth.signUp()` is invoked. The user's email, password, and additional metadata are sent to the Supabase backend.
 4. **Important**: By default, if "Email Confirmation" is OFF in Supabase, the backend instantly creates a session. We configure this flow so users confirm their email via a verification link.

@@ -24,22 +24,10 @@ export const authProvider: AuthProvider = {
         devLog.warn("Auth", `Supabase login failed: ${error.message}`);
         let formattedMessage = error.message || "Invalid email or password.";
 
-        try {
-          const { data: secData } = await supabaseClient.rpc("get_security_question", {
-            p_email: email.trim().toLowerCase(),
-          });
-          if (error.message?.toLowerCase().includes("email not confirmed")) {
-            formattedMessage = "Your email address has not been confirmed yet. Please check your inbox or resend the verification email.";
-          } else if (secData && secData.success === false && secData.error === "No account found with this email address.") {
-            formattedMessage = "No account found with this email address. Please create an account to get started.";
-          } else if (error.message?.toLowerCase().includes("invalid login credentials")) {
-            formattedMessage = "Incorrect password. Please verify your password or use password recovery.";
-          }
-        } catch {
-          // Fall back to default error
-          if (error.message?.toLowerCase().includes("email not confirmed")) {
-            formattedMessage = "Your email address has not been confirmed yet. Please check your inbox or resend the verification email.";
-          }
+        if (error.message?.toLowerCase().includes("email not confirmed")) {
+          formattedMessage = "Your email address has not been confirmed yet. Please check your inbox or resend the verification email.";
+        } else if (error.message?.toLowerCase().includes("invalid login credentials")) {
+          formattedMessage = "Incorrect email or password. Please verify your credentials or use password recovery.";
         }
 
         return {
@@ -109,10 +97,9 @@ export const authProvider: AuthProvider = {
     }
   },
 
-  register: async ({ email, password, name, householdType, securityQuestion, securityAnswer }: any) => {
+  register: async ({ email, password, name, householdType }: any) => {
     const trimmedEmail = (email || "").trim().toLowerCase();
     const trimmedPassword = (password || "").trim();
-    const trimmedAnswer = (securityAnswer || "").trim().toLowerCase();
     const trimmedName = (name || "").trim();
 
     if (!trimmedEmail || !trimmedPassword) {
@@ -148,15 +135,6 @@ export const authProvider: AuthProvider = {
       };
     }
 
-    if (trimmedAnswer && trimmedAnswer === trimmedEmail) {
-      return {
-        success: false,
-        error: {
-          name: "RegisterError",
-          message: "Security answer cannot be your email address.",
-        },
-      };
-    }
 
     try {
       const { data, error } = await supabaseClient.auth.signUp({
@@ -166,8 +144,6 @@ export const authProvider: AuthProvider = {
           data: {
             name: name?.trim() || trimmedEmail.split("@")[0],
             householdType: householdType || "Residential (Meralco 230V)",
-            security_question: securityQuestion || "",
-            security_answer: (securityAnswer || "").trim().toLowerCase(),
           },
           // Tell Supabase where to send the user after they click the email link
           emailRedirectTo: `${window.location.origin}/#/verified`,
@@ -210,19 +186,6 @@ export const authProvider: AuthProvider = {
         };
       }
 
-      // Record security question map in local persistent cache for rapid password recovery
-      if (securityQuestion && securityAnswer) {
-        try {
-          const secDirectory = JSON.parse(localStorage.getItem("powerforecast_sec_dir") || "{}");
-          secDirectory[trimmedEmail] = {
-            question: securityQuestion,
-            answer: securityAnswer.trim().toLowerCase(),
-          };
-          localStorage.setItem("powerforecast_sec_dir", JSON.stringify(secDirectory));
-        } catch (e) {
-          devLog.warn("Auth", "Failed to cache security directory entry", e);
-        }
-      }
 
       // If a session was created during sign up, set active user and go directly to dashboard
       let userSession = data?.session;
