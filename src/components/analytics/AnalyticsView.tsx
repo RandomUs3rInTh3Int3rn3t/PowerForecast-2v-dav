@@ -1050,7 +1050,7 @@ export const AnalyticsView: React.FC = () => {
                             variant="caption"
                             sx={{ color: "primary.main", fontWeight: 900, fontFamily: "monospace", fontSize: "0.95rem" }}
                           >
-                            ⚡ {d.simulatedWatts ?? d.watts} W
+                            {d.simulatedWatts ?? d.watts} W
                           </Typography>
                         </Box>
 
@@ -1065,7 +1065,7 @@ export const AnalyticsView: React.FC = () => {
                               mb: 0.5,
                             }}
                           >
-                            {diff > 0 ? `⚡ Peak Shaved: -${diff}W (Off-Peak)` : `+${Math.abs(diff)}W Load Shift`}
+                            {diff > 0 ? `Peak Shaved: -${diff}W (Off-Peak)` : `+${Math.abs(diff)}W Load Shift`}
                           </Typography>
                         )}
 

@@ -232,7 +232,7 @@ export const PcSpecBuilderSection: React.FC<PcSpecBuilderSectionProps> = ({
                 borderRadius: 1.5,
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>🍃 Light</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>Light</Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
                 Browsing / School
               </Typography>
@@ -253,7 +253,7 @@ export const PcSpecBuilderSection: React.FC<PcSpecBuilderSectionProps> = ({
                 borderRadius: 1.5,
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>⚖️ Standard</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>Standard</Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
                 Daily Work / WFH
               </Typography>
@@ -274,7 +274,7 @@ export const PcSpecBuilderSection: React.FC<PcSpecBuilderSectionProps> = ({
                 borderRadius: 1.5,
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>🎮 Heavy</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>Heavy</Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", display: "block" }}>
                 Gaming / 3D / Render
               </Typography>

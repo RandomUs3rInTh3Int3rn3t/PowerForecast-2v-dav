@@ -306,7 +306,7 @@ export const AiVisionScannerTabContent: React.FC<AiVisionScannerTabContentProps>
             }}
           >
             <MenuItem value="Auto-Detect from Photo">
-              <em>✨ Auto-Detect from Photo</em>
+              <em>Auto-Detect from Photo</em>
             </MenuItem>
             {STREAMLINED_CATEGORIES.map((cat) => (
               <MenuItem key={cat} value={cat}>
@@ -409,7 +409,7 @@ export const AiVisionScannerTabContent: React.FC<AiVisionScannerTabContentProps>
           />
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, px: 0.5 }}>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              💡 Configured PC: <strong>{editWatts > 0 ? editWatts : 350}W Rated</strong> / <strong>{editCustomCruisingWatts || Math.round((editWatts > 0 ? editWatts : 350) * 0.45)}W Running</strong>. You can upload photos below to scan labels, or save this rig directly.
+              Configured PC: <strong>{editWatts > 0 ? editWatts : 350}W Rated</strong> / <strong>{editCustomCruisingWatts || Math.round((editWatts > 0 ? editWatts : 350) * 0.45)}W Running</strong>. You can upload photos below to scan labels, or save this rig directly.
             </Typography>
             <Button
               variant="contained"
@@ -436,7 +436,7 @@ export const AiVisionScannerTabContent: React.FC<AiVisionScannerTabContentProps>
         }}
       >
         <Typography variant="caption" sx={{ fontWeight: 700, display: "block", color: "primary.main" }}>
-          💡 AI Optical Recognition & Accuracy Notice
+          AI Optical Recognition & Accuracy Notice
         </Typography>
         <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25, lineHeight: 1.5 }}>
           Optical recognition accuracy depends heavily on photo quality and label condition. Harsh reflective glare, blurry or angled captures, occluded text, or peeling nameplates may result in estimated or incomplete figures. For best results, ensure well-lit, flat-angle photos displaying the full DOE yellow Energy Guide or manufacturer specification plate. Always review and verify the extracted wattage and inverter settings before saving.
@@ -557,7 +557,7 @@ export const AiVisionScannerTabContent: React.FC<AiVisionScannerTabContentProps>
                   <Chip label={`CSPF/EER: ${scanResult.cspf || scanResult.eer}`} size="small" color="info" sx={{ fontWeight: 600, height: 22 }} />
                 )}
                 {scanResult.cooling_capacity_kj_h && (
-                  <Chip label={`❄️ ${scanResult.cooling_capacity_kj_h.toLocaleString()} kJ/h`} size="small" sx={{ fontWeight: 600, height: 22 }} />
+                  <Chip label={`${scanResult.cooling_capacity_kj_h.toLocaleString()} kJ/h`} size="small" sx={{ fontWeight: 600, height: 22 }} />
                 )}
                 <Chip
                   label={scanResult.confidence ? `${scanResult.confidence.toUpperCase()} CONFIDENCE` : "HIGH CONFIDENCE"}

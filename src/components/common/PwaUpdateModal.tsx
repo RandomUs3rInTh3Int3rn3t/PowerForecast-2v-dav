@@ -23,11 +23,11 @@ import { useLanguage } from "../../context/LanguageContext";
 
 // High-priority features & highlights for the 3.1.0v major release
 const DEFAULT_3_1_0_HIGHLIGHTS = [
-  "✨ Background PWA auto-update detection across Mobile & PC",
-  "⚡ 1-Click instant app restart and service worker cache sync",
-  "📋 Automated 'What's New & Release Notes' launch popup modal",
-  "🔋 Battery-efficient lifecycle checks on window focus & reconnection",
-  "🛡️ Zero data loss with seamless offline fallback cache protection",
+  "Background PWA auto-update detection across Mobile & PC",
+  "1-Click instant app restart and service worker cache sync",
+  "Automated 'What's New & Release Notes' launch popup modal",
+  "Battery-efficient lifecycle checks on window focus & reconnection",
+  "Zero data loss with seamless offline fallback cache protection",
 ];
 
 export const PwaUpdateModal: React.FC = () => {
@@ -61,7 +61,7 @@ export const PwaUpdateModal: React.FC = () => {
               .filter((s: string) => s.length > 3 && !s.startsWith(item.version));
 
             if (lines.length > 0) {
-              setChangelogItems(lines.map((l: string) => (l.startsWith("✨") || l.startsWith("⚡") || l.startsWith("🛠️") ? l : `⚡ ${l}`)));
+              setChangelogItems(lines.map((l: string) => l.replace(/^[✨⚡🛠️📋🔋🛡️\s-]+/, '').trim()));
             }
           }
         }

@@ -41,6 +41,16 @@ export interface SystemChangelogEntry {
 // Master compiled GitHub deployment history covering all releases
 const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.7v",
+    version: "3.4.7v",
+    git_commit_tag: "3.4.7v",
+    created_at: "2026-10-01T03:33:00.000Z",
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.7v - Clean redundant emojis from UI buttons, chips, and modals, and completely remove PM Developer and Feedback to Developer modules",
+  },
+  {
     id: "3.4.6v",
     version: "3.4.6v",
     git_commit_tag: "3.4.6v",

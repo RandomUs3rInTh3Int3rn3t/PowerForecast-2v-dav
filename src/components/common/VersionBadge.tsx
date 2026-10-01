@@ -181,7 +181,7 @@ export const VersionBadge: React.FC = () => {
               },
             }}
           >
-            📜 View Version Changelogs
+            View Version Changelogs
           </Button>
 
           <Divider sx={{ my: 1 }} />

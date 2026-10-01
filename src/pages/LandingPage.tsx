@@ -1669,16 +1669,6 @@ export const LandingPage: React.FC = () => {
                 Support & Contact
               </Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography
-                  component="a"
-                  href="https://www.facebook.com/aj.umali.533308"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="body2"
-                  sx={{ color: "primary.main", textDecoration: "none", fontWeight: 700, "&:hover": { textDecoration: "underline" } }}
-                >
-                  PM Developer (AJ Umali) ↗
-                </Typography>
                 <Typography component={Link} to="/login" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
                   Sign In to Household
                 </Typography>

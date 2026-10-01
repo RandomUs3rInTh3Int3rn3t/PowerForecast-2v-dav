@@ -216,7 +216,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             }}
           >
             <Typography variant="caption" sx={{ color: "text.secondary", lineHeight: 1.5, display: "block" }}>
-              💡 {detail}
+              {detail}
             </Typography>
           </Paper>
         )}

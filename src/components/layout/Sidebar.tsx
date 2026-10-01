@@ -27,9 +27,6 @@ import {
   VerifiedUser as ShieldIcon,
   Paid as CoinsIcon,
   Settings as SettingsIcon,
-  Feedback as FeedbackIcon,
-  Chat as ChatIcon,
-  OpenInNew as OpenInNewIcon,
   Close as CloseIcon,
   Logout as LogoutIcon,
   Refresh as RefreshIcon,
@@ -40,7 +37,6 @@ import { useList, useGetIdentity, useLogout } from "@refinedev/core";
 import { UserAppliance } from "../../types";
 import { APP_VERSION, checkSupabaseConnection } from "../../lib/supabaseClient";
 import { useLanguage } from "../../context/LanguageContext";
-import { FeedbackModal, FB_PM_LINK } from "../feedback/FeedbackModal";
 import { SystemChangelogModal } from "../changelog/SystemChangelogModal";
 import { getMeralcoTariff, MeralcoTariffData, DEFAULT_MERALCO_TARIFF } from "../../lib/meralcoRateService";
 
@@ -62,7 +58,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { data: identity } = useGetIdentity<any>();
   const { mutate: logout } = useLogout();
 
-  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
 
@@ -268,55 +263,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
 
-          {/* Feedback & Support Nav Action */}
-          <ListItem disablePadding sx={{ px: 1, mt: 0.5 }}>
-            <ListItemButton
-              onClick={() => {
-                onClose?.();
-                setIsFeedbackOpen(true);
-              }}
-              sx={{
-                borderRadius: 1.25,
-                py: 1,
-                px: 1.5,
-                color: "text.secondary",
-                "&:hover": {
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.08)" : "rgba(13, 148, 136, 0.08)",
-                  color: "primary.main",
-                },
-                transition: "all 0.15s ease",
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 34, color: "primary.main" }}>
-                <FeedbackIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText
-                primary={t("nav.feedback", "Feedback & Support")}
-                slotProps={{
-                  primary: {
-                    sx: {
-                      fontSize: "0.8125rem",
-                      fontWeight: 600,
-                      letterSpacing: "-0.01em",
-                    },
-                  },
-                }}
-              />
-              <Chip
-                label="PM"
-                size="small"
-                sx={{
-                  height: 18,
-                  fontSize: "0.5625rem",
-                  fontWeight: 800,
-                  bgcolor: "rgba(24, 119, 242, 0.15)",
-                  color: "#1877f2",
-                  border: "1px solid rgba(24, 119, 242, 0.3)",
-                }}
-              />
-            </ListItemButton>
-          </ListItem>
         </List>
       </Box>
 
@@ -412,41 +358,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </Box>
             </>
           )}
-        </Paper>
-
-        {/* Developer PM Support Button */}
-        <Paper
-          variant="outlined"
-          onClick={() => setIsFeedbackOpen(true)}
-          sx={{
-            p: 1.25,
-            mb: 1.5,
-            borderRadius: 1.25,
-            cursor: "pointer",
-            bgcolor: "rgba(24, 119, 242, 0.08)",
-            border: "1px solid rgba(24, 119, 242, 0.25)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            "&:hover": {
-              bgcolor: "rgba(24, 119, 242, 0.14)",
-              borderColor: "#1877f2",
-            },
-            transition: "all 0.2s ease",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <ChatIcon sx={{ fontSize: 16, color: "#1877f2" }} />
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary", display: "block", lineHeight: 1.1 }}>
-                PM Developer
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.625rem" }}>
-                AJ Umali • Facebook
-              </Typography>
-            </Box>
-          </Box>
-          <OpenInNewIcon sx={{ fontSize: 13, color: "#1877f2" }} />
         </Paper>
 
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
@@ -1028,46 +939,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             },
           }}
         >
-          📜 View Version Changelogs
+          View Version Changelogs
         </Button>
-      </Paper>
-
-      {/* 7. Developer PM Support Action */}
-      <Paper
-        variant="outlined"
-        onClick={() => {
-          onClose?.();
-          setIsFeedbackOpen(true);
-        }}
-        sx={{
-          p: 1.25,
-          borderRadius: 1.5,
-          cursor: "pointer",
-          bgcolor: "rgba(24, 119, 242, 0.08)",
-          border: "1px solid rgba(24, 119, 242, 0.25)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          "&:hover": {
-            bgcolor: "rgba(24, 119, 242, 0.14)",
-            borderColor: "#1877f2",
-          },
-          transition: "all 0.2s ease",
-          mb: 1,
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <ChatIcon sx={{ fontSize: 16, color: "#1877f2" }} />
-          <Box>
-            <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary", display: "block", lineHeight: 1.1 }}>
-              PM Developer
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.625rem" }}>
-              AJ Umali • Facebook
-            </Typography>
-          </Box>
-        </Box>
-        <OpenInNewIcon sx={{ fontSize: 13, color: "#1877f2" }} />
       </Paper>
     </Box>
   );
@@ -1165,11 +1038,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </DialogActions>
       </Dialog>
 
-      {/* Reusable Feedback & Support Modal */}
-      <FeedbackModal
-        open={isFeedbackOpen}
-        onClose={() => setIsFeedbackOpen(false)}
-      />
 
       {/* Version Changelogs Modal */}
       <SystemChangelogModal

@@ -243,7 +243,7 @@ export const SmartCalendar: React.FC = () => {
               },
             }}
           >
-            ⚡ Simulate Schedule
+            Simulate Schedule
           </Button>
         </Box>
       </Box>
@@ -591,7 +591,7 @@ export const SmartCalendar: React.FC = () => {
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
               <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#00e5c9" }} />
               <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                ⚡ ₱ Simulated
+                ₱ Simulated
               </Typography>
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
@@ -640,7 +640,7 @@ export const SmartCalendar: React.FC = () => {
             px: 1.5,
           }}
         >
-          📊 Baseline
+          Baseline
         </Button>
         <Button
           size="small"
@@ -655,7 +655,7 @@ export const SmartCalendar: React.FC = () => {
             px: 1.5,
           }}
         >
-          ⚡ Simulated
+          Simulated
         </Button>
       </Box>
 
@@ -870,7 +870,7 @@ export const SmartCalendar: React.FC = () => {
                           lineHeight: 1.1,
                         }}
                       >
-                        ⚡ ₱{metrics.cost.toFixed(2)}
+                        ₱{metrics.cost.toFixed(2)}
                       </Typography>
                     </Box>
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 0.25 }}>
@@ -927,7 +927,7 @@ export const SmartCalendar: React.FC = () => {
                     >
                       {mobileViewMode === "projected"
                         ? `~₱${Math.round(metrics.baselineCost)}`
-                        : `⚡ ₱${Math.round(metrics.cost)}`}
+                        : `₱${Math.round(metrics.cost)}`}
                     </Typography>
                     <Typography
                       variant="caption"

@@ -392,7 +392,7 @@ export const MeralcoRatePopover: React.FC = () => {
               >
                 <TableCell sx={{ py: 1 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "primary.main", fontSize: "0.75rem" }}>
-                    📊 {language === "tl" ? "KABUUANG BLENDED RATE" : "TOTAL EFFECTIVE RATE"}
+                    {language === "tl" ? "KABUUANG BLENDED RATE" : "TOTAL EFFECTIVE RATE"}
                   </Typography>
                 </TableCell>
                 <TableCell align="right" sx={{ py: 1, fontFamily: "monospace", fontWeight: 900, fontSize: "0.875rem", color: "primary.main" }}>
@@ -409,7 +409,7 @@ export const MeralcoRatePopover: React.FC = () => {
         {/* Footer Info & Last Synced Timestamp */}
         <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
           <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", fontFamily: "monospace" }}>
-            🕒 {language === "tl" ? "Huling Na-sync:" : "Last Synced:"} {formattedTime}
+            {language === "tl" ? "Huling Na-sync:" : "Last Synced:"} {formattedTime}
           </Typography>
           <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700, fontSize: "0.6875rem" }}>
             {language === "tl" ? "I-click ang badge para i-refresh" : "Click badge anytime to refetch"}

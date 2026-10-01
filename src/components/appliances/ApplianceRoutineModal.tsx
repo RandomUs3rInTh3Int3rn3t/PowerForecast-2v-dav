@@ -423,7 +423,7 @@ export const ApplianceRoutineModal: React.FC<ApplianceRoutineModalProps> = ({
                 >
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1, mb: 1 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: "text.primary" }}>
-                      🎯 Custom Cruising Power Draw (Optional Override)
+                      Custom Cruising Power Draw (Optional Override)
                     </Typography>
                     {isCustomCruising && (
                       <Button

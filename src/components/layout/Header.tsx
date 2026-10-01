@@ -31,8 +31,6 @@ import {
   Settings as SettingsIcon,
   Shield as ShieldIcon,
   ArrowBack as ArrowBackIcon,
-  Feedback as FeedbackIcon,
-  ChatBubbleOutlined as ChatIcon,
 } from "@mui/icons-material";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useGetIdentity, useLogout } from "@refinedev/core";
@@ -43,7 +41,6 @@ import { useTour } from "../../hooks/useTour";
 import { ROUTE_TO_TOUR_PAGE } from "../tour/tourSteps";
 import { useLanguage } from "../../context/LanguageContext";
 import { MeralcoRatePopover } from "./MeralcoRatePopover";
-import { FeedbackModal } from "../feedback/FeedbackModal";
 
 interface HeaderProps {
   onOpenSidebar: () => void;
@@ -69,7 +66,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
-  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<{ ok: boolean; latency?: number }>({ ok: true, latency: 45 });
   const notifPermission = getNotificationPermission();
@@ -319,25 +315,6 @@ export const Header: React.FC<HeaderProps> = ({
             </IconButton>
           </Tooltip>
 
-          {/* Direct Developer Feedback & Support */}
-          <Tooltip title="Feedback & PM Developer">
-            <IconButton
-              onClick={() => setIsFeedbackModalOpen(true)}
-              color="inherit"
-              size="small"
-              sx={{
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)",
-                border: "1px solid",
-                borderColor: "divider",
-                p: 0.75,
-                borderRadius: 2,
-              }}
-            >
-              <FeedbackIcon sx={{ color: "primary.main", fontSize: 18 }} />
-            </IconButton>
-          </Tooltip>
-
           {/* User Profile Pill & Menu */}
           <Box
             onClick={(e) => setAnchorEl(e.currentTarget)}
@@ -440,17 +417,6 @@ export const Header: React.FC<HeaderProps> = ({
             <MenuItem
               onClick={() => {
                 setAnchorEl(null);
-                setIsFeedbackModalOpen(true);
-              }}
-              sx={{ gap: 1.25, fontSize: "0.8125rem", fontWeight: 700, borderRadius: 1, py: 0.75, color: "text.primary" }}
-            >
-              <FeedbackIcon fontSize="small" sx={{ color: "primary.main" }} />
-              {t("header.feedback", "Feedback & PM Dev")}
-            </MenuItem>
-
-            <MenuItem
-              onClick={() => {
-                setAnchorEl(null);
                 setIsLogoutConfirmOpen(true);
               }}
               sx={{ gap: 1.25, color: "error.main", fontSize: "0.8125rem", fontWeight: 700, borderRadius: 1, py: 0.75 }}
@@ -513,12 +479,6 @@ export const Header: React.FC<HeaderProps> = ({
           <NotificationPopover
             anchorEl={notifAnchorEl}
             onClose={() => setNotifAnchorEl(null)}
-          />
-
-          {/* Feedback & PM Modal */}
-          <FeedbackModal
-            open={isFeedbackModalOpen}
-            onClose={() => setIsFeedbackModalOpen(false)}
           />
         </Box>
       </Toolbar>
