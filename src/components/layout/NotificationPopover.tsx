@@ -94,6 +94,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
 
   const [isPushSubscribed, setIsPushSubscribed] = React.useState(false);
   const [isPushLoading, setIsPushLoading] = React.useState(false);
+  const [pushError, setPushError] = React.useState<string | null>(null);
   const [pushCountdown, setPushCountdown] = React.useState<number | null>(null);
 
   React.useEffect(() => {
@@ -106,6 +107,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
 
   const handleTogglePush = async () => {
     setIsPushLoading(true);
+    setPushError(null);
     try {
       if (isPushSubscribed) {
         await unsubscribeFromPush();
@@ -114,8 +116,12 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
         const res = await subscribeToPush();
         if (res.success) {
           setIsPushSubscribed(true);
+        } else {
+          setPushError(res.error || "Failed to enable Web Push.");
         }
       }
+    } catch (err: any) {
+      setPushError(err?.message || "An unexpected error occurred.");
     } finally {
       setIsPushLoading(false);
     }
@@ -551,6 +557,16 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
             >
               Test Closed-App Push (5s Countdown)
             </Button>
+          )}
+
+          {pushError && (
+            <Alert
+              severity="warning"
+              onClose={() => setPushError(null)}
+              sx={{ mt: 1, py: 0.25, px: 1, fontSize: "0.72rem", borderRadius: 1 }}
+            >
+              {pushError}
+            </Alert>
           )}
         </Paper>
       )}

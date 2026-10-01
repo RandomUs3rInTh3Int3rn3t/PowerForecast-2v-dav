@@ -184,9 +184,36 @@ export const DevLogsFloatingWidget: React.FC = () => {
   const warnCount = logs.filter((l) => l.level === "warn").length;
 
   const handleCopyLog = (log: DevLogEntry) => {
-    const text = `[${log.formattedTime}] [${log.level.toUpperCase()}] [${log.source}] ${log.message}\nDetails: ${
-      log.details ? JSON.stringify(log.details, null, 2) : "None"
-    }`;
+    let detailsStr = "None";
+    if (log.details) {
+      try {
+        if (log.details instanceof Error) {
+          detailsStr = JSON.stringify(
+            {
+              name: log.details.name,
+              message: log.details.message,
+              stack: log.details.stack,
+            },
+            null,
+            2
+          );
+        } else {
+          detailsStr = JSON.stringify(
+            log.details,
+            (_key, value) => {
+              if (value instanceof Error) {
+                return { name: value.name, message: value.message, stack: value.stack };
+              }
+              return value;
+            },
+            2
+          );
+        }
+      } catch {
+        detailsStr = String(log.details);
+      }
+    }
+    const text = `[${log.formattedTime}] [${log.level.toUpperCase()}] [${log.source}] ${log.message}\nDetails: ${detailsStr}`;
     navigator.clipboard.writeText(text);
     setCopiedLogId(log.id);
     setTimeout(() => setCopiedLogId(null), 2000);

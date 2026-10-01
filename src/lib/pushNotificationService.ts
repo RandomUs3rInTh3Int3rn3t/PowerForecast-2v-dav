@@ -72,6 +72,13 @@ export async function subscribeToPush(
     }
 
     // 2. Ensure Service Worker is active
+    if (!navigator.serviceWorker.controller) {
+      try {
+        await navigator.serviceWorker.register("/sw.js");
+      } catch (swErr) {
+        devLog.warn("PushNotifications", "Service Worker registration attempt during push setup:", swErr);
+      }
+    }
     const registration = await navigator.serviceWorker.ready;
 
     // 3. Subscribe or get existing push subscription
@@ -149,10 +156,23 @@ export async function subscribeToPush(
       subscription,
     };
   } catch (err: any) {
-    devLog.error("PushNotifications", "Error during push subscription:", err);
+    const errorDetails = {
+      name: err?.name || "PushSubscriptionError",
+      message: err?.message || String(err),
+      code: err?.code,
+    };
+    devLog.error("PushNotifications", "Error during push subscription:", errorDetails);
+
+    let userFriendlyError = err?.message || "An unexpected error occurred while subscribing to push notifications.";
+    if (err?.name === "NotAllowedError") {
+      userFriendlyError = "Push notifications are blocked in your browser or forbidden in Incognito/Private mode.";
+    } else if (err?.name === "AbortError") {
+      userFriendlyError = "Push service connection failed (e.g. FCM/WNS push gateway unreachable or network blocked).";
+    }
+
     return {
       success: false,
-      error: err?.message || "An unexpected error occurred while subscribing to push notifications.",
+      error: userFriendlyError,
     };
   }
 }

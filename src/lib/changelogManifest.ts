@@ -3,10 +3,20 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.11v",
+    version: "3.4.11v",
+    git_commit_tag: "3.4.11v",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.11v - Fix DevLogger Error serialization, resolve service worker readiness timing, and add diagnostic feedback for Background Web Push",
+  },
+  {
     id: "3.4.10v",
     version: "3.4.10v",
     git_commit_tag: "3.4.10v",
-    created_at: new Date().toISOString(),
+    created_at: "2026-10-01T05:55:00.000Z",
     deployed_by: "Antigravity Pair Programmer",
     source: "github",
     description:

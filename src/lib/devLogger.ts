@@ -90,6 +90,20 @@ class DevLoggerManager {
     };
   }
 
+  private serializeDetails(details: any): any {
+    if (!details) return details;
+    if (details instanceof Error || (typeof details === "object" && ("message" in details || "name" in details))) {
+      return {
+        name: details.name || "Error",
+        message: details.message || String(details),
+        code: (details as any).code,
+        stack: details.stack,
+        ...details,
+      };
+    }
+    return details;
+  }
+
   public log(entry: Omit<DevLogEntry, 'id' | 'timestamp' | 'formattedTime'>): DevLogEntry {
     const now = new Date();
     const fullEntry: DevLogEntry = {
@@ -97,6 +111,7 @@ class DevLoggerManager {
       timestamp: now.toISOString(),
       formattedTime: this.formatTime(now),
       ...entry,
+      details: this.serializeDetails(entry.details),
     };
 
     this.logs.unshift(fullEntry);
