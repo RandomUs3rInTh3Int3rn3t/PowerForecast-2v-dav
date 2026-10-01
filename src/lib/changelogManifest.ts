@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.14cv",
+    version: "3.4.14cv",
+    git_commit_tag: "3.4.14cv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.14cv - Update system testing banner to in-memory lifecycle so it consistently reappears on page refresh (F5/Ctrl+R), logout, and restart",
+  },
+  {
     id: "3.4.14bv",
     version: "3.4.14bv",
     git_commit_tag: "3.4.14bv",

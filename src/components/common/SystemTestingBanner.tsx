@@ -29,8 +29,6 @@ interface SystemTestingBannerProps {
   variant?: "app" | "landing" | "auth";
 }
 
-const STORAGE_KEY = "powerforecast_testing_banner_dismissed";
-
 export const SystemTestingBanner: React.FC<SystemTestingBannerProps> = ({
   forceVisible = false,
   variant = "app",
@@ -39,24 +37,22 @@ export const SystemTestingBanner: React.FC<SystemTestingBannerProps> = ({
   const { t } = useLanguage();
   const isDark = mode === "dark";
 
-  const [isDismissed, setIsDismissed] = useState<boolean>(() => {
-    if (forceVisible) return false;
-    try {
-      return sessionStorage.getItem(STORAGE_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
-
+  // Purely in-memory state: resets upon page refresh (F5/Ctrl+R), logout, or restart
+  const [isDismissed, setIsDismissed] = useState<boolean>(false);
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Clean up any legacy sessionStorage key so old sessions don't suppress the banner
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("powerforecast_testing_banner_dismissed");
+      localStorage.removeItem("powerforecast_testing_banner_dismissed");
+    } catch {
+      // Ignore storage restrictions
+    }
+  }, []);
 
   const handleDismiss = () => {
     setIsDismissed(true);
-    try {
-      sessionStorage.setItem(STORAGE_KEY, "true");
-    } catch {
-      // Ignore sessionStorage errors
-    }
   };
 
   if (isDismissed && !forceVisible) {
