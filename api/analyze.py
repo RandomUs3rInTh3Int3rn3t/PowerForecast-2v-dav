@@ -66,7 +66,18 @@ class handler(BaseHTTPRequestHandler):
         raw_model = payload.get('model', 'gemini-2.5-flash')
 
         # Input Validation & Sanitization
-        preset = str(raw_category or raw_preset or 'specs')[:50]
+        allowed_presets = {
+            'specs', 'specs mode', 'auto-detect from photo',
+            'air conditioners', 'refrigerators & freezers', 'television sets',
+            'electric fans', 'clothes washing machines', 'lighting products',
+            'kitchen appliances', 'water heaters & pumps', 'computers & laptops',
+            'computers & office', 'other'
+        }
+        candidate_preset = str(raw_category or raw_preset or 'specs').strip()
+        if candidate_preset.lower() in allowed_presets:
+            preset = candidate_preset
+        else:
+            preset = 'specs'
 
         if isinstance(raw_model, str) and re.match(r'^[a-zA-Z0-9.\-_]{1,50}$', raw_model):
             model = raw_model

@@ -8,6 +8,7 @@ import IconButton from "@mui/material/IconButton";
 import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import LinearProgress from "@mui/material/LinearProgress";
+import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import Accordion from "@mui/material/Accordion";
 import AccordionSummary from "@mui/material/AccordionSummary";
@@ -24,6 +25,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import {
   CloudUpload as UploadIcon,
+  PhotoCamera as CameraIcon,
   AutoAwesome as SparklesIcon,
   CheckCircle as CheckCircleIcon,
   Delete as TrashIcon,
@@ -31,6 +33,7 @@ import {
   InfoOutlined as InfoIcon,
 } from "@mui/icons-material";
 import { analyzeMultipleApplianceImages, ImageItem } from "../../lib/visionService";
+import { compressImageFile } from "../../lib/imageOptimization";
 import { VisionScanResult, UserAppliance, ApplianceList, STREAMLINED_CATEGORIES } from "../../types";
 import { useCreate, useUpdate, useList } from "@refinedev/core";
 import { getDefaultStartHour } from "../../lib/loadCurveService";
@@ -55,6 +58,7 @@ export const AiVisionScannerTabContent: React.FC<AiVisionScannerTabContentProps>
 }) => {
   const [categoryHint, setCategoryHint] = useState<string>("Auto-Detect from Photo");
   const [isScanning, setIsScanning] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [scanResult, setScanResult] = useState<VisionScanResult | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
 
@@ -93,7 +97,7 @@ export const AiVisionScannerTabContent: React.FC<AiVisionScannerTabContentProps>
   const { mutate: createAppliance, isLoading: isSaving } = useCreate();
   const { mutate: updateAppliance } = useUpdate();
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setScanError(null);
 
@@ -101,21 +105,48 @@ export const AiVisionScannerTabContent: React.FC<AiVisionScannerTabContentProps>
     if (remainingSlots <= 0) return;
 
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    setIsCompressing(true);
 
-    filesToProcess.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const fullBase64 = reader.result as string;
-        const newImg: ImageItem = {
-          id: `img-${Date.now()}-${Math.random()}`,
-          base64: fullBase64,
-          file,
-          name: file.name,
-        };
-        setStagedImages((prev) => [...prev, newImg].slice(0, 3));
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      const processedImages: ImageItem[] = await Promise.all(
+        filesToProcess.map(async (file) => {
+          try {
+            const compressed = await compressImageFile(file, {
+              maxWidth: 1600,
+              maxHeight: 1600,
+              quality: 0.82,
+            });
+            return {
+              id: `img-${Date.now()}-${Math.random()}`,
+              base64: compressed.base64,
+              file: compressed.file,
+              name: file.name,
+            };
+          } catch (compErr) {
+            devLog.warn('AI Scanner', `Compression failed for ${file.name}, using fallback reader:`, compErr);
+            return new Promise<ImageItem>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                resolve({
+                  id: `img-${Date.now()}-${Math.random()}`,
+                  base64: reader.result as string,
+                  file,
+                  name: file.name,
+                });
+              };
+              reader.readAsDataURL(file);
+            });
+          }
+        })
+      );
+
+      setStagedImages((prev) => [...prev, ...processedImages].slice(0, 3));
+    } catch (err: any) {
+      devLog.error("AI Scanner", "Failed to stage photos:", err);
+      setScanError("Failed to process photos. Please try again.");
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const removeStagedImage = (id: string) => {
@@ -443,36 +474,92 @@ export const AiVisionScannerTabContent: React.FC<AiVisionScannerTabContentProps>
         </Typography>
       </Alert>
 
-      {/* Upload Dropzone */}
+      {/* Upload & Mobile Camera Actions */}
       <Paper
         variant="outlined"
         sx={{
-          p: 3.5,
+          p: 3,
           borderRadius: 1.5,
           textAlign: "center",
           borderStyle: "dashed",
           borderWidth: 2,
           bgcolor: "action.hover",
-          cursor: "pointer",
-          "&:hover": { borderColor: "primary.main" },
+          borderColor: "divider",
           position: "relative",
         }}
-        component="label"
       >
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-        <UploadIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
-        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-          Click or drag rating label photos here
-        </Typography>
-        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
-          Upload up to 3 clear photos of appliance specifications (PNG, JPG, WebP)
-        </Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", justifyContent: "center" }}>
+            {/* Native Mobile Camera Trigger */}
+            <Button
+              component="label"
+              variant="contained"
+              color="primary"
+              disabled={isCompressing || stagedImages.length >= 3}
+              startIcon={<CameraIcon />}
+              sx={{
+                fontWeight: 800,
+                borderRadius: 1.25,
+                px: 2.5,
+                py: 1,
+                fontSize: "0.875rem",
+                boxShadow: "0 4px 14px rgba(0, 229, 201, 0.25)",
+              }}
+            >
+              Take Photo with Camera
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                onChange={(e) => {
+                  handleFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </Button>
+
+            {/* Gallery / File Picker */}
+            <Button
+              component="label"
+              variant="outlined"
+              disabled={isCompressing || stagedImages.length >= 3}
+              startIcon={<UploadIcon />}
+              sx={{
+                fontWeight: 700,
+                borderRadius: 1.25,
+                px: 2.5,
+                py: 1,
+                fontSize: "0.875rem",
+              }}
+            >
+              Upload from Gallery
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  handleFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </Button>
+          </Box>
+
+          {isCompressing ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+              <CircularProgress size={16} />
+              <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 600 }}>
+                Optimizing photo for AI scan (compressing to prevent size limit)...
+              </Typography>
+            </Box>
+          ) : (
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+              Capture or upload up to 3 clear photos of appliance specifications (PNG, JPG, WebP, HEIC)
+            </Typography>
+          )}
+        </Box>
       </Paper>
 
       {/* Staged Photo Previews */}

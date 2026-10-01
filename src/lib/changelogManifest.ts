@@ -3,10 +3,20 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.14v",
+    version: "3.4.14v",
+    git_commit_tag: "3.4.14v",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.14v - Fix AI vision scanner mobile camera uploads by introducing client-side Canvas and EXIF image compression, pre-flight payload safeguard, and enhanced serverless 413 error handling",
+  },
+  {
     id: "3.4.13v",
     version: "3.4.13v",
     git_commit_tag: "3.4.13v",
-    created_at: new Date().toISOString(),
+    created_at: "2026-10-01T06:50:00.000Z",
     deployed_by: "Antigravity Pair Programmer",
     source: "github",
     description:

@@ -2,6 +2,7 @@ import { VisionScanResult } from '../types';
 import { devLog } from './devLogger';
 import { executeWithGeminiKeyRotation } from './geminiKeyService';
 import { isCompressorInverterCategory } from './dailyUsageService';
+import { compressImageFile } from './imageOptimization';
 
 export interface ImageItem {
   id: string;
@@ -260,17 +261,49 @@ export async function analyzeMultipleApplianceImages(options: MultiScanOptions):
 
   // 1. First Priority: Vercel Serverless /api/analyze Endpoint
   try {
-    const formattedImages = images.slice(0, 3).map((img) => ({
-      base64: img.base64.replace(/^data:image\/[a-zA-Z]+;base64,/, ''),
-      mimeType: 'image/jpeg',
-    }));
+    const safeImages: { base64: string; mimeType: string }[] = [];
 
-    devLog.info('AI Scanner', 'Routing image payload to Vercel Serverless API (/api/analyze)...');
+    for (const img of images.slice(0, 3)) {
+      let cleanBase64 = img.base64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+      const approxBytes = Math.round(cleanBase64.length * 0.75);
+
+      // If an individual image exceeds 1.2MB, ensure it gets compressed down before sending
+      if (approxBytes > 1.2 * 1024 * 1024) {
+        devLog.warn('AI Scanner', `Image "${img.name || 'unnamed'}" is oversized (${(approxBytes / 1024 / 1024).toFixed(2)} MB), applying dynamic pre-flight compression...`);
+        try {
+          if (img.file) {
+            const comp = await compressImageFile(img.file);
+            cleanBase64 = comp.cleanBase64;
+          } else {
+            const byteCharacters = atob(cleanBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'image/jpeg' });
+            const comp = await compressImageFile(blob);
+            cleanBase64 = comp.cleanBase64;
+          }
+        } catch (compErr) {
+          devLog.warn('AI Scanner', 'Dynamic pre-flight compression skipped:', compErr);
+        }
+      }
+
+      safeImages.push({
+        base64: cleanBase64,
+        mimeType: 'image/jpeg',
+      });
+    }
+
+    const totalPayloadBytes = safeImages.reduce((acc, img) => acc + Math.round(img.base64.length * 0.75), 0);
+    devLog.info('AI Scanner', `Routing image payload to Vercel Serverless API (/api/analyze)... Total payload size: ${(totalPayloadBytes / 1024).toFixed(1)} KB`);
+
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        images: formattedImages,
+        images: safeImages,
         categoryHint: effectiveCategory,
         model: 'gemini-2.5-flash',
       }),
@@ -310,8 +343,12 @@ export async function analyzeMultipleApplianceImages(options: MultiScanOptions):
         };
       }
     } else {
-      const errData = await res.json().catch(() => ({}));
-      serverlessError = errData.error || `Serverless returned HTTP ${res.status}`;
+      if (res.status === 413) {
+        serverlessError = 'Serverless returned HTTP 413 (Payload Too Large). Photos exceeded Vercel size limit.';
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        serverlessError = errData.error || `Serverless returned HTTP ${res.status}`;
+      }
       devLog.warn('AI Scanner', `Vercel serverless /api/analyze unavailable: ${serverlessError}`);
     }
   } catch (err: any) {
@@ -328,6 +365,12 @@ export async function analyzeMultipleApplianceImages(options: MultiScanOptions):
     const failureReason = serverlessError
       ? `Serverless API: ${serverlessError}. Direct Call: ${directErr.message}`
       : directErr.message;
+
+    if (/413|payload too large/i.test(failureReason)) {
+      throw new Error(
+        `Gemini AI Spec Extraction Error: The uploaded photo(s) exceeded the network upload limit. The photos have now been compressed; please try re-scanning or upload a single clear photo.`
+      );
+    }
 
     throw new Error(
       `Gemini AI Spec Extraction Error: ${failureReason}. Please verify GEMINI_API_KEY in Vercel or configure an API key in the scanner.`

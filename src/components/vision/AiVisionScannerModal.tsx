@@ -13,6 +13,7 @@ import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
 import Paper from "@mui/material/Paper";
 import LinearProgress from "@mui/material/LinearProgress";
+import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import Accordion from "@mui/material/Accordion";
 import AccordionSummary from "@mui/material/AccordionSummary";
@@ -38,6 +39,7 @@ import {
   InfoOutlined as InfoIcon,
 } from "@mui/icons-material";
 import { analyzeMultipleApplianceImages, ImageItem } from "../../lib/visionService";
+import { compressImageFile } from "../../lib/imageOptimization";
 import { VisionScanResult, UserAppliance, ApplianceList, STREAMLINED_CATEGORIES } from "../../types";
 import { useCreate, useUpdate, useList } from "@refinedev/core";
 import { getDefaultStartHour } from "../../lib/loadCurveService";
@@ -62,6 +64,7 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
 }) => {
   const [categoryHint, setCategoryHint] = useState<string>("Auto-Detect from Photo");
   const [isScanning, setIsScanning] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [scanResult, setScanResult] = useState<VisionScanResult | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
 
@@ -101,7 +104,7 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
   const { mutate: createAppliance, isLoading: isSaving } = useCreate();
   const { mutate: updateAppliance } = useUpdate();
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setScanError(null);
 
@@ -109,21 +112,48 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
     if (remainingSlots <= 0) return;
 
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    setIsCompressing(true);
 
-    filesToProcess.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const fullBase64 = reader.result as string;
-        const newImg: ImageItem = {
-          id: `img-${Date.now()}-${Math.random()}`,
-          base64: fullBase64,
-          file,
-          name: file.name,
-        };
-        setStagedImages((prev) => [...prev, newImg].slice(0, 3));
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      const processedImages: ImageItem[] = await Promise.all(
+        filesToProcess.map(async (file) => {
+          try {
+            const compressed = await compressImageFile(file, {
+              maxWidth: 1600,
+              maxHeight: 1600,
+              quality: 0.82,
+            });
+            return {
+              id: `img-${Date.now()}-${Math.random()}`,
+              base64: compressed.base64,
+              file: compressed.file,
+              name: file.name,
+            };
+          } catch (compErr) {
+            devLog.warn('AI Scanner', `Compression failed for ${file.name}, using fallback reader:`, compErr);
+            return new Promise<ImageItem>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                resolve({
+                  id: `img-${Date.now()}-${Math.random()}`,
+                  base64: reader.result as string,
+                  file,
+                  name: file.name,
+                });
+              };
+              reader.readAsDataURL(file);
+            });
+          }
+        })
+      );
+
+      setStagedImages((prev) => [...prev, ...processedImages].slice(0, 3));
+    } catch (err: any) {
+      devLog.error("AI Scanner", "Failed to stage photos:", err);
+      setScanError("Failed to process photos. Please try again.");
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const removeStagedImage = (id: string) => {
@@ -494,11 +524,12 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
         >
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", justifyContent: "center" }}>
-              {/* Native Android Camera Trigger */}
+              {/* Native Mobile Camera Trigger */}
               <Button
                 component="label"
                 variant="contained"
                 color="primary"
+                disabled={isCompressing || stagedImages.length >= 3}
                 startIcon={<CameraIcon />}
                 sx={{
                   fontWeight: 800,
@@ -515,7 +546,10 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
                   accept="image/*"
                   capture="environment"
                   hidden
-                  onChange={(e) => handleFiles(e.target.files)}
+                  onChange={(e) => {
+                    handleFiles(e.target.files);
+                    e.target.value = "";
+                  }}
                 />
               </Button>
 
@@ -523,6 +557,7 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
               <Button
                 component="label"
                 variant="outlined"
+                disabled={isCompressing || stagedImages.length >= 3}
                 startIcon={<UploadIcon />}
                 sx={{
                   fontWeight: 700,
@@ -538,14 +573,26 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
                   accept="image/*"
                   multiple
                   hidden
-                  onChange={(e) => handleFiles(e.target.files)}
+                  onChange={(e) => {
+                    handleFiles(e.target.files);
+                    e.target.value = "";
+                  }}
                 />
               </Button>
             </Box>
 
-            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-              Capture or upload up to 3 clear photos of appliance nameplates, DOE yellow energy guides, or specification stickers
-            </Typography>
+            {isCompressing ? (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                <CircularProgress size={16} />
+                <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 600 }}>
+                  Optimizing photo for AI scan (compressing to prevent size limit)...
+                </Typography>
+              </Box>
+            ) : (
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                Capture or upload up to 3 clear photos of appliance nameplates, DOE yellow energy guides, or specification stickers
+              </Typography>
+            )}
           </Box>
         </Paper>
 
