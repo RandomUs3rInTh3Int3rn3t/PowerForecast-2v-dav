@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLogin } from "@refinedev/core";
+import { supabaseClient } from "../lib/supabaseClient";
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
@@ -47,6 +48,20 @@ export const LoginPage: React.FC = () => {
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
   const [lastRawError, setLastRawError] = useState<any>(null);
 
+  // Auto-redirect if already authenticated with active session
+  useEffect(() => {
+    let isMounted = true;
+    const rememberMePref = localStorage.getItem("powerforecast_remember_me") !== "false";
+    supabaseClient.auth.getSession().then(({ data }) => {
+      if (isMounted && data?.session?.user && rememberMePref) {
+        navigate("/dashboard", { replace: true });
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -91,9 +106,11 @@ export const LoginPage: React.FC = () => {
             if (rememberMe) {
               localStorage.setItem("powerforecast_remembered_email", trimmedEmail);
               localStorage.setItem("powerforecast_remember_me", "true");
+              sessionStorage.setItem("powerforecast_session_active", "true");
             } else {
               localStorage.removeItem("powerforecast_remembered_email");
               localStorage.setItem("powerforecast_remember_me", "false");
+              sessionStorage.setItem("powerforecast_session_active", "true");
             }
           } catch (storageErr) {
             console.warn("Storage restricted, skipping rememberMe persistence:", storageErr);
@@ -321,6 +338,9 @@ export const LoginPage: React.FC = () => {
                 <TextField
                   label="Email Address"
                   type="email"
+                  name="email"
+                  id="email"
+                  autoComplete="username email"
                   fullWidth
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -339,6 +359,9 @@ export const LoginPage: React.FC = () => {
                 <TextField
                   label="Password"
                   type={showPassword ? "text" : "password"}
+                  name="password"
+                  id="password"
+                  autoComplete="current-password"
                   fullWidth
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

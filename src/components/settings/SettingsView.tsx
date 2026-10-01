@@ -61,6 +61,10 @@ import {
   MarkEmailRead as EmailReadIcon,
   CheckCircle as CheckCircleIcon,
   MarkEmailUnread as EmailUnreadIcon,
+  NotificationsActive as NotificationsActiveIcon,
+  MobileFriendly as DeviceIcon,
+  Sensors as SensorsIcon,
+  CloudDone as CloudDoneIcon,
 } from "@mui/icons-material";
 import { useGetIdentity, useLogout } from "@refinedev/core";
 import { useToast } from "../common/ToastProvider";
@@ -73,6 +77,13 @@ import {
   sendHouseholdInvitationEmail,
   EmailHealthStatus,
 } from "../../lib/emailService";
+import {
+  isPushSupported,
+  getPushSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+  sendTestBackgroundPush,
+} from "../../lib/pushNotificationService";
 import {
   getNotificationPreferences,
   saveNotificationPreferences,
@@ -432,6 +443,97 @@ export const SettingsView: React.FC = () => {
   const handleRemoveMember = (memberId: string, memberName: string) => {
     setMembers((prev) => prev.filter((m) => m.id !== memberId));
     showInfo(language === "tl" ? `Tinanggal si ${memberName} sa household.` : `Removed ${memberName} from household.`);
+  };
+
+  // ── Web Push & Background OS Notifications ────────────────
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [isPushLoading, setIsPushLoading] = useState(false);
+  const [pushCountdown, setPushCountdown] = useState<number | null>(null);
+  const [pushEndpointType, setPushEndpointType] = useState<string>("Detecting...");
+
+  useEffect(() => {
+    if (isPushSupported()) {
+      getPushSubscription().then((sub) => {
+        setIsPushSubscribed(Boolean(sub));
+        if (sub?.endpoint) {
+          if (sub.endpoint.includes("fcm.googleapis.com")) setPushEndpointType("Google FCM / Chrome");
+          else if (sub.endpoint.includes("notify.windows.com")) setPushEndpointType("Microsoft WNS / Edge");
+          else if (sub.endpoint.includes("mozilla.com")) setPushEndpointType("Mozilla Autopush");
+          else setPushEndpointType("W3C Standard Gateway");
+        } else {
+          setPushEndpointType("Not Subscribed");
+        }
+      });
+    } else {
+      setPushEndpointType("Unsupported");
+    }
+  }, []);
+
+  const handleToggleWebPush = async () => {
+    setIsPushLoading(true);
+    try {
+      if (isPushSubscribed) {
+        await unsubscribeFromPush(identity?.id);
+        setIsPushSubscribed(false);
+        setPushEndpointType("Not Subscribed");
+        showInfo(
+          language === "tl"
+            ? "Na-unlink ang device sa Web Push notifications."
+            : "Device unlinked from background Web Push notifications."
+        );
+      } else {
+        const res = await subscribeToPush(identity?.id);
+        if (res.success) {
+          setIsPushSubscribed(true);
+          const endpoint = res.subscription?.endpoint || "";
+          if (endpoint.includes("fcm.googleapis.com")) setPushEndpointType("Google FCM / Chrome");
+          else if (endpoint.includes("notify.windows.com")) setPushEndpointType("Microsoft WNS / Edge");
+          else if (endpoint.includes("mozilla.com")) setPushEndpointType("Mozilla Autopush");
+          else setPushEndpointType("W3C Standard Gateway");
+
+          showSuccess(
+            language === "tl"
+              ? "Matagumpay na na-link ang device para sa closed-app push alerts!"
+              : "Device successfully registered for closed-app Web Push alerts!",
+            "Web Push Active"
+          );
+        } else {
+          showError(res.error || "Failed to enable Web Push.");
+        }
+      }
+    } catch (err: any) {
+      showError(err?.message || "Failed to update push subscription.");
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
+
+  const handleTestBackgroundPush = async () => {
+    setPushCountdown(5);
+    showInfo(
+      language === "tl"
+        ? "Alert scheduled! Isara ang browser o PWA ngayon upang masubukan ang Windows Action Center notification."
+        : "Alert scheduled! Close your browser or PWA window right now to verify closed-app delivery in Windows Action Center."
+    );
+
+    sendTestBackgroundPush({
+      delaySeconds: 5,
+      title: "PowerForecast Background Alert",
+      message: "⚡ Closed-app push alert successfully received by your device!",
+      userId: identity?.id,
+    }).catch((err) => {
+      devLog.warn("Settings", "Background push error:", err);
+    });
+
+    const interval = setInterval(() => {
+      setPushCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   // ── 5. Account Deletion Security Flow ────────────────────
@@ -852,7 +954,135 @@ export const SettingsView: React.FC = () => {
         </Grid>
       </Card>
 
-      {/* 4. SMTP & Resend Email Delivery Engine Card */}
+      {/* 4. Web Push & OS Background Notifications Card (Closed-App Delivery) */}
+      <Card
+        sx={{
+          p: { xs: 2.5, sm: 3 },
+          borderRadius: 1.5,
+          border: "1px solid",
+          borderColor: (theme) =>
+            theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.25)",
+          bgcolor: (theme) =>
+            theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.85)" : "#ffffff",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" },
+            mb: 2,
+            flexWrap: "wrap",
+            gap: 1.5,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <NotificationsActiveIcon sx={{ color: "primary.main" }} />
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "text.primary" }}>
+                {language === "tl" ? "Background Web Push Notifications (Closed-App)" : "Background Web Push Notifications (Closed-App)"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {language === "tl"
+                  ? "Makatanggap ng instant alerts sa Windows Action Center o Mobile Notification Tray kahit ganap nang nakasara ang browser o PWA."
+                  : "Receive instant energy surge & budget alerts in Windows Action Center or mobile tray even when your browser or PWA is completely closed."}
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Button
+              variant={isPushSubscribed ? "outlined" : "contained"}
+              color={isPushSubscribed ? "inherit" : "primary"}
+              size="small"
+              startIcon={isPushLoading ? <CircularProgress size={14} color="inherit" /> : <SensorsIcon />}
+              onClick={handleToggleWebPush}
+              disabled={isPushLoading || !isPushSupported()}
+              sx={{ borderRadius: 1.5, fontWeight: 700, fontSize: "0.75rem", textTransform: "none" }}
+            >
+              {isPushSubscribed
+                ? (language === "tl" ? "I-unlink ang Device" : "Unlink This Device")
+                : (language === "tl" ? "I-enable ang Background Push" : "Enable Background Push")}
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Status Chips */}
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2.5 }}>
+          <Chip
+            icon={isPushSupported() ? <CheckCircleIcon sx={{ fontSize: "14px !important" }} /> : <WarningIcon sx={{ fontSize: "14px !important" }} />}
+            label={isPushSupported() ? "W3C Web Push: Supported" : "W3C Web Push: Unsupported"}
+            size="small"
+            color={isPushSupported() ? "success" : "default"}
+            variant="outlined"
+            sx={{ fontWeight: 800, fontSize: "0.72rem" }}
+          />
+          <Chip
+            icon={isPushSubscribed ? <CloudDoneIcon sx={{ fontSize: "14px !important" }} /> : <DeviceIcon sx={{ fontSize: "14px !important" }} />}
+            label={isPushSubscribed ? `Status: Registered (${pushEndpointType})` : "Status: Not Subscribed on This Device"}
+            size="small"
+            color={isPushSubscribed ? "primary" : "warning"}
+            variant="outlined"
+            sx={{ fontWeight: 800, fontSize: "0.72rem" }}
+          />
+          <Chip
+            label="Service Worker: WNS / FCM Gateway Active"
+            size="small"
+            variant="outlined"
+            sx={{ fontWeight: 700, fontSize: "0.72rem" }}
+          />
+        </Box>
+
+        {/* Closed-App Verification Banner */}
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 1.25,
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.25)" : "rgba(248, 250, 252, 0.8)",
+            display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
+            alignItems: { xs: "stretch", sm: "center" },
+            justifyContent: "space-between",
+            gap: 2,
+          }}
+        >
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5 }}>
+              {language === "tl" ? "Subukan ang Closed-App Notification (5s Countdown)" : "Test Closed-App Notification (5s Countdown)"}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+              {language === "tl"
+                ? "Pindutin ito, pagkatapos ay agad na isara ang browser tab o PWA. Pagkalipas ng 5 segundo, magpapakita ang Windows Action Center alert."
+                : "Click the test button and immediately close or minimize this window. Within 5 seconds, an alert will pop up in Windows Action Center."}
+            </Typography>
+          </Box>
+
+          <Box sx={{ flexShrink: 0 }}>
+            {pushCountdown !== null ? (
+              <Alert severity="info" sx={{ py: 0.5, px: 1.5, fontSize: "0.75rem", borderRadius: 1 }}>
+                {language === "tl"
+                  ? `Isara ang app ngayon! Darating sa ${pushCountdown}s...`
+                  : `Close the app now! Arriving in ${pushCountdown}s...`}
+              </Alert>
+            ) : (
+              <Button
+                variant="outlined"
+                color="primary"
+                size="small"
+                disabled={!isPushSubscribed}
+                onClick={handleTestBackgroundPush}
+                startIcon={<SensorsIcon />}
+                sx={{ borderRadius: 1.5, fontWeight: 800, fontSize: "0.75rem", textTransform: "none", width: { xs: "100%", sm: "auto" } }}
+              >
+                {language === "tl" ? "Ipadala ang Test Push (5s)" : "Send Test Background Push (5s)"}
+              </Button>
+            )}
+          </Box>
+        </Paper>
+      </Card>
+
+      {/* 5. SMTP & Resend Email Delivery Engine Card */}
       <Card
         sx={{
           p: { xs: 2.5, sm: 3 },

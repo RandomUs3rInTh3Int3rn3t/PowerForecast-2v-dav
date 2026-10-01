@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Refine, Authenticated } from "@refinedev/core";
 import routerBindings, {
   UnsavedChangesNotifier,
@@ -6,6 +6,7 @@ import routerBindings, {
 import { HashRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { resilientDataProvider } from "./providers/dataProvider";
 import { authProvider } from "./providers/authProvider";
+import { supabaseClient } from "./lib/supabaseClient";
 import { Layout } from "./components/layout/Layout";
 import { LandingPage } from "./pages/LandingPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -40,6 +41,64 @@ import {
   HistoryEdu as ChangelogIcon,
   Settings as SettingsIcon,
 } from "@mui/icons-material";
+
+/**
+ * Intelligent Root Gate: Detects existing active session and 'Remember Me' state.
+ * If authenticated, seamlessly routes straight to /dashboard (e.g. when launching installed PC PWA).
+ * If guest, displays the marketing LandingPage.
+ */
+const RootGate: React.FC = () => {
+  const [checking, setChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const rememberMe = localStorage.getItem("powerforecast_remember_me");
+    const sessionActive = sessionStorage.getItem("powerforecast_session_active");
+    // If rememberMe was explicitly turned off ("false") and sessionStorage is gone, user should not be kept logged in
+    const isRemembered = rememberMe !== "false" || sessionActive === "true";
+    const cachedUser = localStorage.getItem("powerforecast_active_user");
+
+    supabaseClient.auth
+      .getSession()
+      .then(({ data }) => {
+        if (isMounted) {
+          if (isRemembered && (data?.session?.user || cachedUser)) {
+            sessionStorage.setItem("powerforecast_session_active", "true");
+            setIsAuthenticated(true);
+          } else if (!isRemembered) {
+            // Explicitly sign out if Remember Me was disabled and browser was reopened
+            supabaseClient.auth.signOut().catch(() => {});
+            localStorage.removeItem("powerforecast_active_user");
+          }
+          setChecking(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          if (isRemembered && cachedUser) {
+            sessionStorage.setItem("powerforecast_session_active", "true");
+            setIsAuthenticated(true);
+          }
+          setChecking(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (checking) {
+    return null;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <LandingPage />;
+};
 
 export const App: React.FC = () => {
   return (
@@ -148,8 +207,8 @@ export const App: React.FC = () => {
             }}
           >
             <Routes>
-              {/* Public Landing / Marketing Page */}
-              <Route path="/" element={<LandingPage />} />
+              {/* Public Landing / Marketing Page (With Intelligent Auth Redirect) */}
+              <Route path="/" element={<RootGate />} />
               <Route path="/landing" element={<LandingPage />} />
 
               {/* Authentication Pages */}

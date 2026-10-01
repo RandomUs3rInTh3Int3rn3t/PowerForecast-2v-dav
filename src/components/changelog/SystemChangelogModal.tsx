@@ -41,6 +41,16 @@ export interface SystemChangelogEntry {
 // Master compiled GitHub deployment history covering all releases
 const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.8v",
+    version: "3.4.8v",
+    git_commit_tag: "3.4.8v",
+    created_at: "2026-10-01T04:05:00.000Z",
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.8v - Implement persistent session remember-me, intelligent root routing, and closed-app W3C Web Push notification architecture with Supabase Edge Functions",
+  },
+  {
     id: "3.4.7v",
     version: "3.4.7v",
     git_commit_tag: "3.4.7v",

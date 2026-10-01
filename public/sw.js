@@ -1,5 +1,5 @@
-// PowerForecast v3.4.0 - BETAv Service Worker — High-Performance Mobile Caching & Offline Resilience
-const SW_VERSION = '3.4.0-BETAv';
+// PowerForecast v3.4.8v Service Worker — High-Performance Mobile Caching, Push & Offline Resilience
+const SW_VERSION = '3.4.8v';
 const CACHE_NAME = `powerforecast-${SW_VERSION}-cache`;
 
 const STATIC_ASSETS = [
@@ -108,7 +108,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Push Event: Handle background web push notifications even when PWA window is closed
+// Push Event: Handle background web push notifications even when PWA window is completely closed
 self.addEventListener('push', (event) => {
   let data = {};
   if (event.data) {
@@ -123,34 +123,59 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body || 'Smart Energy Notification',
     icon: data.icon || '/Assets/LOGO.png',
-    badge: '/Assets/LOGO.png',
+    badge: data.badge || '/Assets/LOGO.png',
     tag: data.tag || `powerforecast-alert-${Date.now()}`,
+    vibrate: [200, 100, 200],
     requireInteraction: data.urgency === 'critical' || data.urgency === 'high' || data.requireInteraction === true,
     data: data,
+    actions: [
+      { action: 'open_dashboard', title: 'Open Dashboard' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ]
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Notification Click Event: Focus existing window or open dashboard when clicked from Windows Action Center
+// Notification Click Event: Focus existing window or open dashboard when clicked from Windows Action Center / Android
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const urlToOpen = (event.notification.data && event.notification.data.url) || '/dashboard';
+
+  // If user clicked the explicit 'dismiss' button
+  if (event.action === 'dismiss') {
+    return;
+  }
+
+  const rawUrl = (event.notification.data && event.notification.data.url) || '/#/dashboard';
+  const targetUrl = new URL(rawUrl.startsWith('/') ? rawUrl : '/' + rawUrl, self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If an existing tab or PWA window is open, focus it and navigate
       for (const client of clientList) {
         if ('focus' in client) {
-          if (client.url && client.url.includes(urlToOpen)) {
+          if (client.url && (client.url.includes('/#/dashboard') || client.url.includes(rawUrl))) {
             return client.focus();
           }
         }
       }
+      // If client exists but on different page, focus first and navigate
+      if (clientList.length > 0 && 'navigate' in clientList[0]) {
+        return clientList[0].focus().then(() => clientList[0].navigate(targetUrl));
+      }
+      // Otherwise open new PWA/browser window
       if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
+        return clients.openWindow(targetUrl);
       }
     })
   );
+});
+
+// Periodic Background Sync: Wakes SW intermittently on Windows & Android PWAs for power monitoring
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'powerforecast-check') {
+    console.log('[SW] Periodic background sync check triggered');
+  }
 });
 
 // Notification Close Event

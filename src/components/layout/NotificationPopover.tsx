@@ -23,9 +23,19 @@ import {
   FlashOn as SurgeIcon,
   Shield as ShieldIcon,
   Speed as SpeedIcon,
+  CloudDone as CloudDoneIcon,
+  Sensors as SensorsIcon,
+  MobileFriendly as DeviceIcon,
 } from "@mui/icons-material";
 import { useNotifications } from "../../hooks/useNotifications";
 import { NotificationLevel } from "../../lib/notificationService";
+import {
+  isPushSupported,
+  getPushSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+  sendTestBackgroundPush,
+} from "../../lib/pushNotificationService";
 
 interface NotificationPopoverProps {
   anchorEl: HTMLElement | null;
@@ -81,6 +91,49 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
 
   const open = Boolean(anchorEl);
   const currentLevelConfig = LEVEL_CONFIG[prefs.notificationLevel || "standard"];
+
+  const [isPushSubscribed, setIsPushSubscribed] = React.useState(false);
+  const [isPushLoading, setIsPushLoading] = React.useState(false);
+  const [pushCountdown, setPushCountdown] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (open && isPushSupported()) {
+      getPushSubscription().then((sub) => {
+        setIsPushSubscribed(Boolean(sub));
+      });
+    }
+  }, [open]);
+
+  const handleTogglePush = async () => {
+    setIsPushLoading(true);
+    try {
+      if (isPushSubscribed) {
+        await unsubscribeFromPush();
+        setIsPushSubscribed(false);
+      } else {
+        const res = await subscribeToPush();
+        if (res.success) {
+          setIsPushSubscribed(true);
+        }
+      }
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
+
+  const handleTestBackgroundPush = async () => {
+    setPushCountdown(5);
+    sendTestBackgroundPush({ delaySeconds: 5 }).catch(() => {});
+    const interval = setInterval(() => {
+      setPushCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   return (
     <Popover
@@ -444,6 +497,62 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
           </Box>
         </Box>
       </Stack>
+
+      {/* Background Web Push Notification Channel (Windows Action Center / Mobile Tray) */}
+      {isPushSupported() && (
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.5,
+            mt: 2,
+            borderRadius: 1.25,
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.05)" : "rgba(13, 148, 136, 0.04)",
+            borderColor: isPushSubscribed ? "primary.main" : "divider",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <CloudDoneIcon sx={{ fontSize: 18, color: isPushSubscribed ? "primary.main" : "text.secondary" }} />
+              <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                Background Web Push (OS / PWA)
+              </Typography>
+            </Box>
+            <Switch
+              size="small"
+              checked={isPushSubscribed}
+              disabled={isPushLoading}
+              onChange={handleTogglePush}
+            />
+          </Box>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.25 }}>
+            Receives alerts directly in Windows Action Center or mobile tray even when this app/browser is completely closed.
+          </Typography>
+
+          {pushCountdown !== null ? (
+            <Alert severity="info" sx={{ py: 0.5, px: 1, fontSize: "0.72rem", borderRadius: 1 }}>
+              Dispatched to cloud! Close browser or PWA window right now! Arriving in {pushCountdown}s...
+            </Alert>
+          ) : (
+            <Button
+              size="small"
+              variant="outlined"
+              fullWidth
+              disabled={!isPushSubscribed}
+              onClick={handleTestBackgroundPush}
+              sx={{
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 1,
+                py: 0.35,
+              }}
+            >
+              Test Closed-App Push (5s Countdown)
+            </Button>
+          )}
+        </Paper>
+      )}
 
       <Divider sx={{ my: 2 }} />
 

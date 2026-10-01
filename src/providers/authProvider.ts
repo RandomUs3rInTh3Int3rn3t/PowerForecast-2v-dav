@@ -76,10 +76,12 @@ export const authProvider: AuthProvider = {
 
       try {
         localStorage.setItem("powerforecast_active_user", JSON.stringify(activeUser));
+        localStorage.setItem("powerforecast_remember_me", rememberMe ? "true" : "false");
+        sessionStorage.setItem("powerforecast_session_active", "true");
       } catch (storageErr) {
         devLog.warn("Auth", "Could not cache active user to localStorage (storage restricted):", storageErr);
       }
-      devLog.info("Auth", "Authentication successful", activeUser);
+      devLog.info("Auth", "Authentication successful (rememberMe=" + Boolean(rememberMe) + ")", activeUser);
 
       return {
         success: true,
@@ -257,7 +259,11 @@ export const authProvider: AuthProvider = {
     } catch (err) {
       devLog.warn("Auth", "Sign out error:", err);
     }
-    localStorage.removeItem("powerforecast_active_user");
+    try {
+      localStorage.removeItem("powerforecast_active_user");
+      localStorage.removeItem("powerforecast_remember_me");
+      sessionStorage.removeItem("powerforecast_session_active");
+    } catch {}
     devLog.info("Auth", "User logged out successfully");
     return {
       success: true,
@@ -267,6 +273,24 @@ export const authProvider: AuthProvider = {
 
   check: async () => {
     try {
+      const rememberMe = localStorage.getItem("powerforecast_remember_me");
+      const sessionActive = sessionStorage.getItem("powerforecast_session_active");
+
+      // If Remember Me was unchecked and browser/tab was closed, expire the session immediately
+      if (rememberMe === "false" && !sessionActive) {
+        devLog.info("Auth", "Remember Me was disabled and browser tab was closed. Clearing session.");
+        try {
+          await supabaseClient.auth.signOut();
+          localStorage.removeItem("powerforecast_active_user");
+          localStorage.removeItem("powerforecast_remember_me");
+        } catch {}
+        return {
+          authenticated: false,
+          redirectTo: "/login",
+          logout: true,
+        };
+      }
+
       const { data, error } = await supabaseClient.auth.getSession();
       if (error || !data?.session?.user) {
         // If offline during check, preserve session if cached user exists
@@ -281,6 +305,8 @@ export const authProvider: AuthProvider = {
         }
         try {
           localStorage.removeItem("powerforecast_active_user");
+          localStorage.removeItem("powerforecast_remember_me");
+          sessionStorage.removeItem("powerforecast_session_active");
         } catch {}
         return {
           authenticated: false,
@@ -289,12 +315,19 @@ export const authProvider: AuthProvider = {
         };
       }
 
+      // Session is active and verified
+      try {
+        sessionStorage.setItem("powerforecast_session_active", "true");
+      } catch {}
+
       return {
         authenticated: true,
       };
     } catch {
       try {
         localStorage.removeItem("powerforecast_active_user");
+        localStorage.removeItem("powerforecast_remember_me");
+        sessionStorage.removeItem("powerforecast_session_active");
       } catch {}
       return {
         authenticated: false,
