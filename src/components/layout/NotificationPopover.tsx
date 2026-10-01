@@ -26,6 +26,7 @@ import {
   CloudDone as CloudDoneIcon,
   Sensors as SensorsIcon,
   MobileFriendly as DeviceIcon,
+  HelpOutlined as HelpIcon,
 } from "@mui/icons-material";
 import { useNotifications } from "../../hooks/useNotifications";
 import { NotificationLevel } from "../../lib/notificationService";
@@ -95,6 +96,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
   const [isPushSubscribed, setIsPushSubscribed] = React.useState(false);
   const [isPushLoading, setIsPushLoading] = React.useState(false);
   const [pushError, setPushError] = React.useState<string | null>(null);
+  const [showGuide, setShowGuide] = React.useState(false);
   const [pushCountdown, setPushCountdown] = React.useState<number | null>(null);
 
   React.useEffect(() => {
@@ -116,12 +118,15 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
         const res = await subscribeToPush();
         if (res.success) {
           setIsPushSubscribed(true);
+          setShowGuide(false);
         } else {
           setPushError(res.error || "Failed to enable Web Push.");
+          setShowGuide(true);
         }
       }
     } catch (err: any) {
       setPushError(err?.message || "An unexpected error occurred.");
+      setShowGuide(true);
     } finally {
       setIsPushLoading(false);
     }
@@ -567,6 +572,48 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
             >
               {pushError}
             </Alert>
+          )}
+
+          {/* Guide toggle button */}
+          <Box sx={{ mt: 1, display: "flex", justifyContent: "flex-end" }}>
+            <Button
+              size="small"
+              onClick={() => setShowGuide(!showGuide)}
+              startIcon={<HelpIcon sx={{ fontSize: 13 }} />}
+              sx={{
+                fontSize: "0.6875rem",
+                textTransform: "none",
+                py: 0.2,
+                px: 0.75,
+                color: "text.secondary",
+                "&:hover": { color: "primary.main" },
+              }}
+            >
+              {showGuide ? "Hide Setup Tips" : "Push Setup & Error Guide"}
+            </Button>
+          </Box>
+
+          {showGuide && (
+            <Paper
+              variant="outlined"
+              sx={{
+                mt: 1,
+                p: 1.25,
+                borderRadius: 1,
+                bgcolor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.3)" : "rgba(248, 250, 252, 0.9)",
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "primary.main", display: "block", mb: 0.5, fontSize: "0.7rem" }}>
+                Browser Setup Tips to Avoid Errors:
+              </Typography>
+              <Typography variant="caption" component="div" sx={{ color: "text.secondary", fontSize: "0.6875rem", lineHeight: 1.45 }}>
+                • <strong>Brave Browser:</strong> Open <code>brave://settings/privacy</code> and enable <em>"Use Google services for push messaging"</em>.<br />
+                • <strong>Ad-Blockers / VPN:</strong> Whitelist Google push sockets (<code>fcm.googleapis.com</code>, <code>mtalk.google.com</code>).<br />
+                • <strong>Windows:</strong> Ensure Notifications are enabled in Windows Settings &gt; System &gt; Notifications.<br />
+                • <strong>Incognito:</strong> Web Push is disabled by browsers in Private/Incognito windows.
+              </Typography>
+            </Paper>
           )}
         </Paper>
       )}

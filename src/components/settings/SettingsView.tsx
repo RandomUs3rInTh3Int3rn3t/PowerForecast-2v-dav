@@ -31,6 +31,9 @@ import InputAdornment from "@mui/material/InputAdornment";
 import Switch from "@mui/material/Switch";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
+import Accordion from "@mui/material/Accordion";
+import AccordionSummary from "@mui/material/AccordionSummary";
+import AccordionDetails from "@mui/material/AccordionDetails";
 import {
   getSupabaseResetPasswordTemplate,
   getSupabaseConfirmSignupTemplate,
@@ -65,6 +68,8 @@ import {
   MobileFriendly as DeviceIcon,
   Sensors as SensorsIcon,
   CloudDone as CloudDoneIcon,
+  ExpandMore as ExpandMoreIcon,
+  HelpOutlined as HelpIcon,
 } from "@mui/icons-material";
 import { useGetIdentity, useLogout } from "@refinedev/core";
 import { useToast } from "../common/ToastProvider";
@@ -1080,6 +1085,133 @@ export const SettingsView: React.FC = () => {
             )}
           </Box>
         </Paper>
+
+        {/* Web Push Setup & Error Prevention Accordion */}
+        <Accordion
+          disableGutters
+          elevation={0}
+          sx={{
+            mt: 2,
+            borderRadius: 1.25,
+            border: "1px solid",
+            borderColor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(18, 21, 26, 0.7)" : "rgba(248, 250, 252, 0.7)",
+            "&:before": { display: "none" },
+          }}
+        >
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />}
+            sx={{ px: 2, py: 0.5, minHeight: 44 }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <HelpIcon sx={{ fontSize: 18, color: "primary.main" }} />
+              <Typography variant="body2" sx={{ fontWeight: 800, fontSize: "0.8rem" }}>
+                {language === "tl"
+                  ? "Gabay: Paano maiwasan ang push connection error? (Brave, Chrome, Windows)"
+                  : "Setup Guide: How to avoid push connection errors (Brave, Chrome, Windows)"}
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={{ px: 2, pb: 2, pt: 0 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+              {language === "tl"
+                ? "Kung nakaranas ka ng 'Push service connection failed' o AbortError habang nag-e-enable, sundin ang mga hakbang na ito batay sa iyong browser at operating system:"
+                : "If you encounter 'Push service connection failed' or an AbortError when enabling, follow these browser-specific guidelines:"}
+            </Typography>
+
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1,
+                    height: "100%",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.2)" : "rgba(255, 255, 255, 0.6)",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: "primary.main", display: "block", mb: 0.5 }}>
+                    🦁 {language === "tl" ? "1. Para sa Brave Browser (Pinakakaraniwan)" : "1. For Brave Browser Users (Most Common)"}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", lineHeight: 1.5 }}>
+                    {language === "tl"
+                      ? "I-type ang brave://settings/privacy sa URL bar. Hanapin ang 'Use Google services for push messaging' at i-ON ito, pagkatapos ay i-relaunch ang Brave."
+                      : "Open brave://settings/privacy in your URL bar. Scroll down and toggle ON 'Use Google services for push messaging', then relaunch Brave."}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1,
+                    height: "100%",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.2)" : "rgba(255, 255, 255, 0.6)",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: "warning.main", display: "block", mb: 0.5 }}>
+                    🛡️ {language === "tl" ? "2. Ad-Blockers, VPNs & Firewalls" : "2. Ad-Blockers, VPNs & Firewalls"}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", lineHeight: 1.5 }}>
+                    {language === "tl"
+                      ? "Siguraduhing hindi bina-block ng extensions (uBlock, AdGuard, Pi-hole) o corporate VPN ang Google FCM (fcm.googleapis.com, mtalk.google.com)."
+                      : "Ensure extensions (uBlock, AdGuard, Pi-hole) or VPNs do not block Google FCM socket domains (fcm.googleapis.com, mtalk.google.com)."}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1,
+                    height: "100%",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.2)" : "rgba(255, 255, 255, 0.6)",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: "info.main", display: "block", mb: 0.5 }}>
+                    🪟 {language === "tl" ? "3. Windows Action Center Notifications" : "3. Windows Action Center Notifications"}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", lineHeight: 1.5 }}>
+                    {language === "tl"
+                      ? "Pumunta sa Windows Settings -> System -> Notifications. Siguraduhing naka-ON ang Notifications at pinapayagan ang iyong browser."
+                      : "Open Windows Settings -> System -> Notifications. Ensure Notifications are ON and your browser is allowed to display desktop banners."}
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1,
+                    height: "100%",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.2)" : "rgba(255, 255, 255, 0.6)",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: "success.main", display: "block", mb: 0.5 }}>
+                    🌐 {language === "tl" ? "4. Regular Browsing Window Lamang" : "4. Standard Window (No Incognito)"}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", lineHeight: 1.5 }}>
+                    {language === "tl"
+                      ? "Awtomatikong bina-block ng mga browser ang Web Push sa Incognito o InPrivate mode. Gamitin ang regular window."
+                      : "Browsers strictly disallow Web Push subscriptions in Incognito or InPrivate windows. Use a normal browser profile."}
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+          </AccordionDetails>
+        </Accordion>
       </Card>
 
       {/* 5. SMTP & Resend Email Delivery Engine Card */}

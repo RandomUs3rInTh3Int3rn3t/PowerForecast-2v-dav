@@ -3,10 +3,20 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.12v",
+    version: "3.4.12v",
+    git_commit_tag: "3.4.12v",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.12v - Add interactive Web Push Setup and Troubleshooting Guide to Settings and Notification Popover for Brave, AdBlockers, and OS permissions",
+  },
+  {
     id: "3.4.11v",
     version: "3.4.11v",
     git_commit_tag: "3.4.11v",
-    created_at: new Date().toISOString(),
+    created_at: "2026-10-01T06:12:00.000Z",
     deployed_by: "Antigravity Pair Programmer",
     source: "github",
     description:
