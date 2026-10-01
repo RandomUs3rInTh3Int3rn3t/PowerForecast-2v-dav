@@ -451,6 +451,41 @@ export const SystemTestingBanner: React.FC<SystemTestingBannerProps> = ({
                 </li>
               </Box>
             </Box>
+
+            {/* Dev Team Note */}
+            <Box
+              sx={{
+                textAlign: "center",
+                py: 0.5,
+                px: 1,
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  fontStyle: "italic",
+                  color: isDark ? "rgba(226, 232, 240, 0.85)" : "#334155",
+                  fontSize: "0.84rem",
+                  fontWeight: 500,
+                  letterSpacing: "0.01em",
+                }}
+              >
+                &ldquo;Sorry bruvs, the devs are broke asf&rdquo;
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: isDark ? "#00e5c9" : "#0f766e",
+                  fontWeight: 800,
+                  fontSize: "0.75rem",
+                  display: "inline-block",
+                  mt: 0.25,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                &mdash; Devs
+              </Typography>
+            </Box>
           </Box>
         </DialogContent>
 
