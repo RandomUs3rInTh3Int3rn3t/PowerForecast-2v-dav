@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.14bv",
+    version: "3.4.14bv",
+    git_commit_tag: "3.4.14bv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.14bv - Add HubSpot-style top testing phase announcement banner and serverless load advisory modal across app layout, landing page, and auth views",
+  },
+  {
     id: "3.4.14av",
     version: "3.4.14av",
     git_commit_tag: "3.4.14av",

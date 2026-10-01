@@ -7,6 +7,7 @@ import { MobileBottomNav } from "./MobileBottomNav";
 import { AiVisionScannerModal } from "../vision/AiVisionScannerModal";
 import { DevLogsFloatingWidget } from "../devlogs/DevLogsFloatingWidget";
 import { VersionBadge } from "../common/VersionBadge";
+import { SystemTestingBanner } from "../common/SystemTestingBanner";
 import { useColorMode } from "../../theme/AppTheme";
 import { TourProvider } from "../tour/TourProvider";
 import { useStopwatchMidnightRollover } from "../../hooks/useStopwatchMidnightRollover";
@@ -61,6 +62,9 @@ export const Layout: React.FC = () => {
           onToggleTheme={toggleColorMode}
           onOpenAiScanner={() => setIsAiScannerOpen(true)}
         />
+
+        {/* HubSpot-Style Testing Phase Announcement Banner Strip */}
+        <SystemTestingBanner variant="app" />
 
         <Box
           component="main"

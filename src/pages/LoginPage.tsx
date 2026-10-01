@@ -26,6 +26,7 @@ import {
 import { useColorMode } from "../theme/AppTheme";
 import { useToast } from "../components/common/ToastProvider";
 import { AuthDiagnosticModal } from "../components/common/AuthDiagnosticModal";
+import { SystemTestingBanner } from "../components/common/SystemTestingBanner";
 import { runAuthDiagnostics, DiagnosticReport } from "../lib/diagnostics";
 
 export const LoginPage: React.FC = () => {
@@ -191,6 +192,9 @@ export const LoginPage: React.FC = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* HubSpot-Style System Testing Announcement Banner Strip */}
+      <SystemTestingBanner variant="auth" />
 
       {/* Background Hanging Bulb (Left) */}
       <Box

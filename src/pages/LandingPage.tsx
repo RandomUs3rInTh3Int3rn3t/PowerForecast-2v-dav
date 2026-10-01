@@ -58,6 +58,7 @@ import {
 } from "@mui/icons-material";
 import { useColorMode } from "../theme/AppTheme";
 import { APP_VERSION } from "../lib/supabaseClient";
+import { SystemTestingBanner } from "../components/common/SystemTestingBanner";
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -294,6 +295,9 @@ export const LandingPage: React.FC = () => {
           </Toolbar>
         </Container>
       </AppBar>
+
+      {/* HubSpot-Style System Testing Announcement Banner Strip */}
+      <SystemTestingBanner variant="landing" />
 
       {/* Mobile Navigation Drawer */}
       <Drawer

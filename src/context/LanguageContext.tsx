@@ -146,6 +146,14 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
     "common.close": "Close",
     "common.back": "Back",
     "common.loading": "Loading...",
+
+    // System Testing Phase Banner
+    "banner.lead": "Active Testing Phase:",
+    "banner.message": "Expect occasional delays or Vercel serverless timeouts due to heavy concurrent user traffic.",
+    "banner.learnMore": "Learn more",
+    "banner.modalTitle": "System Testing & Server Load Advisory",
+    "banner.modalSubtitle": "Information regarding active user testing, Vercel serverless load, and reliability tips.",
+    "banner.gotIt": "Got it",
   },
   tl: {
     // Navigation & Sidebar
@@ -276,6 +284,14 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
     "common.close": "Isara",
     "common.back": "Bumalik",
     "common.loading": "Naglo-load...",
+
+    // System Testing Phase Banner
+    "banner.lead": "Testing Phase Notice:",
+    "banner.message": "Maaaring makaranas ng panandaliang pagbagal o timeouts dahil dagsa ang mga gumagamit sa Vercel server.",
+    "banner.learnMore": "Alamin pa",
+    "banner.modalTitle": "Paunawa Ukol sa Testing Phase at Server Load",
+    "banner.modalSubtitle": "Impormasyon patungkol sa dagsang gumagamit, Vercel serverless load, at tips sa paggamit.",
+    "banner.gotIt": "Naintindihan ko",
   },
 };
 

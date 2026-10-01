@@ -22,6 +22,7 @@ import {
 } from "@mui/icons-material";
 import { useColorMode } from "../theme/AppTheme";
 import { useToast } from "../components/common/ToastProvider";
+import { SystemTestingBanner } from "../components/common/SystemTestingBanner";
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
@@ -186,6 +187,9 @@ export const SignupPage: React.FC = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* HubSpot-Style System Testing Announcement Banner Strip */}
+      <SystemTestingBanner variant="auth" />
 
       {/* Background Hanging Bulb (Left) */}
       <Box
