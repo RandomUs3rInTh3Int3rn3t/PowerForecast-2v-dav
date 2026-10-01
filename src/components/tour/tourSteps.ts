@@ -51,12 +51,12 @@ const dashboardTour: PageTour = {
         en: {
           title: 'Month-to-Date Audited Consumption & Goals',
           description:
-            'Track your cumulative monthly kWh, current accrued bill cost, and remaining projected cost for the billing cycle. These meters balance your audited actual stopwatch logs with daily baseline routine quotas.',
+            'Track your cumulative monthly kWh, current accrued bill cost, and remaining projected cost for the billing cycle. These meters balance your audited actual consumption logs with daily baseline routine quotas.',
         },
         tl: {
           title: 'Buwanang Naitalang Konsumo at Target',
           description:
-            'Subaybayan ang naipong kWh ngayong buwan, kasalukuyang naipong bayarin sa kuryente, at projected na babayaran sa katapusan ng buwan. Binabalanse nito ang aktwal na na-log sa stopwatch at ang iyong baseline target quota.',
+            'Subaybayan ang naipong kWh ngayong buwan, kasalukuyang naipong bayarin sa kuryente, at projected na babayaran sa katapusan ng buwan. Binabalanse nito ang aktwal na na-log na konsumo at ang iyong baseline target quota.',
         },
       },
     },
@@ -81,14 +81,14 @@ const dashboardTour: PageTour = {
       placement: 'top',
       copy: {
         en: {
-          title: 'Live Stopwatch Control & Session Logging',
+          title: 'Live Circuit Control & Real-Time Monitoring',
           description:
-            'Control running appliances in real time. Start a live stopwatch when powering on a high-draw appliance like an Air Conditioner to meter elapsed seconds, cumulative kWh, and generate an exact peso cost receipt upon stopping.',
+            'Monitor active appliances and instantaneous load draw in real time. Energize circuits on high-draw appliances to observe active watts, continuous runtime, and instantaneous rate per hour.',
         },
         tl: {
-          title: 'Live Stopwatch at Pagtatala ng Sesyon',
+          title: 'Live Circuit Control at Real-Time Monitoring',
           description:
-            'Kontrolin ang mga nakabukas na appliance sa real-time. Simulan ang stopwatch kapag binuksan ang mabibigat na gamit tulad ng Aircon upang maitala ang bawat segundo, naipong kWh, at makakuha ng resibo ng eksaktong halaga sa piso.',
+            'Subaybayan ang mga nakabukas na appliance at kabuuang draw sa real-time. Buksan ang circuit sa mga heavy appliances upang makita ang aktibong wattage, tagal ng andar, at halaga bawat oras.',
         },
       },
     },
@@ -324,12 +324,12 @@ const calendarTour: PageTour = {
         en: {
           title: '3-Mode Contextual Calendar Telemetry',
           description:
-            'Click any day to open the telemetry studio. It adapts automatically:\n• TODAY: Live active stopwatches, real-time budget countdown, and running kWh.\n• PAST DAYS: Historical records, retrospective [h:m:s] input, and + Log Past Time Range.\n• FUTURE DAYS: Projected baseline allocations.',
+            'Click any day to open the telemetry studio. It adapts automatically:\n• TODAY: Real-time active circuit draw, budget countdown, and running kWh.\n• PAST DAYS: Historical records, retrospective [h:m:s] input, and + Log Past Time Range.\n• FUTURE DAYS: Projected baseline allocations and simulation schedules.',
         },
         tl: {
           title: 'Tatlong Antas ng Kalendaryo (Kasalukuyan, Nakalipas, Hinaharap)',
           description:
-            'Pindutin ang anumang araw upang buksan ang telemetry studio:\n• NGAYON: Live stopwatch, real-time na pagbawas sa natitirang badyet, at naipong kWh.\n• NAKALIPAS: Kasaysayan ng nagamit, manual na oras, at pagtatala ng nakaraang sesyon.\n• HINAHARAP: Projected na kalkulasyon batay sa iyong baseline habits.',
+            'Pindutin ang anumang araw upang buksan ang telemetry studio:\n• NGAYON: Real-time na konsumo ng kuryente, natitirang badyet, at naipong kWh.\n• NAKALIPAS: Kasaysayan ng nagamit, manual na oras, at pagtatala ng nakaraang sesyon.\n• HINAHARAP: Projected na kalkulasyon at simulation schedules.',
         },
       },
     },
@@ -340,12 +340,12 @@ const calendarTour: PageTour = {
         en: {
           title: 'Smart Routine Autofill with Exclude Today',
           description:
-            'Batch apply routine quotas across the calendar. Option 1 applies baseline hours from the 1st of the month to yesterday while keeping Today clean and ready for real-time live stopwatches.',
+            'Batch apply routine quotas across the calendar. Option 1 applies baseline hours from the 1st of the month to yesterday while keeping Today clean and ready for real-time tracking and custom simulation.',
         },
         tl: {
           title: 'Smart Routine Autofill (Ihiwalay ang Araw Ngayon)',
           description:
-            'Mabilisang ilapat ang routine quota sa buong kalendaryo. Ang Option 1 ay naglalagay ng baseline mula ika-1 ng buwan hanggang kahapon habang pinananatiling malinis ang araw ngayon para sa live stopwatch.',
+            'Mabilisang ilapat ang routine quota sa buong kalendaryo. Ang Option 1 ay naglalagay ng baseline mula ika-1 ng buwan hanggang kahapon habang pinananatiling malinis ang araw ngayon para sa real-time tracking at simulation.',
         },
       },
     },

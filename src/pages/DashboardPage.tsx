@@ -407,7 +407,7 @@ export const DashboardPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* 5. Today's 24-Hour Activity & Stopwatch Timeline */}
+      {/* 5. Today's 24-Hour Activity & Load Timeline */}
       <TodayActivityTimeline appliances={appliances} />
 
       {/* 6. Quick Module Launchpad */}

@@ -918,7 +918,7 @@ export const LandingPage: React.FC = () => {
                     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
                       {[
                         "Smart midnight crossing detector automatically creates balanced multi-day usage logs",
-                        "Live interactive stopwatch modal with built-in 24-hour visual day track",
+                        "Interactive Smart Calendar Simulation Engine with built-in 24-hour visual load curve",
                         "Detailed date analytics modal showing exact kWh, cost, and session breakdown per day",
                       ].map((item, idx) => (
                         <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>

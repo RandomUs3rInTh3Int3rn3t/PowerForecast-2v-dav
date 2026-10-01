@@ -44,7 +44,7 @@ interface TimelineSessionBlock {
   id: string;
   logId?: string;
   rawLog?: ApplianceUsageLog;
-  type: "live_stopwatch" | "logged_session";
+  type: "live_active" | "live_stopwatch" | "logged_session";
   startHour: number;
   endHour: number;
   durationHours: number;
@@ -84,25 +84,29 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
   const logs: ApplianceUsageLog[] = logsRes?.data?.data || logsRes?.result?.data || [];
   const dailyUsage: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
 
-  const hasActiveStopwatch = appliances.some((a) => a.is_currently_on && a.last_turned_on_at);
+  const hasActiveCircuit = appliances.some((a) => a.is_currently_on && a.last_turned_on_at);
 
-  // Live real-time 1-second ticker when stopwatches are running today
+  // Live real-time 1-second ticker when circuits are actively drawing power today
   useEffect(() => {
-    if (!hasActiveStopwatch) return;
+    if (!hasActiveCircuit) return;
     const interval = setInterval(() => {
       setLiveTick((t) => t + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [hasActiveStopwatch]);
+  }, [hasActiveCircuit]);
 
-  // Refetch on midnight rollover
+  // Refetch on session sync / rollover
   useEffect(() => {
     const handleRollover = () => {
       if (logsRes?.refetch) logsRes.refetch();
       if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
     };
+    window.addEventListener("powerforecast_session_sync", handleRollover);
     window.addEventListener("powerforecast_stopwatch_rollover", handleRollover);
-    return () => window.removeEventListener("powerforecast_stopwatch_rollover", handleRollover);
+    return () => {
+      window.removeEventListener("powerforecast_session_sync", handleRollover);
+      window.removeEventListener("powerforecast_stopwatch_rollover", handleRollover);
+    };
   }, [logsRes, dailyUsageRes]);
 
   const handleBlockClick = (block: TimelineSessionBlock, appliance: UserAppliance) => {
@@ -230,12 +234,12 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
     }
   };
 
-  // Compute 24-hour pure stopwatch session blocks for each appliance today
+  // Compute 24-hour pure activity session blocks for each appliance today
   const timelineData = useMemo(() => {
     return appliances.map((app) => {
       const sessionBlocks: TimelineSessionBlock[] = [];
 
-      // 1. Logged Stopwatch Sessions for Today (using splitSessionAcrossDays for exact midnight slices)
+      // 1. Logged Activity Sessions for Today (using splitSessionAcrossDays for exact midnight slices)
       (logs || []).forEach((log) => {
         if (log.appliance_id !== app.id) return;
         const start = new Date(log.started_at);
@@ -263,7 +267,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
         }
       });
 
-      // 2. Currently Running Live Stopwatch
+      // 2. Currently Running Active Circuit
       if (app.is_currently_on && app.last_turned_on_at) {
         const start = new Date(app.last_turned_on_at);
         const now = new Date();
@@ -276,7 +280,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
 
           sessionBlocks.push({
             id: `live-${app.id}`,
-            type: "live_stopwatch",
+            type: "live_active",
             startHour: matchingSlice.startHourFrac,
             endHour: matchingSlice.endHourFrac,
             durationHours: matchingSlice.hours,
@@ -367,7 +371,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
           <Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                Today's 24-Hour Activity & Stopwatch Timeline
+                Today's 24-Hour Activity & Load Timeline
               </Typography>
               {activeLiveCount > 0 && (
                 <Chip
@@ -379,7 +383,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
               )}
             </Box>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Exact metered sessions recorded via stopwatch (00:00 – 24:00) with second-by-second live updates
+              Real-time active circuits and logged daily activity sessions (00:00 – 24:00) with second-by-second live updates
             </Typography>
           </Box>
         </Box>
@@ -398,13 +402,13 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
                 }}
               />
               <Typography variant="caption" sx={{ fontSize: "0.6875rem", color: "text.secondary", fontWeight: 700 }}>
-                Live Running Stopwatch
+                Active Live Circuit
               </Typography>
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
               <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#009e88" }} />
               <Typography variant="caption" sx={{ fontSize: "0.6875rem", color: "text.secondary", fontWeight: 700 }}>
-                Logged Stopwatch Session
+                Logged Activity Session
               </Typography>
             </Box>
           </Box>
@@ -526,7 +530,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
                   {sessionBlocks.length === 0 && (
                     <Box sx={{ height: "100%", display: "flex", alignItems: "center", px: 2 }}>
                       <Typography variant="caption" sx={{ color: "text.secondary", opacity: 0.35, fontSize: "0.625rem" }}>
-                        No stopwatch sessions
+                        No activity sessions
                       </Typography>
                     </Box>
                   )}
@@ -536,13 +540,15 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
                     const leftPct = (block.startHour / 24) * 100;
                     const widthPct = Math.max(1.5, ((block.endHour - block.startHour) / 24) * 100);
 
+                    const isLive = block.type === "live_active" || block.type === "live_stopwatch";
+
                     const bgGradient =
-                      block.type === "live_stopwatch"
+                      isLive
                         ? "linear-gradient(90deg, #00e5c9 0%, #26c6da 100%)"
                         : "linear-gradient(90deg, #009e88 0%, #00e5c9 100%)";
 
                     const glowColor =
-                      block.type === "live_stopwatch"
+                      isLive
                         ? "0 0 10px rgba(0, 229, 201, 0.6)"
                         : "0 0 8px rgba(0, 158, 136, 0.4)";
 
@@ -553,7 +559,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
                         title={
                           <Box sx={{ p: 0.5 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#fff" }}>
-                              {app.name} ({block.type === "live_stopwatch" ? "Live Active" : "Logged Stopwatch Session (Click to Edit / Delete)"})
+                              {app.name} ({isLive ? "Live Active Circuit" : "Logged Activity Session (Click to Edit / Delete)"})
                             </Typography>
                             <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
                               {block.startTimeStr} – {block.endTimeStr} ({block.durationHours.toFixed(2)} hrs)
@@ -605,7 +611,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
           Peak Live Demand: <strong style={{ color: "#ffd54f" }}>{peakDemand} W</strong> (₱{((peakDemand / 1000) * DEFAULT_EFFECTIVE_RATE).toFixed(2)}/hr rate)
         </Typography>
         <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-          Stopwatch sessions automatically update live energy costs and calculate real-time concurrency.
+          Active circuit sessions automatically update live energy costs and calculate real-time concurrency.
         </Typography>
       </Box>
 
@@ -643,7 +649,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
                   width: 38,
                   height: 38,
                   borderRadius: 1,
-                  bgcolor: selectedBlockForAction.block.type === "live_stopwatch" ? "rgba(0, 229, 201, 0.2)" : "rgba(0, 229, 201, 0.15)",
+                  bgcolor: (selectedBlockForAction.block.type === "live_active" || selectedBlockForAction.block.type === "live_stopwatch") ? "rgba(0, 229, 201, 0.2)" : "rgba(0, 229, 201, 0.15)",
                   color: "primary.main",
                   display: "flex",
                   alignItems: "center",
@@ -657,7 +663,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
                   {selectedBlockForAction.appliance.name}
                 </Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  {selectedBlockForAction.appliance.watts}W • {selectedBlockForAction.block.type === "live_stopwatch" ? "Live Running Stopwatch" : "Timestamped Session Log"}
+                  {selectedBlockForAction.appliance.watts}W • {(selectedBlockForAction.block.type === "live_active" || selectedBlockForAction.block.type === "live_stopwatch") ? "Active Live Circuit" : "Timestamped Activity Log"}
                 </Typography>
               </Box>
             </Box>
@@ -719,7 +725,7 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
               >
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>ACTIVE TIME WINDOW</Typography>
-                  {selectedBlockForAction.block.type !== "live_stopwatch" && (
+                  {selectedBlockForAction.block.type !== "live_active" && selectedBlockForAction.block.type !== "live_stopwatch" && (
                     <Button
                       size="small"
                       startIcon={<TuneIcon sx={{ fontSize: 15 }} />}

@@ -6,8 +6,8 @@ import { useToast } from "../components/common/ToastProvider";
 import { devLog } from "../lib/devLogger";
 
 /**
- * Global hook to manage automatic 11:59 PM / midnight stopwatch rollover.
- * Automatically saves yesterday's completed slice and seamlessly advances the stopwatch into today.
+ * Global hook to manage automatic 11:59 PM / midnight active circuit session rollover.
+ * Automatically saves yesterday's completed slice and seamlessly advances active circuit sessions into today.
  */
 export function useStopwatchMidnightRollover() {
   const { data: appliancesData, refetch: refetchAppliances } = useList<UserAppliance>({
@@ -29,12 +29,12 @@ export function useStopwatchMidnightRollover() {
       if (result.rolledOverCount > 0) {
         devLog.info(
           "useStopwatchMidnightRollover",
-          `Midnight Rollover executed: Saved ${result.rolledOverCount} overnight stopwatch(es) across dates: ${result.affectedDates.join(", ")}`
+          `Midnight Rollover executed: Saved ${result.rolledOverCount} overnight active session(s) across dates: ${result.affectedDates.join(", ")}`
         );
 
         showInfo(
-          `⏱️ Midnight Rollover: Yesterday's running stopwatch session was automatically saved to daily records. Today's live tracking continues seamlessly.`,
-          "Stopwatch Midnight Rollover"
+          `⏱️ Midnight Rollover: Yesterday's active circuit session was automatically saved to daily records. Today's live tracking continues seamlessly.`,
+          "Active Session Midnight Rollover"
         );
 
         if (refetchAppliances) {

@@ -27,13 +27,13 @@ interface TourWelcomeModalProps {
 const WELCOME_COPY: Record<TourLanguage, { heading: string; body: string; start: string; skip: string }> = {
   en: {
     heading: 'Welcome to PowerForecast!',
-    body: 'Take a comprehensive guided tour to learn how to track appliances, set daily target quotas, meter live stopwatches, and forecast your Meralco electric bill.',
+    body: 'Take a comprehensive guided tour to learn how to track appliances, set daily target quotas, simulate energy schedules, and forecast your Meralco electric bill.',
     start: 'Start Guided Tour',
     skip: 'Skip for now',
   },
   tl: {
     heading: 'Maligayang Pagdating sa PowerForecast!',
-    body: 'Sumali sa isang komprehensibong gabay upang matutunan kung paano magtala ng gamit, magtakda ng daily target quota, gumamit ng live stopwatch, at mag-forecast ng Meralco bill.',
+    body: 'Sumali sa isang komprehensibong gabay upang matutunan kung paano magtala ng gamit, magtakda ng daily target quota, mag-simulate ng konsumo, at mag-forecast ng Meralco bill.',
     start: 'Simulan ang Gabay',
     skip: 'Laktawan muna',
   },

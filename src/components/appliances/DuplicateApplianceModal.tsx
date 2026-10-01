@@ -255,7 +255,7 @@ export const DuplicateApplianceModal: React.FC<DuplicateApplianceModalProps> = (
                       Operates Independently / Different Schedule
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
-                      Creates a separate card with its own Stopwatch timer, room location, and daily hours.
+                      Creates a separate card with its own routine schedule, room location, and daily hours.
                     </Typography>
                   </Box>
                 }
@@ -277,7 +277,7 @@ export const DuplicateApplianceModal: React.FC<DuplicateApplianceModalProps> = (
                         setErrorMsg(null);
                       }}
                       placeholder="e.g., Sharp AC (Kids Room) or Sharp AC - Window Side"
-                      helperText="Must be unique to avoid confusing stopwatch cards"
+                      helperText="Must be unique to avoid confusing inventory cards"
                       error={Boolean(errorMsg)}
                     />
 

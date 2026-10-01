@@ -24,7 +24,7 @@
         "id": "telemetry-scheduling",
         "label": "Live Telemetry & Peak Scheduling",
         "focus": ["live_dashboard", "smart_calendar", "telemetry_tracker", "peak_analyzer"],
-        "note": "Live circuit switches, stopwatch tracking, and 24h load curve with 11AM-4PM & 6PM-9PM peak overlays."
+        "note": "Live circuit switches, active load tracking, and 24h load curve with 11AM-4PM & 6PM-9PM peak overlays."
       },
       {
         "id": "tariff-and-audit",
@@ -61,7 +61,7 @@
     { "id": "catalog_vision", "lane": "ingest", "col": 1, "type": "database", "label": "DOE & Vision", "sublabel": "PELP & Gemini", "brand": "google-gemini", "tag": "Multi-Source", "width": 128 },
     { "id": "live_dashboard", "lane": "ui", "col": 2, "type": "frontend", "label": "Live Board", "sublabel": "Circuit toggles", "brand": "react", "tag": "Real-Time", "width": 128 },
     { "id": "smart_calendar", "lane": "telemetry", "col": 2, "type": "frontend", "label": "Smart Calendar", "sublabel": "Month & Week", "brand": "react", "tag": "Scheduler", "width": 128 },
-    { "id": "telemetry_tracker", "lane": "telemetry", "col": 3, "type": "backend", "label": "Telemetry", "sublabel": "Live stopwatch", "brand": "typescript", "tag": "Live Draw", "width": 128 },
+    { "id": "telemetry_tracker", "lane": "telemetry", "col": 3, "type": "backend", "label": "Telemetry", "sublabel": "Active Draw", "brand": "typescript", "tag": "Live Draw", "width": 128 },
     { "id": "load_curve_gen", "lane": "calc", "col": 3, "type": "backend", "label": "24H Profiler", "sublabel": "Minute aggregate", "brand": "typescript", "tag": "Load Curve", "width": 128 },
     { "id": "peak_analyzer", "lane": "policy", "col": 3, "type": "security", "label": "Peak Analyzer", "sublabel": "Meralco windows", "brand": "typescript", "tag": "Overlays", "width": 128 },
     { "id": "meralco_ui", "lane": "ui", "col": 4, "type": "frontend", "label": "Calculator", "sublabel": "Tariff controls", "brand": "react", "tag": "Tariff UI", "width": 128 },
@@ -101,7 +101,7 @@
       "dot": "amber",
       "title": "Real-Time Telemetry & Peak Windows",
       "items": [
-        "Live Power Board with circuit switches and active running stopwatch",
+        "Live Power Board with circuit switches and active load tracking",
         "Smart Calendar featuring Month Grid, 7-Day Week, and 24-Hour Timeline views",
         "Meralco Peak Overlays highlighting 11:00-16:00 and 18:00-21:00 high-demand bands"
       ]

@@ -300,7 +300,7 @@ export const RoutineAutofillModal: React.FC<RoutineAutofillModalProps> = ({
               </Box>
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
                 {isCurrentMonth && excludeToday && today.getDate() > 1
-                  ? `Fills Day 1 up to yesterday (${today.getDate() - 1} days), preserving Today for live stopwatch`
+                  ? `Fills Day 1 up to yesterday (${today.getDate() - 1} days), preserving Today for active real-time tracking & custom simulation`
                   : `Fills Day 1 up to today (${isCurrentMonth ? today.getDate() : currentDayNum} days)`}
               </Typography>
             </Paper>
@@ -571,7 +571,7 @@ export const RoutineAutofillModal: React.FC<RoutineAutofillModalProps> = ({
                   <Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
                       <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary" }}>
-                        Exclude Today (Keep Today empty for live stopwatch tracking)
+                        Exclude Today (Keep Today empty for real-time tracking & custom simulation)
                       </Typography>
                       <Chip label="Recommended" size="small" color="primary" sx={{ height: 18, fontSize: "0.625rem", fontWeight: 800 }} />
                     </Box>

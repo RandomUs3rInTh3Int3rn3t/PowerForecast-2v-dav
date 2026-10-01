@@ -57,7 +57,7 @@ export const ForecastingView: React.FC = () => {
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
   const [whatIfHours, setWhatIfHours] = useState<Record<string, number>>({});
 
-  // 1. Fetch Real User Inventory, Spaces, Daily Usage Records, and Stopwatch Logs
+  // 1. Fetch Real User Inventory, Spaces, Daily Usage Records, and Telemetry & Session Logs
   const appliancesRes = useList<UserAppliance>({
     resource: "user_appliances",
     pagination: { mode: "off" },

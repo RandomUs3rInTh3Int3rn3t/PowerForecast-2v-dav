@@ -49,7 +49,7 @@
 ## 📅 3. Smart Calendar with Multi-View Modes (`SmartCalendar.tsx`)
 * **Three View Modes**:
   1. **Month Grid View (`month`)**:
-     * 30-day month grid with Prior (`—`), Today focal card with live stopwatch and accumulated Pesos, and Upcoming scheduled windows.
+     * 30-day month grid with Prior (`—`), Today focal card with live consumption and accumulated Pesos, and Upcoming scheduled windows.
      * Header banner with Background Month-End Projection calculation (`Proj. Month-End: X kWh • ₱Y`).
   2. **7-Day Week Columns View (`week`)**:
      * Sunday to Saturday vertical column breakdown.
@@ -117,7 +117,7 @@ D:\Powerforecast\refine-app\
 │   │   ├── analytics/
 │   │   │   └── AnalyticsView.tsx   # Monthly trends & 24h load curve
 │   │   ├── appliances/
-│   │   │   ├── ApplianceList.tsx   # Live stopwatch & peso table
+│   │   │   ├── ApplianceList.tsx   # Multi-space inventory & routine quotas
 │   │   │   ├── ApplianceModal.tsx  # Add/edit appliance modal
 │   │   │   └── PelpCatalogModal.tsx# Official DOE PELP search & import
 │   │   ├── calculator/

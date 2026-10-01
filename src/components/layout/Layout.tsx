@@ -18,7 +18,7 @@ export const Layout: React.FC = () => {
   const [isAiScannerOpen, setIsAiScannerOpen] = useState(false);
   const { mode, toggleColorMode } = useColorMode();
 
-  // Continuous background midnight auto-save & rollover for overnight stopwatches
+  // Continuous background midnight auto-save & rollover for overnight active circuit sessions
   useStopwatchMidnightRollover();
 
   return (

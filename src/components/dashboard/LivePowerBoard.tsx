@@ -96,7 +96,7 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
     const nowIso = newState ? new Date().toISOString() : null;
 
     if (!newState && app.last_turned_on_at) {
-      // Stopwatch is being STOPPED! Save the completed session to logs & daily usage
+      // Circuit is being DE-ENERGIZED / TURNED OFF! Save active session to logs & daily usage
       const start = new Date(app.last_turned_on_at);
       const end = new Date();
       if (!isNaN(start.getTime())) {
@@ -117,7 +117,7 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
             duration_minutes: durationMinutes,
             kwh_consumed: appKwh,
             estimated_cost: appCost,
-            source: "stopwatch",
+            source: "live_session",
           });
 
           // 2. Accumulate in daily_appliance_usage
@@ -134,14 +134,12 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
 
           // 3. Dispatch global sync event
           if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("powerforecast_stopwatch_rollover", {
-                detail: {
-                  rolledOverCount: 1,
-                  affectedDates: [start.toISOString().split("T")[0], end.toISOString().split("T")[0]],
-                },
-              })
-            );
+            const syncDetail = {
+              rolledOverCount: 1,
+              affectedDates: [start.toISOString().split("T")[0], end.toISOString().split("T")[0]],
+            };
+            window.dispatchEvent(new CustomEvent("powerforecast_session_sync", { detail: syncDetail }));
+            window.dispatchEvent(new CustomEvent("powerforecast_stopwatch_rollover", { detail: syncDetail }));
           }
         } catch (err: any) {
           devLog.warn("LivePowerBoard", `Error auto-saving stopped session: ${err?.message}`);
@@ -149,7 +147,7 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
       }
     }
 
-    devLog.telemetry("Telemetry", `Stopwatch ${newState ? "started [TIMING]" : "stopped [STOPPED]"}: "${app.name}" (${app.watts}W @ 230V)`, {
+    devLog.telemetry("Telemetry", `Circuit ${newState ? "energized [ACTIVE]" : "de-energized [IDLE]"}: "${app.name}" (${app.watts}W @ 230V)`, {
       applianceId: app.id,
       name: app.name,
       category: app.category,
@@ -212,10 +210,10 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
             </Box>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                Live Stopwatch Power Board
+                Live Circuit Power Board
               </Typography>
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                Real-time demand gauge and individual appliance stopwatch timers
+                Real-time demand gauge and active appliance circuit controls
               </Typography>
             </Box>
           </Box>
@@ -385,7 +383,7 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
                         sx={{ fontWeight: 700, fontFamily: "monospace", height: 20, fontSize: "0.6875rem" }}
                       />
 
-                      <Tooltip title={isOn ? "Stop Stopwatch" : "Start Stopwatch"}>
+                      <Tooltip title={isOn ? "Power OFF Circuit" : "Power ON Circuit"}>
                         <IconButton
                           size="small"
                           onClick={() => togglePower(app)}

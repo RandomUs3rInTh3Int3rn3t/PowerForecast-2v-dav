@@ -691,7 +691,7 @@ export const SettingsView: React.FC = () => {
                 {t("settings.householdTitle", "Household Sharing & Multi-User Access")}
               </Typography>
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                {t("settings.householdSubtitle", "Invite family members to control stopwatches and log daily usage while keeping master billing locked")}
+                {t("settings.householdSubtitle", "Invite family members to simulate usage schedules and log daily consumption while keeping master billing locked")}
               </Typography>
             </Box>
           </Box>
@@ -813,7 +813,7 @@ export const SettingsView: React.FC = () => {
                     {language === "tl" ? "Miyembro ng Pamilya (Usage Logging)" : "Family Member (Usage Logging)"}
                   </Typography>
                   <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                    {t("settings.memberDesc", "Can control live stopwatches, log daily hours on Smart Calendar, and view load curves. Restricted from master rate changes and account deletion.")}
+                    {t("settings.memberDesc", "Can simulate appliance usage, log daily hours on Smart Calendar, and view load curves. Restricted from master rate changes and account deletion.")}
                   </Typography>
                 </Box>
               </Box>
@@ -1287,7 +1287,7 @@ export const SettingsView: React.FC = () => {
               </Typography>
             </Box>
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block", lineHeight: 1.5 }}>
-              {t("settings.dangerSubtitle", "Permanently erase your account, registered appliances, daily calendar logs, live stopwatch history, and analytics records. This action is irreversible.")}
+              {t("settings.dangerSubtitle", "Permanently erase your account, registered appliances, daily calendar logs, usage simulation history, and analytics records. This action is irreversible.")}
             </Typography>
           </Box>
           <Button
@@ -1336,7 +1336,7 @@ export const SettingsView: React.FC = () => {
           {!generatedInvite ? (
             <Box component="form" onSubmit={handleSendInvite} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                {t("settings.inviteModalDesc", "Enter the name and email address of the family member you want to add. They will receive permission to control appliance stopwatches and log daily hours.")}
+                {t("settings.inviteModalDesc", "Enter the name and email address of the family member you want to add. They will receive permission to simulate appliance schedules and log daily hours.")}
               </Typography>
               <TextField
                 label={t("settings.fullName", "Full Name")}
@@ -1676,7 +1676,7 @@ export const SettingsView: React.FC = () => {
         </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
           <Alert severity="error" sx={{ borderRadius: 1, fontWeight: 600 }}>
-            {t("settings.deleteWarning", "This action is permanent and cannot be undone. All your appliances, daily logs, stopwatch records, and analytics telemetry will be deleted.")}
+            {t("settings.deleteWarning", "This action is permanent and cannot be undone. All your appliances, daily logs, simulation records, and analytics telemetry will be deleted.")}
           </Alert>
 
           {deleteError && (

@@ -190,7 +190,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
       {isSupported && permission === "default" && (
         <Box sx={{ mb: 2, p: 1.5, borderRadius: 1.25, bgcolor: "rgba(0, 229, 201, 0.08)", border: "1px solid rgba(0, 229, 201, 0.25)" }}>
           <Typography variant="caption" sx={{ color: "text.primary", display: "block", mb: 1 }}>
-            Allow browser alerts to receive live stopwatch over-run warnings, surge spikes, and schedule reminders.
+            Allow browser alerts to receive active circuit extended runtime warnings, surge spikes, and schedule reminders.
           </Typography>
           <Button
             variant="contained"
@@ -389,19 +389,19 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
           </Box>
         </Box>
 
-        {/* Stopwatch Over-run Alert */}
+        {/* Extended Runtime Alert */}
         <Box sx={{ opacity: prefs.enabled ? 1 : 0.4, transition: "opacity 0.2s" }}>
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <TimerIcon sx={{ fontSize: 18, color: "warning.main" }} />
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Stopwatch Over-run
+                Extended Runtime Alert
               </Typography>
             </Box>
             <Switch
-              checked={prefs.stopwatchAlert}
+              checked={prefs.runtimeAlert ?? prefs.stopwatchAlert ?? true}
               disabled={!prefs.enabled}
-              onChange={(e) => updatePrefs({ stopwatchAlert: e.target.checked })}
+              onChange={(e) => updatePrefs({ runtimeAlert: e.target.checked, stopwatchAlert: e.target.checked })}
               size="small"
             />
           </Box>
@@ -412,11 +412,12 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ anchor
             <TextField
               type="number"
               size="small"
-              disabled={!prefs.enabled || !prefs.stopwatchAlert}
-              value={prefs.stopwatchThresholdHours}
-              onChange={(e) =>
-                updatePrefs({ stopwatchThresholdHours: Math.max(1, parseInt(e.target.value) || 4) })
-              }
+              disabled={!prefs.enabled || !(prefs.runtimeAlert ?? prefs.stopwatchAlert ?? true)}
+              value={prefs.runtimeThresholdHours ?? prefs.stopwatchThresholdHours ?? 4}
+              onChange={(e) => {
+                const val = Math.max(1, parseInt(e.target.value) || 4);
+                updatePrefs({ runtimeThresholdHours: val, stopwatchThresholdHours: val });
+              }}
               sx={{ width: 60, "& input": { py: 0.25, px: 1, fontSize: "0.75rem", textAlign: "center" } }}
             />
             <Typography variant="caption" sx={{ color: "text.secondary" }}>

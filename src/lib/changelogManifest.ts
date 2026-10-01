@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.10v",
+    version: "3.4.10v",
+    git_commit_tag: "3.4.10v",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.10v - Complete Stopwatch-to-Simulation Architecture Alignment: Purge orphaned modals, harmonize Live Circuit Board, timeline load curves, extended runtime notifications, and multi-language settings",
+  },
+  {
     id: "3.4.9v",
     version: "3.4.9v",
     git_commit_tag: "3.4.9v",

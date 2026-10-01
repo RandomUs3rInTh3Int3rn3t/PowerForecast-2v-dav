@@ -677,7 +677,7 @@ export function allocateNonOverlappingSlots(
 }
 
 /**
- * Accumulates live stopwatch runtime into the daily usage table across midnight boundaries
+ * Accumulates live active session runtime into the daily usage table across midnight boundaries
  */
 export async function accumulateLiveSessionDailyUsage(params: {
   appliance_id: string;
@@ -951,7 +951,7 @@ export async function savePastSessionWithAllocation(params: {
 let isReconcilingStopwatches = false;
 
 /**
- * Reconciles running stopwatches that crossed midnight (11:59:59 PM).
+ * Reconciles running active circuit sessions that crossed midnight (11:59:59 PM).
  * Automatically finalizes yesterday's usage rows into appliance_usage_logs & daily_appliance_usage,
  * and advances the appliance's last_turned_on_at to 00:00:00 of the new day.
  */
@@ -1003,7 +1003,7 @@ export async function reconcileOvernightRunningStopwatches(
           duration_minutes: sliceMinutes,
           kwh_consumed: sliceKwh,
           estimated_cost: sliceCost,
-          source: "stopwatch_midnight_rollover",
+          source: "live_session_midnight_rollover",
         });
 
         // 2. Accumulate/Upsert into daily_appliance_usage
@@ -1051,22 +1051,20 @@ export async function reconcileOvernightRunningStopwatches(
       rolledOverCount += 1;
       devLog.info(
         "DailyUsageService",
-        `Auto-rolled over stopwatch for ${app.name}: Finalized ${pastSlices.length} past slice(s), advanced timer to 00:00:00.`
+        `Auto-rolled over active session for ${app.name}: Finalized ${pastSlices.length} past slice(s), advanced timer to 00:00:00.`
       );
     }
 
     if (rolledOverCount > 0 && typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("powerforecast_stopwatch_rollover", {
-          detail: {
-            rolledOverCount,
-            affectedDates: Array.from(affectedDatesSet),
-          },
-        })
-      );
+      const syncDetail = {
+        rolledOverCount,
+        affectedDates: Array.from(affectedDatesSet),
+      };
+      window.dispatchEvent(new CustomEvent("powerforecast_session_sync", { detail: syncDetail }));
+      window.dispatchEvent(new CustomEvent("powerforecast_stopwatch_rollover", { detail: syncDetail }));
     }
   } catch (err: any) {
-    devLog.error("DailyUsageService", `Exception during overnight stopwatch reconciliation: ${err?.message}`, err);
+    devLog.error("DailyUsageService", `Exception during overnight active session reconciliation: ${err?.message}`, err);
   } finally {
     isReconcilingStopwatches = false;
   }

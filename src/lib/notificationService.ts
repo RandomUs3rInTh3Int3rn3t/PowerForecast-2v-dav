@@ -8,8 +8,12 @@ export interface NotificationPreferences {
   notificationLevel: NotificationLevel;
   soundEnabled: boolean;
   vibrationEnabled: boolean;
-  stopwatchAlert: boolean;
-  stopwatchThresholdHours: number; // 6 (relaxed), 4 (standard), 2 (proactive), 1 (strict)
+  runtimeAlert: boolean;
+  runtimeThresholdHours: number; // 6 (relaxed), 4 (standard), 2 (proactive), 1 (strict)
+  /** @deprecated Backward-compatible alias for runtimeAlert */
+  stopwatchAlert?: boolean;
+  /** @deprecated Backward-compatible alias for runtimeThresholdHours */
+  stopwatchThresholdHours?: number;
   budgetAlert: boolean;
   budgetThresholdPercent: number; // 90 (relaxed), 80 (standard), 70 (proactive), 50 (strict)
   scheduleAlert: boolean;
@@ -27,6 +31,8 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     notificationLevel: "relaxed",
     soundEnabled: false,
     vibrationEnabled: false,
+    runtimeAlert: true,
+    runtimeThresholdHours: 6,
     stopwatchAlert: true,
     stopwatchThresholdHours: 6,
     budgetAlert: true,
@@ -41,6 +47,8 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     notificationLevel: "standard",
     soundEnabled: true,
     vibrationEnabled: true,
+    runtimeAlert: true,
+    runtimeThresholdHours: 4,
     stopwatchAlert: true,
     stopwatchThresholdHours: 4,
     budgetAlert: true,
@@ -55,6 +63,8 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     notificationLevel: "proactive",
     soundEnabled: true,
     vibrationEnabled: true,
+    runtimeAlert: true,
+    runtimeThresholdHours: 2,
     stopwatchAlert: true,
     stopwatchThresholdHours: 2,
     budgetAlert: true,
@@ -69,6 +79,8 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     notificationLevel: "strict",
     soundEnabled: true,
     vibrationEnabled: true,
+    runtimeAlert: true,
+    runtimeThresholdHours: 1,
     stopwatchAlert: true,
     stopwatchThresholdHours: 1,
     budgetAlert: true,
@@ -86,6 +98,8 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   notificationLevel: "standard",
   soundEnabled: true,
   vibrationEnabled: true,
+  runtimeAlert: true,
+  runtimeThresholdHours: 4,
   stopwatchAlert: true,
   stopwatchThresholdHours: 4,
   budgetAlert: true,

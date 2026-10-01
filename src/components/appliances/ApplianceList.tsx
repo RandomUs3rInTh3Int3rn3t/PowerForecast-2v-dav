@@ -207,7 +207,7 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
     const nowIso = newState ? new Date().toISOString() : null;
 
     if (!newState && app.last_turned_on_at) {
-      // Stopwatch is being STOPPED! Save the completed session to logs & daily usage
+      // Circuit is being DE-ENERGIZED / TURNED OFF! Save active session to logs & daily usage
       const start = new Date(app.last_turned_on_at);
       const end = new Date();
       if (!isNaN(start.getTime())) {
@@ -228,7 +228,7 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
             duration_minutes: durationMinutes,
             kwh_consumed: appKwh,
             estimated_cost: appCost,
-            source: "stopwatch",
+            source: "live_session",
           });
 
           // 2. Accumulate in daily_appliance_usage
@@ -245,14 +245,12 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
 
           // 3. Dispatch global sync event
           if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("powerforecast_stopwatch_rollover", {
-                detail: {
-                  rolledOverCount: 1,
-                  affectedDates: [start.toISOString().split("T")[0], end.toISOString().split("T")[0]],
-                },
-              })
-            );
+            const syncDetail = {
+              rolledOverCount: 1,
+              affectedDates: [start.toISOString().split("T")[0], end.toISOString().split("T")[0]],
+            };
+            window.dispatchEvent(new CustomEvent("powerforecast_session_sync", { detail: syncDetail }));
+            window.dispatchEvent(new CustomEvent("powerforecast_stopwatch_rollover", { detail: syncDetail }));
           }
         } catch (err: any) {
           devLog.warn("ApplianceList", `Error auto-saving stopped session: ${err?.message}`);
@@ -260,7 +258,7 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
       }
     }
 
-    devLog.telemetry("Telemetry", `Stopwatch ${newState ? "started [TIMING]" : "stopped [STOPPED]"}: "${app.name}" (${app.watts}W @ 230V)`, {
+    devLog.telemetry("Telemetry", `Circuit ${newState ? "energized [ACTIVE]" : "de-energized [IDLE]"}: "${app.name}" (${app.watts}W @ 230V)`, {
       applianceId: app.id,
       name: app.name,
       category: app.category,
@@ -279,14 +277,14 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
       },
     });
 
-    showInfo(`${app.name} stopwatch ${newState ? "started" : "stopped and saved"}.`);
+    showInfo(`${app.name} circuit ${newState ? "energized" : "de-energized and session saved"}.`);
   };
 
   const handleToggleBlacklist = async (app: UserAppliance) => {
     const isCurrentlyBlacklisted = app.is_active === false;
     const willBeBlacklisted = !isCurrentlyBlacklisted;
 
-    // If appliance is currently running on live stopwatch and will be blacklisted, stop and save it first
+    // If appliance is currently active and will be blacklisted, de-energize and save its session first
     if (willBeBlacklisted && app.is_currently_on) {
       await togglePower(app);
     }

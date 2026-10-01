@@ -1,5 +1,5 @@
-// PowerForecast v3.4.9v Service Worker — High-Performance Mobile Caching, Push & Offline Resilience
-const SW_VERSION = '3.4.9v';
+// PowerForecast v3.4.10v Service Worker — High-Performance Mobile Caching, Push & Offline Resilience
+const SW_VERSION = '3.4.10v';
 const CACHE_NAME = `powerforecast-${SW_VERSION}-cache`;
 
 const STATIC_ASSETS = [

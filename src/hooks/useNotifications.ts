@@ -87,14 +87,15 @@ export function useNotifications({
     triggerNotificationVibration(urgency);
   }, []);
 
-  // 1. Stopwatch Over-run Monitor (Every 30s)
+  // 1. Extended Continuous Runtime Monitor (Every 30s)
   useEffect(() => {
-    if (!prefs.enabled || !prefs.stopwatchAlert) return;
+    const isRuntimeAlertActive = prefs.enabled && (prefs.runtimeAlert ?? prefs.stopwatchAlert ?? true);
+    if (!isRuntimeAlertActive) return;
 
-    const checkStopwatches = () => {
+    const checkActiveCircuits = () => {
       const running = appliances.filter((a) => a.is_currently_on && a.last_turned_on_at);
       const now = Date.now();
-      const thresholdHours = prefs.stopwatchThresholdHours || 4;
+      const thresholdHours = prefs.runtimeThresholdHours ?? prefs.stopwatchThresholdHours ?? 4;
       const thresholdMs = thresholdHours * 3600 * 1000;
 
       running.forEach((app) => {
@@ -110,7 +111,7 @@ export function useNotifications({
 
         if (elapsedMs >= adjustedThresholdMs) {
           const hoursElapsed = Math.floor(elapsedMs / (3600 * 1000));
-          const alertKey = `stopwatch-${app.id}-${hoursElapsed}`;
+          const alertKey = `runtime-${app.id}-${hoursElapsed}`;
 
           if (!sentAlertsRef.current.has(alertKey)) {
             sentAlertsRef.current.add(alertKey);
@@ -121,9 +122,9 @@ export function useNotifications({
             const urgency = isHeavy || parseFloat(hours) >= 4 ? "critical" : "high";
 
             sendNotification({
-              title: `⚡ Stopwatch Alert: ${app.name} (${app.watts}W)`,
-              body: `Running for ${hours} hrs (${kwh} kWh / ~₱${cost}). Did you leave it on?`,
-              tag: `stopwatch-${app.id}`,
+              title: `⚡ Extended Runtime Alert: ${app.name} (${app.watts}W)`,
+              body: `Active for ${hours} hrs (${kwh} kWh / ~₱${cost}). Did you leave it running?`,
+              tag: `runtime-${app.id}`,
               urgency,
             });
           }
@@ -131,10 +132,10 @@ export function useNotifications({
       });
     };
 
-    checkStopwatches();
-    const interval = setInterval(checkStopwatches, 30000);
+    checkActiveCircuits();
+    const interval = setInterval(checkActiveCircuits, 30000);
     return () => clearInterval(interval);
-  }, [appliances, prefs.enabled, prefs.stopwatchAlert, prefs.stopwatchThresholdHours, prefs.notificationLevel]);
+  }, [appliances, prefs.enabled, prefs.runtimeAlert, prefs.stopwatchAlert, prefs.runtimeThresholdHours, prefs.stopwatchThresholdHours, prefs.notificationLevel]);
 
   // 2. Real-Time High Wattage Surge Spike Monitor (Every 15s)
   useEffect(() => {
