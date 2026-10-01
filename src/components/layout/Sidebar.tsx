@@ -130,7 +130,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { label: t("nav.calendar", "Smart Calendar"), icon: <CalendarIcon fontSize="small" />, path: "/calendar" },
     { label: t("nav.analytics", "Analytics"), icon: <AnalyticsIcon fontSize="small" />, path: "/analytics" },
     { label: t("nav.forecasting", "Forecasting"), icon: <ShieldIcon fontSize="small" />, path: "/forecasting" },
-    { label: t("nav.docs", "API Docs"), icon: <CoinsIcon fontSize="small" />, path: "/docs" },
   ];
 
   /* -------------------------------------------------------------------------- */
@@ -624,44 +623,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <ListItemText
                 primary={t("header.settings", "Settings")}
                 secondary="Preferences & App Configuration"
-                slotProps={{
-                  primary: { sx: { fontSize: "0.8125rem", fontWeight: 700 } },
-                  secondary: { sx: { fontSize: "0.6875rem", color: "text.secondary" } },
-                }}
-              />
-              <ChevronRightIcon sx={{ fontSize: 16, color: "text.disabled" }} />
-            </ListItemButton>
-          </ListItem>
-
-          {/* API Docs */}
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/docs"
-              onClick={onClose}
-              sx={{
-                borderRadius: 1.5,
-                py: 0.85,
-                px: 1.5,
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)",
-                border: "1px solid",
-                borderColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.06)",
-                "&:hover": {
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.08)" : "rgba(13, 148, 136, 0.08)",
-                  borderColor: "primary.main",
-                },
-                transition: "all 0.15s ease",
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 32, color: "primary.main" }}>
-                <CoinsIcon sx={{ fontSize: 18 }} />
-              </ListItemIcon>
-              <ListItemText
-                primary={t("nav.docs", "API Docs")}
-                secondary="Developer Endpoints & Schema"
                 slotProps={{
                   primary: { sx: { fontSize: "0.8125rem", fontWeight: 700 } },
                   secondary: { sx: { fontSize: "0.6875rem", color: "text.secondary" } },
