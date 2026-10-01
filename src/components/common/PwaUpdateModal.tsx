@@ -20,21 +20,21 @@ import {
 import { usePwaUpdate } from "../../lib/pwaService";
 import { APP_VERSION, supabaseClient } from "../../lib/supabaseClient";
 import { useLanguage } from "../../context/LanguageContext";
-
-// High-priority features & highlights for the 3.1.0v major release
-const DEFAULT_3_1_0_HIGHLIGHTS = [
-  "Background PWA auto-update detection across Mobile & PC",
-  "1-Click instant app restart and service worker cache sync",
-  "Automated 'What's New & Release Notes' launch popup modal",
-  "Battery-efficient lifecycle checks on window focus & reconnection",
-  "Zero data loss with seamless offline fallback cache protection",
-];
+import { parseReleaseHighlights } from "../../lib/changelogService";
+import { COMPLETE_GITHUB_DEPLOYMENTS } from "../../lib/changelogManifest";
 
 export const PwaUpdateModal: React.FC = () => {
   const { updateAvailable, isUpdating, applyUpdate, dismissUpdate } = usePwaUpdate();
   const { t } = useLanguage();
-  const [changelogItems, setChangelogItems] = useState<string[]>(DEFAULT_3_1_0_HIGHLIGHTS);
-  const [latestVersion, setLatestVersion] = useState<string>("3.1.0v");
+
+  const topManifest = COMPLETE_GITHUB_DEPLOYMENTS[0];
+  const initialParsed = parseReleaseHighlights(
+    topManifest?.description || "",
+    topManifest?.version || APP_VERSION
+  );
+
+  const [changelogItems, setChangelogItems] = useState<string[]>(initialParsed.highlights);
+  const [latestVersion, setLatestVersion] = useState<string>(topManifest?.version || APP_VERSION);
 
   // Fetch the latest changelog description from Supabase when update is available
   useEffect(() => {
@@ -54,19 +54,14 @@ export const PwaUpdateModal: React.FC = () => {
           if (item.version) setLatestVersion(item.version);
 
           if (item.description) {
-            // Split by bullet points, newlines, or semicolons
-            const lines = item.description
-              .split(/[\n;•]+/)
-              .map((s: string) => s.trim())
-              .filter((s: string) => s.length > 3 && !s.startsWith(item.version));
-
-            if (lines.length > 0) {
-              setChangelogItems(lines.map((l: string) => l.replace(/^[✨⚡🛠️📋🔋🛡️\s-]+/, '').trim()));
+            const parsed = parseReleaseHighlights(item.description, item.version);
+            if (parsed.highlights.length > 0) {
+              setChangelogItems(parsed.highlights);
             }
           }
         }
       } catch {
-        // Fallback to default highlights
+        // Fallback to initial manifest highlights
       }
     }
 

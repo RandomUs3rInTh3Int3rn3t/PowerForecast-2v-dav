@@ -134,6 +134,13 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
     "pwa.laterButton": "Later",
     "pwa.readyBadge": "Ready to install",
 
+    // What's New Release Popup
+    "whatsNew.title": "What's New in PowerForecast",
+    "whatsNew.highlightsHeader": "Key Updates & Features Created",
+    "whatsNew.loading": "Loading release highlights...",
+    "whatsNew.viewFullLogs": "View All Changelogs",
+    "whatsNew.gotItButton": "Awesome, Got It!",
+
     // Common
     "common.save": "Save",
     "common.close": "Close",
@@ -256,6 +263,13 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
     "pwa.updatingButton": "Ina-update ang App...",
     "pwa.laterButton": "Mamaya na",
     "pwa.readyBadge": "Handa nang i-install",
+
+    // What's New Release Popup
+    "whatsNew.title": "Mga Bagong Tampok sa PowerForecast",
+    "whatsNew.highlightsHeader": "Mga Pangunahing Update at Bagong Tampok",
+    "whatsNew.loading": "Kinukuha ang mga detalye ng release...",
+    "whatsNew.viewFullLogs": "Tingnan ang Lahat ng Talaan",
+    "whatsNew.gotItButton": "Ayos, Naintindihan Ko!",
 
     // Common
     "common.save": "I-save",

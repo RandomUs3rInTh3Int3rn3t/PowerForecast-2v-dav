@@ -24,6 +24,7 @@ import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { EmailVerifiedPage } from "./pages/EmailVerifiedPage";
 import { VersionBadge } from "./components/common/VersionBadge";
 import { PwaUpdateModal } from "./components/common/PwaUpdateModal";
+import { WhatsNewModal } from "./components/common/WhatsNewModal";
 import { ToastProvider } from "./components/common/ToastProvider";
 import { ConfirmProvider } from "./components/common/ConfirmProvider";
 import { LanguageProvider } from "./context/LanguageContext";
@@ -242,6 +243,7 @@ export const App: React.FC = () => {
             <UnsavedChangesNotifier />
             <VersionBadge />
             <PwaUpdateModal />
+            <WhatsNewModal />
           </Refine>
           </HashRouter>
           </ConfirmProvider>

@@ -18,6 +18,7 @@ import {
   HistoryEdu as ChangelogIcon,
 } from "@mui/icons-material";
 import { SystemChangelogModal } from "../changelog/SystemChangelogModal";
+import { openWhatsNewModal } from "../../lib/changelogService";
 
 export const VersionBadge: React.FC = () => {
   const [dbStatus, setDbStatus] = useState<{
@@ -152,6 +153,39 @@ export const VersionBadge: React.FC = () => {
 
           <Divider sx={{ my: 1 }} />
 
+          {/* What's New & Release Highlights Button */}
+          <Button
+            fullWidth
+            variant="contained"
+            size="small"
+            startIcon={<SparklesIcon sx={{ fontSize: 16 }} />}
+            onClick={() => {
+              setIsOpen(false);
+              openWhatsNewModal(APP_VERSION);
+            }}
+            sx={{
+              mt: 1,
+              mb: 0.75,
+              py: 0.75,
+              fontSize: "0.75rem",
+              fontWeight: 800,
+              textTransform: "none",
+              borderRadius: 1.25,
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
+              boxShadow: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "0 0 16px rgba(0, 229, 201, 0.3)"
+                  : "0 2px 8px rgba(13, 148, 136, 0.25)",
+              "&:hover": {
+                bgcolor: "primary.dark",
+                transform: "translateY(-1px)",
+              },
+            }}
+          >
+            What's New in {APP_VERSION}
+          </Button>
+
           {/* GitHub Changelogs Button */}
           <Button
             fullWidth
@@ -163,7 +197,7 @@ export const VersionBadge: React.FC = () => {
               setIsChangelogModalOpen(true);
             }}
             sx={{
-              my: 1,
+              mb: 1,
               py: 0.75,
               fontSize: "0.75rem",
               fontWeight: 800,
@@ -181,7 +215,7 @@ export const VersionBadge: React.FC = () => {
               },
             }}
           >
-            View Version Changelogs
+            View Full Changelogs
           </Button>
 
           <Divider sx={{ my: 1 }} />
