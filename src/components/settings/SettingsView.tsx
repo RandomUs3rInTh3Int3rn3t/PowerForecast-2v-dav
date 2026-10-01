@@ -70,7 +70,25 @@ import {
   CloudDone as CloudDoneIcon,
   ExpandMore as ExpandMoreIcon,
   HelpOutlined as HelpIcon,
+  Explore as ExploreIcon,
+  RocketLaunch as RocketIcon,
+  RestartAlt as ResetIcon,
+  PlayArrow as PlayArrowIcon,
+  Calculate as CalculateIcon,
+  CalendarToday as CalendarIcon,
+  Insights as InsightsIcon,
+  AutoGraph as AutoGraphIcon,
+  Dashboard as DashboardIcon,
 } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
+import { useTour } from "../../hooks/useTour";
+import {
+  FULL_TOUR_PAGE_ORDER,
+  PAGE_METADATA,
+  ALL_PAGE_TOURS,
+  PAGE_TO_ROUTE,
+  TourPage,
+} from "../tour/tourSteps";
 import { useGetIdentity, useLogout } from "@refinedev/core";
 import { useToast } from "../common/ToastProvider";
 import { supabaseClient } from "../../lib/supabaseClient";
@@ -106,6 +124,8 @@ interface HouseholdMember {
 
 
 export const SettingsView: React.FC = () => {
+  const navigate = useNavigate();
+  const { startTour, startFullTour, resetTour, completedPages } = useTour();
   const { data: identity } = useGetIdentity<any>();
   const { mutate: logout } = useLogout();
   const { showSuccess, showError, showInfo } = useToast();
@@ -676,6 +696,218 @@ export const SettingsView: React.FC = () => {
             }
           />
         </RadioGroup>
+      </Card>
+
+      {/* 1.5 Interactive Guided Tour & Tutorials Section */}
+      <Card
+        sx={{
+          p: { xs: 2.5, sm: 3 },
+          borderRadius: 1.5,
+          border: "1px solid",
+          borderColor: (theme) =>
+            theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.2)",
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.7)" : "#ffffff"),
+        }}
+      >
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, flexWrap: "wrap", gap: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <ExploreIcon sx={{ color: "primary.main" }} />
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "text.primary" }}>
+                {language === "tl" ? "Mga Gabay at Tutorial sa Sistema (Interactive Guided Tours)" : "Guided Tours & System Tutorials"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {language === "tl"
+                  ? "Suriin ang mga gabay sa bawat modyul o simulan ang komprehensibong paglalakbay mula ulo hanggang paa"
+                  : "Replay step-by-step tutorials for specific modules or experience the full app walkthrough"}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={startFullTour}
+              startIcon={<RocketIcon />}
+              sx={{
+                fontWeight: 800,
+                borderRadius: 1,
+                fontSize: "0.75rem",
+                textTransform: "none",
+                bgcolor: "#00e5c9",
+                color: "#0c1b18",
+                boxShadow: "0 2px 10px rgba(0, 229, 201, 0.3)",
+                "&:hover": { bgcolor: "#00c7ae" },
+              }}
+            >
+              {language === "tl" ? "Simulan ang Buong Gabay" : "Start Full App Tour"}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                resetTour();
+                showSuccess(
+                  language === "tl"
+                    ? "Na-reset na ang lahat ng kasaysayan ng tour. Maaari mong ulitin ang anumang gabay."
+                    : "All tour history has been reset. You can restart any tour at any time.",
+                  language === "tl" ? "Na-reset ang Tour" : "Tours Reset"
+                );
+              }}
+              startIcon={<ResetIcon />}
+              sx={{
+                fontWeight: 700,
+                borderRadius: 1,
+                fontSize: "0.75rem",
+                textTransform: "none",
+                color: "text.secondary",
+                borderColor: "divider",
+                "&:hover": { borderColor: "primary.main", color: "primary.main" },
+              }}
+            >
+              {language === "tl" ? "I-reset Lahat" : "Reset History"}
+            </Button>
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Grid container spacing={1.5}>
+          {FULL_TOUR_PAGE_ORDER.map((pageKey) => {
+            const meta = PAGE_METADATA[pageKey];
+            const tour = ALL_PAGE_TOURS[pageKey];
+            const isCompleted = completedPages[pageKey];
+            const icons: Record<TourPage, React.ReactElement> = {
+              dashboard: <DashboardIcon sx={{ fontSize: 18 }} />,
+              calculator: <CalculateIcon sx={{ fontSize: 18 }} />,
+              appliances: <BoltIcon sx={{ fontSize: 18 }} />,
+              calendar: <CalendarIcon sx={{ fontSize: 18 }} />,
+              analytics: <InsightsIcon sx={{ fontSize: 18 }} />,
+              forecasting: <AutoGraphIcon sx={{ fontSize: 18 }} />,
+            };
+
+            return (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={pageKey}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1.75,
+                    borderRadius: 1.25,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    height: "100%",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                    borderColor: isCompleted ? "rgba(52, 211, 153, 0.3)" : "divider",
+                    transition: "border-color 0.2s ease",
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        sx={{
+                          p: 0.75,
+                          borderRadius: 1,
+                          bgcolor: (theme) =>
+                            theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.1)" : "rgba(13, 148, 136, 0.08)",
+                          color: "primary.main",
+                          display: "flex",
+                        }}
+                      >
+                        {icons[pageKey]}
+                      </Box>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                          {meta.title[language]}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          {tour.steps.length} {language === "tl" ? "mga hakbang" : "interactive steps"}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {isCompleted ? (
+                      <Chip
+                        icon={<CheckCircleIcon sx={{ fontSize: "12px !important", color: "#34d399 !important" }} />}
+                        label={language === "tl" ? "Natapos" : "Completed"}
+                        size="small"
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: "0.625rem",
+                          height: 20,
+                          bgcolor: "rgba(52, 211, 153, 0.12)",
+                          color: "#34d399",
+                          border: "1px solid rgba(52, 211, 153, 0.3)",
+                        }}
+                      />
+                    ) : (
+                      <Chip
+                        label={language === "tl" ? "Bago" : "Unseen"}
+                        size="small"
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: "0.625rem",
+                          height: 20,
+                          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.05)",
+                          color: "text.secondary",
+                        }}
+                      />
+                    )}
+                  </Box>
+
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: "auto" }}>
+                    <Button
+                      fullWidth
+                      size="small"
+                      variant="outlined"
+                      startIcon={<PlayArrowIcon sx={{ fontSize: "14px !important" }} />}
+                      onClick={() => {
+                        navigate(PAGE_TO_ROUTE[pageKey]);
+                        setTimeout(() => {
+                          startTour(pageKey);
+                        }, 400);
+                      }}
+                      sx={{
+                        borderRadius: 1,
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        textTransform: "none",
+                        py: 0.5,
+                      }}
+                    >
+                      {language === "tl" ? "Simulan ang Gabay" : "Start Tour"}
+                    </Button>
+                    {isCompleted && (
+                      <Tooltip title={language === "tl" ? "I-reset itong modyul" : "Reset this module tour"}>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            resetTour(pageKey);
+                            showSuccess(
+                              language === "tl"
+                                ? `Na-reset ang tour para sa ${meta.title[language]}.`
+                                : `Reset tour for ${meta.title[language]}.`
+                            );
+                          }}
+                          sx={{
+                            border: "1px solid",
+                            borderColor: "divider",
+                            p: 0.5,
+                            borderRadius: 1,
+                          }}
+                        >
+                          <ResetIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                </Paper>
+              </Grid>
+            );
+          })}
+        </Grid>
       </Card>
 
       {/* 2. Household Sharing & Hierarchy Section */}

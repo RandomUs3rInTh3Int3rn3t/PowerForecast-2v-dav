@@ -165,6 +165,14 @@ export const SmartCalendar: React.FC = () => {
     };
   }, [billingWindow, dailyUsageMap, appliances, events]);
 
+  const realToday = new Date();
+  const hasTodayInView = billingWindow.days.some(
+    (d) =>
+      d.getDate() === realToday.getDate() &&
+      d.getMonth() === realToday.getMonth() &&
+      d.getFullYear() === realToday.getFullYear()
+  );
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2.5, sm: 3 } }}>
       {/* 1. Header Banner & Simulate Schedule Action */}
@@ -389,7 +397,7 @@ export const SmartCalendar: React.FC = () => {
       )}
 
       {/* 2. TOP KPI CARDS: BASELINE VS SIMULATED TELEMETRY */}
-      <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+      <Grid container spacing={{ xs: 1.5, sm: 2 }} data-tour="calendar-kpi-summary">
         {/* Card 1: Baseline Projected Period */}
         <Grid size={{ xs: 6, sm: 3 }}>
           <Paper
@@ -539,7 +547,7 @@ export const SmartCalendar: React.FC = () => {
       </Grid>
 
       {/* 3. Calendar Controls & Month/Cycle Navigator Card */}
-      <Card sx={{ p: 2, borderRadius: 1.5 }}>
+      <Card data-tour="calendar-billing-period" sx={{ p: 2, borderRadius: 1.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <IconButton onClick={handlePrevPeriod} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
@@ -581,7 +589,7 @@ export const SmartCalendar: React.FC = () => {
           </Box>
 
           {/* Visual Legend */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          <Box data-tour="calendar-legend" sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
               <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#818cf8" }} />
               <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
@@ -692,26 +700,26 @@ export const SmartCalendar: React.FC = () => {
 
           {/* Actual day cells */}
           {billingWindow.days.map((dayDate, idx) => {
-            const dayNum = dayDate.getDate();
-            const realToday = new Date();
-            const isCurrentToday =
-              dayNum === realToday.getDate() &&
-              dayDate.getMonth() === realToday.getMonth() &&
-              dayDate.getFullYear() === realToday.getFullYear();
-            const dateKey = formatDateToKey(dayDate);
-            const metrics = computeDayMetrics(
-              dateKey,
-              dayDate,
-              dailyUsageMap[dateKey] || [],
-              appliances,
-              events,
-              DEFAULT_EFFECTIVE_RATE
-            );
+              const dayNum = dayDate.getDate();
+              const isCurrentToday =
+                dayNum === realToday.getDate() &&
+                dayDate.getMonth() === realToday.getMonth() &&
+                dayDate.getFullYear() === realToday.getFullYear();
+              const isTourTarget = hasTodayInView ? isCurrentToday : idx === 0;
+              const dateKey = formatDateToKey(dayDate);
+              const metrics = computeDayMetrics(
+                dateKey,
+                dayDate,
+                dailyUsageMap[dateKey] || [],
+                appliances,
+                events,
+                DEFAULT_EFFECTIVE_RATE
+              );
 
-            return (
-              <Grid size={1} key={`day-${dateKey}-${idx}`}>
-                <Paper
-                  data-tour={isCurrentToday ? "calendar-day-click" : undefined}
+              return (
+                <Grid size={1} key={`day-${dateKey}-${idx}`}>
+                  <Paper
+                    data-tour={isTourTarget ? "calendar-day-click" : undefined}
                   variant="outlined"
                   onClick={() => setSelectedDateForModal(dayDate)}
                   sx={{

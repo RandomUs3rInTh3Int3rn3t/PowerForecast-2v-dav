@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.13v",
+    version: "3.4.13v",
+    git_commit_tag: "3.4.13v",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.13v - Comprehensive revamp of guided tour and tutorial system across all modules with head-to-toe cross-page navigation, dual-mode welcome modal, and settings management",
+  },
+  {
     id: "3.4.12v",
     version: "3.4.12v",
     git_commit_tag: "3.4.12v",

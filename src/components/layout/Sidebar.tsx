@@ -198,7 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </Box>
 
         {/* Navigation List */}
-        <List sx={{ px: 1.25, py: 1.75 }}>
+        <List sx={{ px: 1.25, py: 1.75 }} data-tour="nav-sidebar">
           {navItems.map((item) => {
             const isActive =
               location.pathname === item.path || (item.path === "/dashboard" && location.pathname === "/");

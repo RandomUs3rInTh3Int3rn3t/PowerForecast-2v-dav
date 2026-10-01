@@ -58,7 +58,7 @@ export const Header: React.FC<HeaderProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { startTour, isActive: isTourActive } = useTour();
+  const { startTour, openWelcomeModal, isActive: isTourActive } = useTour();
   const currentTourPage = ROUTE_TO_TOUR_PAGE[location.pathname] || (location.pathname === "/" ? "dashboard" : null);
 
   const { data: identity } = useGetIdentity<any>();
@@ -175,6 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Database Connection Status Chip */}
           <Tooltip title={dbStatus.ok ? `Supabase Connected (${dbStatus.latency || 0}ms)` : "Supabase Offline / Local Mode"}>
             <Chip
+              data-tour="header-db-status"
               icon={
                 dbStatus.ok ? (
                   <CloudDoneIcon sx={{ color: "#34d399 !important", fontSize: "15px !important" }} />
@@ -198,7 +199,9 @@ export const Header: React.FC<HeaderProps> = ({
           </Tooltip>
 
           {/* Meralco Generation Rate Badge & Hover Breakdown Popover */}
-          <MeralcoRatePopover />
+          <Box data-tour="header-rate-popover">
+            <MeralcoRatePopover />
+          </Box>
         </Box>
 
         {/* Center: Live Time / Date */}
@@ -215,6 +218,7 @@ export const Header: React.FC<HeaderProps> = ({
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
           {onOpenAiScanner && (
             <Button
+              data-tour="header-ai-scanner"
               variant="outlined"
               size="small"
               onClick={onOpenAiScanner}
@@ -235,7 +239,8 @@ export const Header: React.FC<HeaderProps> = ({
           {currentTourPage && (
             <Tooltip title="Page Tour & Tutorial [?]">
               <IconButton
-                onClick={() => startTour(currentTourPage)}
+                data-tour="header-tour-button"
+                onClick={() => openWelcomeModal(currentTourPage || "dashboard")}
                 color="inherit"
                 size="small"
                 disabled={isTourActive}
@@ -264,6 +269,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Theme Mode Toggle Button */}
           <Tooltip title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}>
             <IconButton
+              data-tour="header-theme-toggle"
               onClick={onToggleTheme}
               color="inherit"
               size="small"
@@ -283,6 +289,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Smart Energy Notifications Bell */}
           <Tooltip title="Smart Energy Notifications">
             <IconButton
+              data-tour="header-notifications"
               onClick={(e) => setNotifAnchorEl(e.currentTarget)}
               color="inherit"
               size="small"
@@ -317,6 +324,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* User Profile Pill & Menu */}
           <Box
+            data-tour="header-profile"
             onClick={(e) => setAnchorEl(e.currentTarget)}
             sx={{
               display: "flex",

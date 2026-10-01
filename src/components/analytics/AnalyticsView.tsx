@@ -702,7 +702,7 @@ export const AnalyticsView: React.FC = () => {
       </Paper>
 
       {/* 3. KPI Metrics Cards */}
-      <Grid container spacing={{ xs: 2, sm: 2.5 }}>
+      <Grid container spacing={{ xs: 2, sm: 2.5 }} data-tour="analytics-kpi-row">
         {/* Monthly Volume */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <MetricCard
@@ -950,7 +950,7 @@ export const AnalyticsView: React.FC = () => {
       </Grid>
 
       {/* 5. 24-Hour Load Curve Simulation */}
-      <Card sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 1.5 }}>
+      <Card data-tour="analytics-load-curve" sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 1.5 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5, mb: 2.5 }}>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
@@ -1104,7 +1104,7 @@ export const AnalyticsView: React.FC = () => {
       </Card>
 
       {/* 6. Multi-Month Trend & Predictive Baseline Forecast */}
-      <Card sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 1.5 }}>
+      <Card data-tour="analytics-historical-trend" sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 1.5 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5, mb: 2.5 }}>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>

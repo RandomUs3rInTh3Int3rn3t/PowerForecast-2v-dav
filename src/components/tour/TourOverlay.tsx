@@ -4,26 +4,39 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Chip from '@mui/material/Chip';
+import LinearProgress from '@mui/material/LinearProgress';
+import Tooltip from '@mui/material/Tooltip';
 import {
   ArrowBack as ArrowBackIcon,
   ArrowForward as ArrowForwardIcon,
   Close as CloseIcon,
   CheckCircle as CheckIcon,
+  SkipNext as SkipNextIcon,
   Translate as TranslateIcon,
+  Explore as ExploreIcon,
+  InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
 import { AnimatePresence, motion } from 'framer-motion';
-import { type TourStep, type TourLanguage } from './tourSteps';
+import { type TourStep, type TourLanguage, type TourPage, PAGE_METADATA } from './tourSteps';
+import { type TourMode } from './TourProvider';
 
 interface TourOverlayProps {
   step: TourStep;
   stepIndex: number;
   totalSteps: number;
   language: TourLanguage;
+  mode: TourMode;
+  fullTourProgress: {
+    pageIndex: number;
+    totalPages: number;
+    pageName: TourPage;
+  } | null;
+  currentTourTitle: string;
   onChangeLanguage: (lang: TourLanguage) => void;
   onNext: () => void;
   onPrev: () => void;
+  onSkipPage?: () => void;
   onSkip: () => void;
   isFirstStep: boolean;
   isLastStep: boolean;
@@ -38,43 +51,37 @@ interface Rect {
   right: number;
 }
 
-const SPOTLIGHT_PADDING = 10;
-const TOOLTIP_GAP = 16;
-const TOOLTIP_MAX_WIDTH = 380;
+const SPOTLIGHT_PADDING = 8;
+const TOOLTIP_GAP = 14;
+const TOOLTIP_MAX_WIDTH = 420;
 
-/**
- * Calculate the best placement for the tooltip relative to the target element.
- */
 function computePlacement(
   targetRect: Rect,
   tooltipWidth: number,
   tooltipHeight: number,
-  preferred?: 'top' | 'bottom' | 'left' | 'right' | 'auto'
+  preferred?: 'top' | 'bottom' | 'left' | 'right'
 ): { top: number; left: number; placement: 'top' | 'bottom' | 'left' | 'right' } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  // Space available in each direction
   const spaceTop = targetRect.top - SPOTLIGHT_PADDING;
   const spaceBottom = vh - targetRect.bottom - SPOTLIGHT_PADDING;
   const spaceLeft = targetRect.left - SPOTLIGHT_PADDING;
   const spaceRight = vw - targetRect.right - SPOTLIGHT_PADDING;
 
-  // Determine best placement
   let placement: 'top' | 'bottom' | 'left' | 'right' = 'bottom';
 
-  if (preferred && preferred !== 'auto') {
-    // Use preferred if there's enough room
+  if (preferred) {
     const fits: Record<string, boolean> = {
       top: spaceTop >= tooltipHeight + TOOLTIP_GAP,
       bottom: spaceBottom >= tooltipHeight + TOOLTIP_GAP,
       left: spaceLeft >= tooltipWidth + TOOLTIP_GAP,
       right: spaceRight >= tooltipWidth + TOOLTIP_GAP,
     };
+
     if (fits[preferred]) {
       placement = preferred;
     } else {
-      // Fallback: pick the direction with the most space
       const ranked = [
         { dir: 'bottom' as const, space: spaceBottom },
         { dir: 'top' as const, space: spaceTop },
@@ -115,9 +122,8 @@ function computePlacement(
       break;
   }
 
-  // Clamp within viewport
-  left = Math.max(12, Math.min(left, vw - tooltipWidth - 12));
-  top = Math.max(12, Math.min(top, vh - tooltipHeight - 12));
+  left = Math.max(16, Math.min(left, vw - tooltipWidth - 16));
+  top = Math.max(16, Math.min(top, vh - tooltipHeight - 16));
 
   return { top, left, placement };
 }
@@ -127,38 +133,40 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
   stepIndex,
   totalSteps,
   language,
+  mode,
+  fullTourProgress,
+  currentTourTitle,
   onChangeLanguage,
   onNext,
   onPrev,
+  onSkipPage,
   onSkip,
   isFirstStep,
   isLastStep,
 }) => {
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-  const [showLangPicker, setShowLangPicker] = useState(false);
+  const [isCenteredFallback, setIsCenteredFallback] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const copy = step.copy[language];
+  const copy = step.copy[language] || step.copy.en;
 
-  // ── Find & measure target element ──────────────────────────
+  // ── Find and measure target element ──────────────────────────
   const measureTarget = useCallback(() => {
     const el = document.querySelector(`[data-tour="${step.id}"]`);
     if (!el) {
       setTargetRect(null);
+      setIsCenteredFallback(true);
       return;
     }
 
-    // Scroll into view if needed
+    setIsCenteredFallback(false);
     const rect = el.getBoundingClientRect();
-    const isInView =
-      rect.top >= -50 &&
-      rect.bottom <= window.innerHeight + 50;
+    const isInView = rect.top >= 20 && rect.bottom <= window.innerHeight - 20;
 
     if (!isInView) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Re-measure after scroll animation
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         const newRect = el.getBoundingClientRect();
         setTargetRect({
           top: newRect.top,
@@ -168,7 +176,8 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
           bottom: newRect.bottom,
           right: newRect.right,
         });
-      }, 450);
+      }, 420);
+      return () => clearTimeout(timer);
     } else {
       setTargetRect({
         top: rect.top,
@@ -181,12 +190,10 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
     }
   }, [step.id]);
 
-  // Re-measure on step change
   useEffect(() => {
     measureTarget();
   }, [measureTarget, stepIndex]);
 
-  // Re-measure on resize / scroll
   useEffect(() => {
     const handler = () => measureTarget();
     window.addEventListener('resize', handler);
@@ -197,19 +204,28 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
     };
   }, [measureTarget]);
 
-  // ── Position tooltip once we know target rect + tooltip dimensions
+  // ── Compute Tooltip Position ──────────────────────────────
   useLayoutEffect(() => {
-    if (!targetRect || !tooltipRef.current) return;
-
     const tooltipEl = tooltipRef.current;
-    const tooltipWidth = Math.min(tooltipEl.offsetWidth || TOOLTIP_MAX_WIDTH, TOOLTIP_MAX_WIDTH);
-    const tooltipHeight = tooltipEl.offsetHeight || 200;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tooltipWidth = Math.min(tooltipEl?.offsetWidth || TOOLTIP_MAX_WIDTH, vw - 32);
+    const tooltipHeight = tooltipEl?.offsetHeight || 220;
+
+    if (!targetRect) {
+      // Graceful centered fallback
+      setTooltipPos({
+        top: Math.max(20, Math.floor((vh - tooltipHeight) / 2)),
+        left: Math.max(16, Math.floor((vw - tooltipWidth) / 2)),
+      });
+      return;
+    }
 
     const pos = computePlacement(targetRect, tooltipWidth, tooltipHeight, step.placement);
     setTooltipPos({ top: pos.top, left: pos.left });
-  }, [targetRect, step.placement, language, showLangPicker]);
+  }, [targetRect, step.placement, language, stepIndex]);
 
-  // ── Handle keyboard ────────────────────────────────────────
+  // ── Keyboard Controls ─────────────────────────────────────
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onSkip();
@@ -220,18 +236,16 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
     return () => window.removeEventListener('keydown', handleKey);
   }, [onSkip, onNext, onPrev]);
 
-  // ── Build clip-path for spotlight cutout ────────────────────
+  // ── Build clip-path for spotlight cutout ──────────────────
   const buildClipPath = () => {
     if (!targetRect) return 'none';
     const p = SPOTLIGHT_PADDING;
-    const x = targetRect.left - p;
-    const y = targetRect.top - p;
+    const x = Math.max(0, targetRect.left - p);
+    const y = Math.max(0, targetRect.top - p);
     const w = targetRect.width + p * 2;
     const h = targetRect.height + p * 2;
-    const r = 12; // border-radius of cutout
+    const r = 10;
 
-    // Polygon with rounded rect hole using SVG-in-clip-path approach not supported,
-    // so we use a simpler approach: inset with polygon
     return `polygon(
       0% 0%, 0% 100%, ${x}px 100%, ${x}px ${y + r}px,
       ${x + r}px ${y}px, ${x + w - r}px ${y}px, ${x + w}px ${y + r}px,
@@ -241,23 +255,26 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
     )`;
   };
 
+  const progressPct = totalSteps > 0 ? ((stepIndex + 1) / totalSteps) * 100 : 0;
+  const currentModuleMeta = fullTourProgress ? PAGE_METADATA[fullTourProgress.pageName] : null;
+
   return (
     <>
-      {/* Full-screen backdrop with spotlight cutout */}
+      {/* Semi-transparent backdrop with cutout */}
       <Box
         onClick={onSkip}
         sx={{
           position: 'fixed',
           inset: 0,
           zIndex: 99980,
-          bgcolor: 'rgba(0, 0, 0, 0.62)',
+          bgcolor: 'rgba(0, 0, 0, 0.65)',
           clipPath: targetRect ? buildClipPath() : 'none',
-          transition: 'clip-path 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'clip-path 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           cursor: 'pointer',
         }}
       />
 
-      {/* Highlight border ring around target */}
+      {/* Target Focus Ring & Pulse */}
       {targetRect && (
         <Box
           sx={{
@@ -266,234 +283,278 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
             left: targetRect.left - SPOTLIGHT_PADDING,
             width: targetRect.width + SPOTLIGHT_PADDING * 2,
             height: targetRect.height + SPOTLIGHT_PADDING * 2,
-            borderRadius: '10px',
+            borderRadius: 1.5,
             border: '2px solid',
-            borderColor: 'primary.main',
-            boxShadow: '0 0 24px rgba(0, 229, 201, 0.45), inset 0 0 24px rgba(0, 229, 201, 0.08)',
+            borderColor: '#00e5c9',
+            boxShadow: '0 0 0 4px rgba(0, 229, 201, 0.25), 0 0 24px rgba(0, 229, 201, 0.35)',
             pointerEvents: 'none',
-            zIndex: 99981,
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 99982,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            animation: 'tourPulse 2.5s infinite ease-in-out',
+            '@keyframes tourPulse': {
+              '0%': { boxShadow: '0 0 0 3px rgba(0, 229, 201, 0.2), 0 0 16px rgba(0, 229, 201, 0.3)' },
+              '50%': { boxShadow: '0 0 0 7px rgba(0, 229, 201, 0.35), 0 0 28px rgba(0, 229, 201, 0.5)' },
+              '100%': { boxShadow: '0 0 0 3px rgba(0, 229, 201, 0.2), 0 0 16px rgba(0, 229, 201, 0.3)' },
+            },
           }}
         />
       )}
 
-      {/* Tooltip Card */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`tour-step-${stepIndex}`}
-          initial={{ opacity: 0, y: 12, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -8, scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 360, damping: 30, mass: 0.8 }}
-          style={{
-            position: 'fixed',
-            top: tooltipPos.top,
-            left: tooltipPos.left,
-            zIndex: 99985,
-            maxWidth: TOOLTIP_MAX_WIDTH,
-            width: '92vw',
-          }}
-        >
-          <Paper
-            ref={tooltipRef}
-            elevation={0}
-            sx={{
-              p: 2.5,
-              borderRadius: 1.5,
-              bgcolor: (theme) =>
-                theme.palette.mode === 'dark'
-                  ? 'rgba(23, 26, 31, 0.98)'
-                  : 'rgba(255, 255, 255, 0.98)',
-              border: '1px solid',
-              borderColor: 'rgba(0, 229, 201, 0.35)',
-              boxShadow: '0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 229, 201, 0.1)',
-              backdropFilter: 'blur(20px)',
-              position: 'relative',
-              overflow: 'visible',
-            }}
+      {/* Floating Tooltip Card */}
+      <Box
+        ref={tooltipRef}
+        sx={{
+          position: 'fixed',
+          top: tooltipPos.top,
+          left: tooltipPos.left,
+          width: { xs: 'calc(100vw - 32px)', sm: TOOLTIP_MAX_WIDTH },
+          maxWidth: TOOLTIP_MAX_WIDTH,
+          zIndex: 99985,
+          pointerEvents: 'auto',
+          transition: 'top 0.25s cubic-bezier(0.4, 0, 0.2, 1), left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${step.id}-${language}`}
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
           >
-            {/* Top bar: step indicator + language + close */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 2.25, sm: 2.75 },
+                borderRadius: 2,
+                bgcolor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(23, 26, 31, 0.96)' : 'rgba(255, 255, 255, 0.98)',
+                border: '1px solid',
+                borderColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(0, 229, 201, 0.35)' : 'rgba(13, 148, 136, 0.28)',
+                boxShadow: (theme) =>
+                  theme.palette.mode === 'dark'
+                    ? '0 20px 60px rgba(0, 0, 0, 0.65), 0 0 24px rgba(0, 229, 201, 0.1)'
+                    : '0 16px 45px rgba(15, 23, 42, 0.12)',
+                backdropFilter: 'blur(20px)',
+                position: 'relative',
+              }}
+            >
+              {/* Top Banner / Breadcrumb */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1 }}>
+                  {mode === 'full' && fullTourProgress ? (
+                    <Chip
+                      size="small"
+                      label={`Module ${fullTourProgress.pageIndex + 1}/${fullTourProgress.totalPages}: ${
+                        currentModuleMeta?.title[language] || fullTourProgress.pageName
+                      }`}
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: '0.6875rem',
+                        bgcolor: (theme) =>
+                          theme.palette.mode === 'dark' ? 'rgba(0, 229, 201, 0.15)' : 'rgba(13, 148, 136, 0.1)',
+                        color: 'primary.main',
+                        border: '1px solid',
+                        borderColor: (theme) =>
+                          theme.palette.mode === 'dark' ? 'rgba(0, 229, 201, 0.3)' : 'rgba(13, 148, 136, 0.25)',
+                        maxWidth: 260,
+                      }}
+                    />
+                  ) : (
+                    <Typography variant="caption" sx={{ fontWeight: 800, color: 'primary.main', letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '0.6875rem' }}>
+                      {currentTourTitle || 'PowerForecast Tour'}
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  {/* Language switch */}
+                  <Tooltip title={language === 'en' ? 'Lumipat sa Tagalog' : 'Switch to English'}>
+                    <Button
+                      size="small"
+                      onClick={() => onChangeLanguage(language === 'en' ? 'tl' : 'en')}
+                      startIcon={<TranslateIcon sx={{ fontSize: '13px !important' }} />}
+                      sx={{
+                        fontSize: '0.6875rem',
+                        fontWeight: 800,
+                        minWidth: 42,
+                        py: 0.25,
+                        px: 0.75,
+                        borderRadius: 1,
+                        textTransform: 'none',
+                        color: 'text.secondary',
+                        bgcolor: 'action.hover',
+                      }}
+                    >
+                      {language.toUpperCase()}
+                    </Button>
+                  </Tooltip>
+
+                  {/* Close button */}
+                  <IconButton
+                    size="small"
+                    onClick={onSkip}
+                    sx={{
+                      color: 'text.secondary',
+                      p: 0.5,
+                      borderRadius: 1,
+                      '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                    }}
+                  >
+                    <CloseIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Box>
+              </Box>
+
+              {/* Centered Overview Notice if element not spotlighted */}
+              {isCenteredFallback && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    mb: 1.5,
+                    p: 1,
+                    borderRadius: 1,
+                    bgcolor: (theme) =>
+                      theme.palette.mode === 'dark' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(217, 119, 6, 0.1)',
+                    color: 'warning.main',
+                  }}
+                >
+                  <InfoIcon sx={{ fontSize: 16 }} />
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                    {language === 'tl'
+                      ? 'Pangkalahatang Tanawin para sa seksyong ito'
+                      : 'Overview step for this module'}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Title */}
               <Typography
-                variant="caption"
+                variant="subtitle1"
                 sx={{
-                  fontWeight: 800,
-                  color: 'primary.main',
-                  fontSize: '0.6875rem',
-                  letterSpacing: '0.05em',
+                  fontWeight: 900,
+                  color: 'text.primary',
+                  letterSpacing: '-0.01em',
+                  mb: 0.75,
+                  lineHeight: 1.3,
                 }}
               >
-                STEP {stepIndex + 1} OF {totalSteps}
+                {copy.title}
               </Typography>
 
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {/* Language toggle mini button */}
-                <IconButton
-                  size="small"
-                  onClick={() => setShowLangPicker((p) => !p)}
-                  sx={{
-                    p: 0.5,
-                    color: showLangPicker ? 'primary.main' : 'text.secondary',
-                    '&:hover': { color: 'primary.main' },
-                  }}
-                >
-                  <TranslateIcon sx={{ fontSize: 16 }} />
-                </IconButton>
+              {/* Description */}
+              <Typography
+                variant="body2"
+                sx={{
+                  color: 'text.secondary',
+                  lineHeight: 1.55,
+                  mb: 2,
+                  fontSize: '0.8125rem',
+                }}
+              >
+                {copy.description}
+              </Typography>
 
-                <IconButton
-                  size="small"
-                  onClick={onSkip}
-                  sx={{
-                    p: 0.5,
-                    color: 'text.secondary',
-                    '&:hover': { color: 'error.main' },
-                  }}
-                >
-                  <CloseIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Box>
-            </Box>
-
-            {/* Inline language picker (collapsible) */}
-            {showLangPicker && (
+              {/* Progress bar */}
               <Box sx={{ mb: 2 }}>
-                <ToggleButtonGroup
-                  value={language}
-                  exclusive
-                  onChange={(_, val) => {
-                    if (val) onChangeLanguage(val as TourLanguage);
-                  }}
-                  size="small"
-                  fullWidth
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', fontSize: '0.6875rem' }}>
+                    {language === 'tl' ? 'Hakbang' : 'Step'} {stepIndex + 1} {language === 'tl' ? 'ng' : 'of'} {totalSteps}
+                  </Typography>
+                  {mode === 'full' && onSkipPage && (
+                    <Button
+                      size="small"
+                      onClick={onSkipPage}
+                      endIcon={<SkipNextIcon sx={{ fontSize: '14px !important' }} />}
+                      sx={{
+                        fontSize: '0.6875rem',
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        color: 'text.secondary',
+                        p: 0,
+                        minWidth: 0,
+                        '&:hover': { color: 'primary.main' },
+                      }}
+                    >
+                      {language === 'tl' ? 'Laktawan itong modyul' : 'Skip module'}
+                    </Button>
+                  )}
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={progressPct}
                   sx={{
-                    '& .MuiToggleButton-root': {
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      fontSize: '0.75rem',
-                      py: 0.5,
-                      borderRadius: '6px !important',
-                      mx: 0.25,
-                      '&.Mui-selected': {
-                        bgcolor: 'primary.main',
-                        color: '#ffffff',
-                        borderColor: 'primary.main',
-                      },
+                    height: 5,
+                    borderRadius: 3,
+                    bgcolor: (theme) =>
+                      theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                    '& .MuiLinearProgress-bar': {
+                      borderRadius: 3,
+                      bgcolor: '#00e5c9',
                     },
                   }}
-                >
-                  <ToggleButton value="en">English</ToggleButton>
-                  <ToggleButton value="tl">Tagalog</ToggleButton>
-                </ToggleButtonGroup>
-              </Box>
-            )}
-
-            {/* Title */}
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: 800,
-                letterSpacing: '-0.01em',
-                mb: 1,
-                lineHeight: 1.3,
-              }}
-            >
-              {copy.title}
-            </Typography>
-
-            {/* Description */}
-            <Typography
-              variant="body2"
-              sx={{
-                color: 'text.secondary',
-                lineHeight: 1.65,
-                mb: 2.5,
-                fontSize: '0.8125rem',
-              }}
-            >
-              {copy.description}
-            </Typography>
-
-            {/* Progress dots */}
-            <Box sx={{ display: 'flex', gap: 0.5, mb: 2, justifyContent: 'center' }}>
-              {Array.from({ length: totalSteps }, (_, i) => (
-                <Box
-                  key={i}
-                  sx={{
-                    width: i === stepIndex ? 20 : 6,
-                    height: 6,
-                    borderRadius: 3,
-                    bgcolor: i === stepIndex ? 'primary.main' : i < stepIndex ? 'primary.light' : 'action.disabled',
-                    transition: 'all 0.3s ease',
-                  }}
                 />
-              ))}
-            </Box>
+              </Box>
 
-            {/* Navigation buttons */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Button
-                size="small"
-                variant="text"
-                onClick={onPrev}
-                disabled={isFirstStep}
-                startIcon={<ArrowBackIcon sx={{ fontSize: '14px !important' }} />}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  fontSize: '0.8125rem',
-                  color: 'text.secondary',
-                  '&:hover': { color: 'text.primary' },
-                  visibility: isFirstStep ? 'hidden' : 'visible',
-                }}
-              >
-                Back
-              </Button>
+              {/* Controls Footer */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                <Button
+                  size="small"
+                  onClick={onPrev}
+                  disabled={isFirstStep}
+                  startIcon={<ArrowBackIcon sx={{ fontSize: '16px !important' }} />}
+                  sx={{
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    fontSize: '0.8125rem',
+                    borderRadius: 1,
+                    px: 1.5,
+                    color: 'text.secondary',
+                    '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                  }}
+                >
+                  {language === 'tl' ? 'Bumalik' : 'Back'}
+                </Button>
 
-              <Button
-                size="small"
-                variant="contained"
-                onClick={onNext}
-                endIcon={
-                  isLastStep ? (
-                    <CheckIcon sx={{ fontSize: '16px !important' }} />
-                  ) : (
-                    <ArrowForwardIcon sx={{ fontSize: '14px !important' }} />
-                  )
-                }
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 800,
-                  fontSize: '0.8125rem',
-                  borderRadius: 1,
-                  px: 2.5,
-                  py: 0.75,
-                  boxShadow: '0 2px 12px rgba(0, 229, 201, 0.3)',
-                }}
-              >
-                {isLastStep ? 'Finish' : 'Next'}
-              </Button>
-            </Box>
-
-            {/* Skip link */}
-            <Box sx={{ textAlign: 'center', mt: 1.5 }}>
-              <Typography
-                variant="caption"
-                onClick={onSkip}
-                sx={{
-                  color: 'text.disabled',
-                  cursor: 'pointer',
-                  fontSize: '0.6875rem',
-                  fontWeight: 600,
-                  '&:hover': { color: 'text.secondary', textDecoration: 'underline' },
-                  transition: 'color 0.2s',
-                }}
-              >
-                Skip tour
-              </Typography>
-            </Box>
-          </Paper>
-        </motion.div>
-      </AnimatePresence>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={onNext}
+                    endIcon={isLastStep ? <CheckIcon sx={{ fontSize: '16px !important' }} /> : <ArrowForwardIcon sx={{ fontSize: '16px !important' }} />}
+                    sx={{
+                      fontWeight: 800,
+                      textTransform: 'none',
+                      fontSize: '0.8125rem',
+                      borderRadius: 1,
+                      px: 2,
+                      py: 0.75,
+                      bgcolor: '#00e5c9',
+                      color: '#0a1715',
+                      boxShadow: '0 4px 14px rgba(0, 229, 201, 0.3)',
+                      '&:hover': {
+                        bgcolor: '#00c7ae',
+                        boxShadow: '0 6px 18px rgba(0, 229, 201, 0.4)',
+                      },
+                    }}
+                  >
+                    {isLastStep
+                      ? language === 'tl'
+                        ? 'Tapusin'
+                        : 'Finish'
+                      : language === 'tl'
+                      ? 'Susunod'
+                      : 'Next'}
+                  </Button>
+                </Box>
+              </Box>
+            </Paper>
+          </motion.div>
+        </AnimatePresence>
+      </Box>
     </>
   );
 };

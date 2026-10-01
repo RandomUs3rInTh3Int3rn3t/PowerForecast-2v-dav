@@ -356,7 +356,7 @@ export const ForecastingView: React.FC = () => {
 
       {/* 2. Space Selector Tabs (When spaces exist) */}
       {spaces.length > 0 && (
-        <Box data-tour="forecast-space-tabs">
+        <Box data-tour="forecasting-space-tabs">
           <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", display: "block", mb: 1, letterSpacing: "0.05em" }}>
             FORECAST SCOPE / TARGET SPACE
           </Typography>
@@ -486,6 +486,7 @@ export const ForecastingView: React.FC = () => {
 
           {/* 4. Active Billing Cycle Run-Rate Telemetry Banner */}
           <Card
+            data-tour="forecasting-hero-kpi"
             sx={{
               p: { xs: 2.5, sm: 3 },
               borderRadius: 1.5,
@@ -631,6 +632,7 @@ export const ForecastingView: React.FC = () => {
 
           {/* 4.5. Dual Trajectory Forecast: Baseline Path vs Simulated Plan */}
           <Card
+            data-tour="forecasting-trajectory-chart"
             sx={{
               p: { xs: 2.5, sm: 3 },
               borderRadius: 1.5,
@@ -759,7 +761,7 @@ export const ForecastingView: React.FC = () => {
 
           {/* 5. Meralco Rate Fluctuation Simulator */}
           <Card
-            data-tour="forecast-rate-slider"
+            data-tour="forecasting-rate-slider"
             sx={{
               p: { xs: 2.5, sm: 3.5 },
               borderRadius: 1.5,
@@ -865,7 +867,7 @@ export const ForecastingView: React.FC = () => {
           </Card>
 
           {/* 6. Four Data-Grounded Forecast Scenarios */}
-          <Box data-tour="forecast-scenarios">
+          <Box data-tour="forecasting-scenarios">
             <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "text.primary", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
               <ScienceIcon sx={{ color: "primary.main" }} />
               {t("fc.scenariosTitle", "Data-Driven Forecast Scenarios & Stress Tests")}
@@ -1283,7 +1285,7 @@ export const ForecastingView: React.FC = () => {
 
           {/* 9. Advisory Insights Box */}
           <Paper
-            data-tour="forecast-advisory"
+            data-tour="forecasting-advisory"
             sx={{
               p: 3,
               borderRadius: 1.5,

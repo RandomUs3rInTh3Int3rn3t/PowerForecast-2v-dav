@@ -174,7 +174,7 @@ export const MeralcoCalculator: React.FC = () => {
                   <Typography variant="caption" sx={{ fontWeight: 700, mb: 1, display: "block" }}>
                     Select Space Tariff
                   </Typography>
-                  <Grid container spacing={1.5}>
+                  <Grid container spacing={1.5} data-tour="calculator-space-comparison">
                     <Grid size={6}>
                       <Paper
                         variant="outlined"
@@ -248,7 +248,7 @@ export const MeralcoCalculator: React.FC = () => {
                 </Box>
 
                 {/* Base Generation Charge */}
-                <Box data-tour="calc-subsidies">
+                <Box data-tour="calculator-subsidies">
                   <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", display: "block", mb: 1 }}>
                     BASE GENERATION CHARGE (₱ / kWh)
                   </Typography>
@@ -307,7 +307,7 @@ export const MeralcoCalculator: React.FC = () => {
                 </Box>
 
                 {/* Monthly kWh Slider */}
-                <Box data-tour="calc-kwh-slider">
+                <Box data-tour="calculator-kwh-slider">
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
                       MONTHLY CONSUMPTION
@@ -387,7 +387,7 @@ export const MeralcoCalculator: React.FC = () => {
               </Card>
             ) : (
               <Card
-                data-tour="calc-whatif"
+                data-tour="calculator-whatif"
                 sx={{
                   p: { xs: 2.5, sm: 3 },
                   borderRadius: 1.5,
@@ -477,6 +477,7 @@ export const MeralcoCalculator: React.FC = () => {
           <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2.5, sm: 3 } }}>
             {/* Total Amount Due Display */}
             <Card
+              data-tour="calculator-summary"
               sx={{
                 p: { xs: 3, sm: 4 },
                 textAlign: "center",
@@ -546,7 +547,7 @@ export const MeralcoCalculator: React.FC = () => {
 
             {/* Cost Share Distribution Bar */}
             <Card
-              data-tour="calc-unbundled"
+              data-tour="calculator-unbundled"
               sx={{
                 p: { xs: 2.5, sm: 3 },
                 borderRadius: 1.5,
