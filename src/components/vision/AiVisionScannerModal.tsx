@@ -108,49 +108,54 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
     if (!files || files.length === 0) return;
     setScanError(null);
 
-    const remainingSlots = 3 - stagedImages.length;
-    if (remainingSlots <= 0) return;
+    const file = files[0];
+    const MAX_RAW_BYTES = 12 * 1024 * 1024; // 12 MB raw file cap
+    if (file.size > MAX_RAW_BYTES) {
+      setScanError(`The selected photo is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 12 MB. Please select or capture a standard photo.`);
+      return;
+    }
 
-    const filesToProcess = Array.from(files).slice(0, remainingSlots);
     setIsCompressing(true);
 
     try {
-      const processedImages: ImageItem[] = await Promise.all(
-        filesToProcess.map(async (file) => {
-          try {
-            const compressed = await compressImageFile(file, {
-              maxWidth: 1600,
-              maxHeight: 1600,
-              quality: 0.82,
-            });
-            return {
-              id: `img-${Date.now()}-${Math.random()}`,
-              base64: compressed.base64,
-              file: compressed.file,
+      let processedImage: ImageItem;
+      try {
+        const compressed = await compressImageFile(file, {
+          maxWidth: 1600,
+          maxHeight: 1600,
+          quality: 0.82,
+        });
+        processedImage = {
+          id: `img-${Date.now()}`,
+          base64: compressed.base64,
+          file: compressed.file,
+          name: file.name,
+          sizeBytes: compressed.compressedSizeBytes,
+          savingsPercent: Math.round(compressed.compressionRatio * 100),
+        };
+      } catch (compErr) {
+        devLog.warn('AI Scanner', `Compression failed for ${file.name}, using fallback reader:`, compErr);
+        processedImage = await new Promise<ImageItem>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            resolve({
+              id: `img-${Date.now()}`,
+              base64: reader.result as string,
+              file,
               name: file.name,
-            };
-          } catch (compErr) {
-            devLog.warn('AI Scanner', `Compression failed for ${file.name}, using fallback reader:`, compErr);
-            return new Promise<ImageItem>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                resolve({
-                  id: `img-${Date.now()}-${Math.random()}`,
-                  base64: reader.result as string,
-                  file,
-                  name: file.name,
-                });
-              };
-              reader.readAsDataURL(file);
+              sizeBytes: file.size,
+              savingsPercent: 0,
             });
-          }
-        })
-      );
+          };
+          reader.readAsDataURL(file);
+        });
+      }
 
-      setStagedImages((prev) => [...prev, ...processedImages].slice(0, 3));
+      // Enforce 1 photo: replaces previous photo on retake
+      setStagedImages([processedImage]);
     } catch (err: any) {
-      devLog.error("AI Scanner", "Failed to stage photos:", err);
-      setScanError("Failed to process photos. Please try again.");
+      devLog.error("AI Scanner", "Failed to stage photo:", err);
+      setScanError("Failed to process photo. Please try again.");
     } finally {
       setIsCompressing(false);
     }
@@ -557,7 +562,7 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
               <Button
                 component="label"
                 variant="outlined"
-                disabled={isCompressing || stagedImages.length >= 3}
+                disabled={isCompressing}
                 startIcon={<UploadIcon />}
                 sx={{
                   fontWeight: 700,
@@ -571,7 +576,6 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
                 <input
                   type="file"
                   accept="image/*"
-                  multiple
                   hidden
                   onChange={(e) => {
                     handleFiles(e.target.files);
@@ -590,50 +594,78 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
               </Box>
             ) : (
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                Capture or upload up to 3 clear photos of appliance nameplates, DOE yellow energy guides, or specification stickers
+                Capture or upload 1 clear photo of DOE Yellow Energy Guide or appliance nameplate (Max 12 MB)
               </Typography>
             )}
           </Box>
         </Paper>
 
-        {/* Staged Photo Previews */}
+        {/* Single Staged Photo Preview Card */}
         {stagedImages.length > 0 && (
-          <Box>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", display: "block", mb: 1.5 }}>
-              STAGED PHOTOS ({stagedImages.length} / 3)
-            </Typography>
-            <Grid container spacing={2}>
-              {stagedImages.map((img) => (
-                <Grid size={4} key={img.id}>
-                  <Paper
-                    sx={{
-                      p: 1,
-                      borderRadius: 1.25,
-                      position: "relative",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Box
-                      component="img"
-                      src={img.base64}
-                      alt={img.name}
-                      sx={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 1 }}
-                    />
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => removeStagedImage(img.id)}
-                      sx={{ position: "absolute", top: 4, right: 4, bgcolor: "rgba(0,0,0,0.6)" }}
-                    >
-                      <TrashIcon fontSize="small" sx={{ color: "#ffffff" }} />
-                    </IconButton>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              borderRadius: 1.5,
+              bgcolor: "action.hover",
+              borderColor: "primary.main",
+              display: "flex",
+              flexDirection: "column",
+              gap: 1.5,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                <Chip
+                  icon={<CheckCircleIcon sx={{ fontSize: "16px !important" }} />}
+                  label="Photo Ready for AI Scan"
+                  color="success"
+                  size="small"
+                  sx={{ fontWeight: 700 }}
+                />
+                {stagedImages[0].sizeBytes && (
+                  <Chip
+                    label={`${(stagedImages[0].sizeBytes / 1024).toFixed(0)} KB${stagedImages[0].savingsPercent ? ` (-${stagedImages[0].savingsPercent}%)` : ""}`}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontWeight: 600 }}
+                  />
+                )}
+              </Box>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => removeStagedImage(stagedImages[0].id)}
+                title="Remove photo"
+              >
+                <TrashIcon fontSize="small" />
+              </IconButton>
+            </Box>
+
+            <Box
+              sx={{
+                width: "100%",
+                height: 220,
+                borderRadius: 1.25,
+                overflow: "hidden",
+                bgcolor: "rgba(0, 0, 0, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Box
+                component="img"
+                src={stagedImages[0].base64}
+                alt={stagedImages[0].name || "Appliance specification photo"}
+                sx={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                }}
+              />
+            </Box>
+          </Paper>
         )}
 
         {/* Scan Action Progress */}
@@ -986,7 +1018,7 @@ export const AiVisionScannerModal: React.FC<AiVisionScannerModalProps> = ({
             disabled={isScanning || stagedImages.length === 0}
             startIcon={<SparklesIcon />}
           >
-            {isScanning ? "Scanning..." : `Scan ${stagedImages.length} Image(s)`}
+            {isScanning ? "Scanning..." : "Scan Appliance Photo with AI"}
           </Button>
         )}
       </DialogActions>

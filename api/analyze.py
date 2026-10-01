@@ -50,6 +50,18 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
+
+        # Enforce serverless payload boundary (3MB hard cap)
+        if content_length > 3 * 1024 * 1024:
+            self.send_response(413)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "error": "Payload Too Large: Maximum allowed upload is 3 MB. Please capture a single compressed photo."
+            }).encode('utf-8'))
+            return
+
         body = self.rfile.read(content_length).decode('utf-8')
 
         try:
@@ -57,7 +69,9 @@ class handler(BaseHTTPRequestHandler):
         except Exception:
             payload = {}
 
-        images = payload.get('images', [])
+        raw_images = payload.get('images', [])
+        # Strictly enforce single photo scan limit
+        images = raw_images[:1] if isinstance(raw_images, list) else []
         image_base64 = payload.get('imageBase64')
         raw_mime_type = payload.get('mimeType', 'image/jpeg')
         raw_prompt = payload.get('prompt')

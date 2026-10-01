@@ -9,6 +9,8 @@ export interface ImageItem {
   base64: string;
   file?: File;
   name?: string;
+  sizeBytes?: number;
+  savingsPercent?: number;
 }
 
 export interface MultiScanOptions {
@@ -251,10 +253,13 @@ export async function analyzeMultipleApplianceImages(options: MultiScanOptions):
 
   const effectiveCategory = categoryHint || preset || 'Auto-Detect from Photo';
 
-  devLog.info('AI Scanner', `Initiating Google Gemini Multimodal AI Analysis (${images.length} photo(s)) [Category: ${effectiveCategory}]`, {
-    photoCount: images.length,
+  // Strictly enforce 1 photo for ultra-fast mobile scanning and zero payload overflow
+  const singleImageSet = images.slice(0, 1);
+
+  devLog.info('AI Scanner', `Initiating Google Gemini Multimodal AI Analysis (1 photo) [Category: ${effectiveCategory}]`, {
+    photoCount: 1,
     categoryHint: effectiveCategory,
-    files: images.map((i) => i.name || 'Appliance photo'),
+    file: singleImageSet[0]?.name || 'Appliance photo',
   });
 
   let serverlessError: string | null = null;
@@ -263,12 +268,12 @@ export async function analyzeMultipleApplianceImages(options: MultiScanOptions):
   try {
     const safeImages: { base64: string; mimeType: string }[] = [];
 
-    for (const img of images.slice(0, 3)) {
+    for (const img of singleImageSet) {
       let cleanBase64 = img.base64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
       const approxBytes = Math.round(cleanBase64.length * 0.75);
 
-      // If an individual image exceeds 1.2MB, ensure it gets compressed down before sending
-      if (approxBytes > 1.2 * 1024 * 1024) {
+      // If the image exceeds 1.0MB, ensure it gets compressed down before sending
+      if (approxBytes > 1.0 * 1024 * 1024) {
         devLog.warn('AI Scanner', `Image "${img.name || 'unnamed'}" is oversized (${(approxBytes / 1024 / 1024).toFixed(2)} MB), applying dynamic pre-flight compression...`);
         try {
           if (img.file) {
@@ -297,6 +302,10 @@ export async function analyzeMultipleApplianceImages(options: MultiScanOptions):
     }
 
     const totalPayloadBytes = safeImages.reduce((acc, img) => acc + Math.round(img.base64.length * 0.75), 0);
+    if (totalPayloadBytes > 2.5 * 1024 * 1024) {
+      throw new Error(`Photo payload exceeds the 2.5 MB network safety limit (${(totalPayloadBytes / 1024 / 1024).toFixed(1)} MB). Please select a smaller photo.`);
+    }
+
     devLog.info('AI Scanner', `Routing image payload to Vercel Serverless API (/api/analyze)... Total payload size: ${(totalPayloadBytes / 1024).toFixed(1)} KB`);
 
     const res = await fetch('/api/analyze', {
@@ -359,7 +368,7 @@ export async function analyzeMultipleApplianceImages(options: MultiScanOptions):
   // 2. Second Priority: Direct Client Gemini Call with Automatic Multi-Key Rotation Pool
   try {
     devLog.info('AI Scanner', 'Invoking direct Gemini Multimodal Vision API with key rotation pool...');
-    return await callGeminiMultiVision(images, effectiveCategory, apiKey);
+    return await callGeminiMultiVision(singleImageSet, effectiveCategory, apiKey);
   } catch (directErr: any) {
     devLog.error('AI Scanner', `Direct Google Gemini API rotation failed: ${directErr.message}`, { error: directErr });
     const failureReason = serverlessError

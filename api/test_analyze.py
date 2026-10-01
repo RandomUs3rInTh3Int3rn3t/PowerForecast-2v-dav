@@ -91,5 +91,42 @@ class TestAnalyzeHandlerInputValidation(unittest.TestCase):
         self.assertIn("### 5. PRESET MODE: specs", default_prompt_text)
         self.assertNotIn("malicious_preset_injection", default_prompt_text)
 
+    def test_payload_too_large_rejection(self):
+        # 3.5 MB content length exceeds 3MB limit
+        self.handler.headers = {'Content-Length': str(3500000)}
+        self.handler.do_POST()
+
+        self.handler.send_response.assert_called_with(413)
+
+    @patch('api.analyze.get_gemini_api_keys', return_value=['fake_key_123'])
+    @patch('urllib.request.urlopen')
+    def test_single_image_slicing_enforcement(self, mock_urlopen, mock_keys):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({"candidates": []}).encode('utf-8')
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        # Supply 3 images
+        body_data = {
+            "images": [
+                {"base64": "img1_base64", "mimeType": "image/jpeg"},
+                {"base64": "img2_base64", "mimeType": "image/jpeg"},
+                {"base64": "img3_base64", "mimeType": "image/jpeg"},
+            ]
+        }
+        json_bytes = json.dumps(body_data).encode('utf-8')
+        self.handler.headers = {'Content-Length': str(len(json_bytes))}
+        self.handler.rfile.read.return_value = json_bytes
+
+        self.handler.do_POST()
+
+        req = mock_urlopen.call_args[0][0]
+        req_body = json.loads(req.data.decode('utf-8'))
+        parts = req_body["contents"][0]["parts"]
+        # Exactly 1 image part + 1 prompt part = 2 parts
+        image_parts = [p for p in parts if "inline_data" in p]
+        self.assertEqual(len(image_parts), 1)
+        self.assertEqual(image_parts[0]["inline_data"]["data"], "img1_base64")
+
 if __name__ == '__main__':
     unittest.main()

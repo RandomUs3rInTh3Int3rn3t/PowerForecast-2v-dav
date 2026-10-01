@@ -3,10 +3,20 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.4.14av",
+    version: "3.4.14av",
+    git_commit_tag: "3.4.14av",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.4.14av - Enforce single-photo scan limit (max 1 photo, 12MB raw limit) with streamlined preview UI and multi-tier payload bounding",
+  },
+  {
     id: "3.4.14v",
     version: "3.4.14v",
     git_commit_tag: "3.4.14v",
-    created_at: new Date().toISOString(),
+    created_at: "2026-10-01T07:01:08.000Z",
     deployed_by: "Antigravity Pair Programmer",
     source: "github",
     description:
