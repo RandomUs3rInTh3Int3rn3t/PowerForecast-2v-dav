@@ -468,9 +468,12 @@ export const SystemTestingBanner: React.FC<SystemTestingBannerProps> = ({
                   fontSize: "0.84rem",
                   fontWeight: 500,
                   letterSpacing: "0.01em",
+                  lineHeight: 1.5,
                 }}
               >
-                &ldquo;Sorry bruvs, the devs are broke asf&rdquo;
+                &ldquo;Sorry bruvs, the devs are broke asf.
+                <br />
+                Wala kaming panghost, naubos pondo namin kaka-s*gal ni Jas.&rdquo;
               </Typography>
               <Typography
                 variant="caption"
