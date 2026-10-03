@@ -45,7 +45,7 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
 } from "recharts";
-import { UserAppliance, ApplianceList, DailyApplianceUsage, ApplianceUsageLog } from "../../types";
+import { UserAppliance, ApplianceList, DailyApplianceUsage, ApplianceUsageLog, SimulatedApplianceUsage } from "../../types";
 import { useList } from "@refinedev/core";
 import { calculateMeralcoBill } from "../../lib/meralcoCalculator";
 import { calculateKwh, calculateApplianceKwh, calculateCost, DEFAULT_EFFECTIVE_RATE } from "../../lib/dailyUsageService";
@@ -57,7 +57,7 @@ export const ForecastingView: React.FC = () => {
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
   const [whatIfHours, setWhatIfHours] = useState<Record<string, number>>({});
 
-  // 1. Fetch Real User Inventory, Spaces, Daily Usage Records, and Telemetry & Session Logs
+  // 1. Fetch Real User Inventory, Spaces, Daily Usage Records, Simulated Schedules, and Telemetry
   const appliancesRes = useList<UserAppliance>({
     resource: "user_appliances",
     pagination: { mode: "off" },
@@ -78,10 +78,16 @@ export const ForecastingView: React.FC = () => {
     pagination: { mode: "off" },
   }) as any;
 
+  const simulatedUsageRes = useList<SimulatedApplianceUsage>({
+    resource: "simulated_appliance_usage",
+    pagination: { mode: "off" },
+  }) as any;
+
   const appliances: UserAppliance[] = appliancesRes?.data?.data || appliancesRes?.result?.data || [];
   const spaces: ApplianceList[] = spacesRes?.data?.data || spacesRes?.result?.data || [];
   const dailyRecords: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
   const sessionLogs: ApplianceUsageLog[] = usageLogsRes?.data?.data || usageLogsRes?.result?.data || [];
+  const simulatedRecords: SimulatedApplianceUsage[] = simulatedUsageRes?.data?.data || simulatedUsageRes?.result?.data || [];
 
   // Filter target appliances based on space selection (excluding blacklisted / inactive appliances)
   const allSpaceAppliances = useMemo(() => {
@@ -177,18 +183,62 @@ export const ForecastingView: React.FC = () => {
     };
   }, [targetAppliances, daysInActiveMonth, simulatedGenRate, tariffType]);
 
-  // 4. Composite End-of-Month Forecast (Actual Logged + Remaining Unlogged Routine Days)
+  // Map simulated kWh per date for the active month
+  const simulatedDateMap = useMemo(() => {
+    const map = new Map<string, number>();
+    simulatedRecords.forEach((rec) => {
+      if (rec.usage_date && rec.usage_date.startsWith(activeMonthKey) && targetApplianceIds.has(rec.appliance_id)) {
+        map.set(rec.usage_date, (map.get(rec.usage_date) || 0) + (Number(rec.kwh_consumed) || 0));
+      }
+    });
+    return map;
+  }, [simulatedRecords, activeMonthKey, targetApplianceIds]);
+
+  const dailyActualCostMap = useMemo(() => {
+    const map = new Map<number, number>();
+    dailyRecords.forEach((rec) => {
+      if (rec.usage_date && rec.usage_date.startsWith(activeMonthKey) && targetApplianceIds.has(rec.appliance_id)) {
+        const d = parseInt(rec.usage_date.split("-")[2], 10);
+        map.set(d, (map.get(d) || 0) + (Number(rec.estimated_cost) || 0));
+      }
+    });
+    return map;
+  }, [dailyRecords, activeMonthKey, targetApplianceIds]);
+
+  // 4. Composite End-of-Month Forecast (Actual Logged + Simulation Plan / Remaining Routine Days)
   const trajectoryForecast = useMemo(() => {
     let forecastedKwh = 0;
     let projectedRemainingKwh = 0;
+    let simulatedDaysCount = 0;
     const unloggedDaysCount = Math.max(0, daysInActiveMonth - mtdActuals.loggedDaysCount);
 
     if (mtdActuals.hasLoggedRecords) {
-      projectedRemainingKwh = Number((routineBaseline.dailyKwh * unloggedDaysCount).toFixed(3));
+      for (let d = 1; d <= daysInActiveMonth; d++) {
+        const dateStr = `${activeMonthKey}-${String(d).padStart(2, "0")}`;
+        const isLogged = dailyRecords.some(
+          (r) => r.usage_date === dateStr && targetApplianceIds.has(r.appliance_id) && (Number(r.hours_used) > 0 || Number(r.kwh_consumed) > 0)
+        );
+        if (!isLogged) {
+          if (simulatedDateMap.has(dateStr)) {
+            projectedRemainingKwh += simulatedDateMap.get(dateStr)!;
+            simulatedDaysCount++;
+          } else {
+            projectedRemainingKwh += routineBaseline.dailyKwh;
+          }
+        }
+      }
       forecastedKwh = Number((mtdActuals.actualKwh + projectedRemainingKwh).toFixed(3));
     } else {
-      // If zero logs recorded for this month yet, projection runs on pure inventory routine
-      forecastedKwh = routineBaseline.monthlyBaselineKwh;
+      for (let d = 1; d <= daysInActiveMonth; d++) {
+        const dateStr = `${activeMonthKey}-${String(d).padStart(2, "0")}`;
+        if (simulatedDateMap.has(dateStr)) {
+          forecastedKwh += simulatedDateMap.get(dateStr)!;
+          simulatedDaysCount++;
+        } else {
+          forecastedKwh += routineBaseline.dailyKwh;
+        }
+      }
+      forecastedKwh = Number(forecastedKwh.toFixed(3));
       projectedRemainingKwh = forecastedKwh;
     }
 
@@ -197,12 +247,13 @@ export const ForecastingView: React.FC = () => {
 
     return {
       forecastedKwh,
-      projectedRemainingKwh,
+      projectedRemainingKwh: Number(projectedRemainingKwh.toFixed(3)),
       forecastedBill,
       unloggedDaysCount,
+      simulatedDaysCount,
       effectiveBurnRate: Number(effectiveBurnRate.toFixed(3)),
     };
-  }, [mtdActuals, routineBaseline, daysInActiveMonth, simulatedGenRate, tariffType]);
+  }, [mtdActuals, routineBaseline, daysInActiveMonth, simulatedGenRate, tariffType, activeMonthKey, dailyRecords, targetApplianceIds, simulatedDateMap]);
 
   // 5. Data-Driven Scenarios Based on Actual System Capabilities
   const scenarios = useMemo(() => {
@@ -277,7 +328,7 @@ export const ForecastingView: React.FC = () => {
     };
   }, [targetAppliances, whatIfHours, mtdActuals, remainingDays, daysInActiveMonth, simulatedGenRate, tariffType, trajectoryForecast]);
 
-  // Trajectory Curve Data: Cumulative Day-by-Day comparison (Baseline vs Simulated)
+  // Trajectory Curve Data: Cumulative Day-by-Day comparison (Baseline vs Simulated/Blended)
   const trajectoryCurveData = useMemo(() => {
     const points = [];
     const dailyBaseBill = routineBaseline.monthlyBaselineBill / Math.max(1, daysInActiveMonth);
@@ -290,6 +341,9 @@ export const ForecastingView: React.FC = () => {
       cumBaselineCost += dailyBaseBill;
       cumSimulatedCost += dailySimulatedBill;
 
+      const dateStr = `${activeMonthKey}-${String(day).padStart(2, "0")}`;
+      const hasPlan = simulatedDateMap.has(dateStr);
+
       points.push({
         day: `D${day}`,
         dayNum: day,
@@ -297,11 +351,12 @@ export const ForecastingView: React.FC = () => {
         baselineCost: Math.round(cumBaselineCost),
         simulatedCost: Math.round(cumSimulatedCost),
         savingsDiff: Math.max(0, Math.round(cumBaselineCost - cumSimulatedCost)),
+        hasPlan,
       });
     }
 
     return points;
-  }, [daysInActiveMonth, elapsedDays, routineBaseline.monthlyBaselineBill, scenarios.smartBill]);
+  }, [daysInActiveMonth, elapsedDays, routineBaseline.monthlyBaselineBill, scenarios.smartBill, activeMonthKey, simulatedDateMap]);
 
   // 7. Appliance Pareto Breakdown (Ranked by Forecasted Energy Share)
   const paretoBreakdown = useMemo(() => {
@@ -584,7 +639,10 @@ export const ForecastingView: React.FC = () => {
                     {trajectoryForecast.projectedRemainingKwh.toFixed(1)} <Typography component="span" variant="caption">kWh</Typography>
                   </Typography>
                   <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                    {remainingDays} {language === "tl" ? "natitirang araw sa cycle" : "days remaining in cycle"}
+                    {remainingDays} {language === "tl" ? "natitirang araw sa cycle" : "days remaining"}
+                    {trajectoryForecast.simulatedDaysCount > 0
+                      ? ` (${trajectoryForecast.simulatedDaysCount} ${language === "tl" ? "naka-plano sa simulasyon" : "planned in simulation"})`
+                      : ""}
                   </Typography>
                 </Paper>
               </Grid>

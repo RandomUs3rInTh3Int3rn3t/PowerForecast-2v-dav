@@ -42,9 +42,8 @@ import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmProvider";
 import { devLog } from "../../lib/devLogger";
 import { calculateMeralcoBill } from "../../lib/meralcoCalculator";
-import { supabaseClient } from "../../lib/supabaseClient";
+import { switchOffCircuit } from "../../lib/sessionService";
 import {
-  accumulateLiveSessionDailyUsage,
   calculateKwh,
   calculateApplianceKwh,
   calculateCost,
@@ -202,91 +201,13 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
   const spaceTariffType = activeSpace?.tariff_type || "residential";
   const spaceBillCalc = calculateMeralcoBill(spaceMonthlyKwh, undefined, 0, false, spaceTariffType);
 
-  const togglePower = async (app: UserAppliance) => {
-    const newState = !app.is_currently_on;
-    const nowIso = newState ? new Date().toISOString() : null;
-
-    if (!newState && app.last_turned_on_at) {
-      // Circuit is being DE-ENERGIZED / TURNED OFF! Save active session to logs & daily usage
-      const start = new Date(app.last_turned_on_at);
-      const end = new Date();
-      if (!isNaN(start.getTime())) {
-        const diffMs = Math.max(1000, end.getTime() - start.getTime());
-        const durationMinutes = Math.max(1, Math.round(diffMs / 60000));
-        const durationHours = diffMs / 3600000;
-        const appKwh = calculateApplianceKwh(app, durationHours);
-        const effectiveRate = app.tariff_type === "commercial" ? 15.2 : 14.8261;
-        const appCost = calculateCost(appKwh, effectiveRate);
-
-        try {
-          // 1. Insert session log
-          await supabaseClient.from("appliance_usage_logs").insert({
-            appliance_id: app.id,
-            user_id: app.user_id || null,
-            started_at: start.toISOString(),
-            ended_at: end.toISOString(),
-            duration_minutes: durationMinutes,
-            kwh_consumed: appKwh,
-            estimated_cost: appCost,
-            source: "live_session",
-          });
-
-          // 2. Accumulate in daily_appliance_usage
-          await accumulateLiveSessionDailyUsage({
-            appliance_id: app.id,
-            durationMinutes,
-            watts: app.watts,
-            quantity: app.quantity || 1,
-            effectiveRate,
-            user_id: app.user_id,
-            startTime: start,
-            endTime: end,
-          });
-
-          // 3. Dispatch global sync event
-          if (typeof window !== "undefined") {
-            const syncDetail = {
-              rolledOverCount: 1,
-              affectedDates: [start.toISOString().split("T")[0], end.toISOString().split("T")[0]],
-            };
-            window.dispatchEvent(new CustomEvent("powerforecast_session_sync", { detail: syncDetail }));
-            window.dispatchEvent(new CustomEvent("powerforecast_stopwatch_rollover", { detail: syncDetail }));
-          }
-        } catch (err: any) {
-          devLog.warn("ApplianceList", `Error auto-saving stopped session: ${err?.message}`);
-        }
-      }
-    }
-
-    devLog.telemetry("Telemetry", `Circuit ${newState ? "energized [ACTIVE]" : "de-energized [IDLE]"}: "${app.name}" (${app.watts}W @ 230V)`, {
-      applianceId: app.id,
-      name: app.name,
-      category: app.category,
-      watts: app.watts,
-      is_currently_on: newState,
-      last_turned_on_at: nowIso,
-      ratePerHourPHP: (((app.watts * (app.quantity || 1)) / 1000) * 14.8261).toFixed(2),
-    });
-
-    updateAppliance({
-      resource: "user_appliances",
-      id: app.id,
-      values: {
-        is_currently_on: newState,
-        last_turned_on_at: nowIso,
-      },
-    });
-
-    showInfo(`${app.name} circuit ${newState ? "energized" : "de-energized and session saved"}.`);
-  };
-
   const handleToggleBlacklist = async (app: UserAppliance) => {
     const isCurrentlyBlacklisted = app.is_active === false;
     const willBeBlacklisted = !isCurrentlyBlacklisted;
 
     // If appliance is currently active and will be blacklisted, de-energize and save its session first
     if (willBeBlacklisted && app.is_currently_on) {
-      await togglePower(app);
+      await switchOffCircuit(app);
     }
 
     updateAppliance(

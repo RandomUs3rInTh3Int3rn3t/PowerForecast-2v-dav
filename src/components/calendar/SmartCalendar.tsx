@@ -8,6 +8,8 @@ import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Chip from "@mui/material/Chip";
 import Tooltip from "@mui/material/Tooltip";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
 import {
   CalendarMonth as CalendarIcon,
   ChevronLeft as ChevronLeftIcon,
@@ -17,28 +19,31 @@ import {
   CheckCircle as CheckCircleIcon,
   Home as HomeIcon,
   Store as StoreIcon,
-  Public as PublicIcon,
-  AutoAwesome as SparklesIcon,
   Bolt as BoltIcon,
-  TrendingDown as TrendingDownIcon,
   Savings as SavingsIcon,
   DateRange as DateRangeIcon,
+  Science as ScienceIcon,
+  Timeline as TimelineIcon,
+  Timer as TimerIcon,
 } from "@mui/icons-material";
 import {
   UserCalendarEvent,
   UserAppliance,
   DailyApplianceUsage,
+  SimulatedApplianceUsage,
   ApplianceList,
+  ApplianceUsageLog,
   BillingPeriodConfig,
-  BillingPeriodWindow,
 } from "../../types";
 import { useList } from "@refinedev/core";
 import { DateAnalyticsModal } from "./DateAnalyticsModal";
-import { RoutineAutofillModal } from "./RoutineAutofillModal";
+import { SimulatedDayModal } from "./SimulatedDayModal";
+import { SimulateApplianceModal } from "./SimulateApplianceModal";
 import { BillingPeriodModal } from "./BillingPeriodModal";
 import {
   formatDateToKey,
-  computeDayMetrics,
+  computeActualDayMetrics,
+  computeSimulatedDayMetrics,
   DEFAULT_EFFECTIVE_RATE,
   getStoredBillingPeriodConfig,
   setStoredBillingPeriodConfig,
@@ -46,23 +51,34 @@ import {
 } from "../../lib/dailyUsageService";
 
 export const SmartCalendar: React.FC = () => {
+  // Calendar Tab: Actual Tracker vs Simulation Plan
+  const [calendarTab, setCalendarTab] = useState<"actual" | "simulation">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("powerforecast_calendar_tab") as "actual" | "simulation") || "actual";
+    }
+    return "actual";
+  });
+
+  const handleTabChange = (newTab: "actual" | "simulation") => {
+    setCalendarTab(newTab);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("powerforecast_calendar_tab", newTab);
+    }
+  };
+
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [selectedDateForModal, setSelectedDateForModal] = useState<Date | null>(null);
+  const [selectedDateForActualModal, setSelectedDateForActualModal] = useState<Date | null>(null);
+  const [selectedDateForSimModal, setSelectedDateForSimModal] = useState<Date | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
-  const [mobileViewMode, setMobileViewMode] = useState<"projected" | "simulated">("simulated");
 
   // Billing Period state & config modal
   const [billingConfig, setBillingConfig] = useState<BillingPeriodConfig>(getStoredBillingPeriodConfig());
   const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
 
-  // Modals state
-  const [isRoutineAutofillOpen, setIsRoutineAutofillOpen] = useState(false);
+  // Simulate Appliance modal state
+  const [isSimulateApplianceOpen, setIsSimulateApplianceOpen] = useState(false);
 
-  const eventsRes = useList<UserCalendarEvent>({
-    resource: "user_calendar_events",
-    pagination: { mode: "off" },
-  }) as any;
-
+  // Queries
   const appliancesRes = useList<UserAppliance>({
     resource: "user_appliances",
     pagination: { mode: "off" },
@@ -78,18 +94,29 @@ export const SmartCalendar: React.FC = () => {
     pagination: { mode: "off" },
   }) as any;
 
-  const events: UserCalendarEvent[] = eventsRes?.data?.data || eventsRes?.result?.data || [];
+  const simulatedUsageRes = useList<SimulatedApplianceUsage>({
+    resource: "simulated_appliance_usage",
+    pagination: { mode: "off" },
+  }) as any;
+
+  const logsRes = useList<ApplianceUsageLog>({
+    resource: "appliance_usage_logs",
+    pagination: { mode: "off" },
+  }) as any;
+
   const allAppliances: UserAppliance[] = appliancesRes?.data?.data || appliancesRes?.result?.data || [];
   const dailyUsageList: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
+  const simulatedUsageList: SimulatedApplianceUsage[] = simulatedUsageRes?.data?.data || simulatedUsageRes?.result?.data || [];
+  const usageLogs: ApplianceUsageLog[] = logsRes?.data?.data || logsRes?.result?.data || [];
   const spaces: ApplianceList[] = spacesRes?.data?.data || spacesRes?.result?.data || [];
 
-  // Filter appliances by selected space (excluding inactive/blacklisted)
+  // Filter appliances by selected space
   const appliances = useMemo(() => {
     const spaceFiltered = selectedSpaceId === "all" ? allAppliances : allAppliances.filter((a) => a.list_id === selectedSpaceId);
     return spaceFiltered.filter((a) => a.is_active !== false);
   }, [allAppliances, selectedSpaceId]);
 
-  // Group daily usage by dateKey
+  // Group actual daily usage by dateKey
   const dailyUsageMap = useMemo(() => {
     const map: Record<string, DailyApplianceUsage[]> = {};
     dailyUsageList.forEach((item) => {
@@ -101,82 +128,111 @@ export const SmartCalendar: React.FC = () => {
     return map;
   }, [dailyUsageList]);
 
-  const handleSaveBillingConfig = (newConfig: BillingPeriodConfig) => {
-    setBillingConfig(newConfig);
-    setStoredBillingPeriodConfig(newConfig);
-  };
+  // Group simulated daily usage by dateKey
+  const simulatedUsageMap = useMemo(() => {
+    const map: Record<string, SimulatedApplianceUsage[]> = {};
+    simulatedUsageList.forEach((item) => {
+      if (!map[item.usage_date]) {
+        map[item.usage_date] = [];
+      }
+      map[item.usage_date].push(item);
+    });
+    return map;
+  }, [simulatedUsageList]);
 
-  // Active Billing Window resolution
-  const billingWindow: BillingPeriodWindow = useMemo(() => {
+  // Resolve custom billing window
+  const billingWindow = useMemo(() => {
     return resolveBillingPeriodWindow(currentDate, billingConfig);
   }, [currentDate, billingConfig]);
 
-  const firstDayIndex = billingWindow.startDate.getDay();
+  const handleSaveBillingConfig = (newConfig: BillingPeriodConfig) => {
+    setBillingConfig(newConfig);
+    setStoredBillingPeriodConfig(newConfig);
+    setIsBillingModalOpen(false);
+  };
 
   const handlePrevPeriod = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    const nextDate = new Date(currentDate);
+    nextDate.setMonth(nextDate.getMonth() - 1);
+    setCurrentDate(nextDate);
   };
 
   const handleNextPeriod = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    const nextDate = new Date(currentDate);
+    nextDate.setMonth(nextDate.getMonth() + 1);
+    setCurrentDate(nextDate);
   };
 
-  // Billing Period / Month aggregations: Baseline Projected vs Simulated Scenario
-  const periodSummary = useMemo(() => {
-    let baselinePeriodKwh = 0;
-    let baselinePeriodCost = 0;
-    let simulatedPeriodKwh = 0;
-    let simulatedPeriodCost = 0;
-    let simulatedDaysCount = 0;
+  const realToday = new Date();
+  const realTodayKey = formatDateToKey(realToday);
+
+  // Period Summaries
+  const actualPeriodSummary = useMemo(() => {
+    let totCost = 0;
+    let totKwh = 0;
+    let loggedDays = 0;
 
     billingWindow.days.forEach((dayDate) => {
-      const dateKey = formatDateToKey(dayDate);
-      const metrics = computeDayMetrics(
-        dateKey,
-        dayDate,
-        dailyUsageMap[dateKey] || [],
-        appliances,
-        events,
-        DEFAULT_EFFECTIVE_RATE
-      );
-
-      baselinePeriodKwh += metrics.baselineKwh;
-      baselinePeriodCost += metrics.baselineCost;
-      simulatedPeriodKwh += metrics.kwh;
-      simulatedPeriodCost += metrics.cost;
-
-      if (metrics.isSimulated || metrics.isLogged) {
-        simulatedDaysCount += 1;
+      const dKey = formatDateToKey(dayDate);
+      const metrics = computeActualDayMetrics(dKey, dailyUsageMap[dKey] || [], appliances, DEFAULT_EFFECTIVE_RATE);
+      if (metrics.isLogged) {
+        totCost += metrics.cost;
+        totKwh += metrics.kwh;
+        loggedDays++;
       }
     });
 
-    const periodSavings = baselinePeriodCost - simulatedPeriodCost;
-    const periodSavingsPct = baselinePeriodCost > 0 ? (periodSavings / baselinePeriodCost) * 100 : 0;
+    const runningCount = appliances.filter((a) => a.is_currently_on).length;
 
     return {
-      baselinePeriodKwh: Number(baselinePeriodKwh.toFixed(1)),
-      baselinePeriodCost: Number(baselinePeriodCost.toFixed(2)),
-      simulatedPeriodKwh: Number(simulatedPeriodKwh.toFixed(1)),
-      simulatedPeriodCost: Number(simulatedPeriodCost.toFixed(2)),
-      simulatedDaysCount,
+      actualCost: Number(totCost.toFixed(2)),
+      actualKwh: Number(totKwh.toFixed(2)),
+      loggedDaysCount: loggedDays,
+      runningCircuitsCount: runningCount,
       totalDays: billingWindow.days.length,
-      periodSavings: Number(periodSavings.toFixed(2)),
-      periodSavingsPct: Number(periodSavingsPct.toFixed(1)),
     };
-  }, [billingWindow, dailyUsageMap, appliances, events]);
+  }, [billingWindow.days, dailyUsageMap, appliances]);
 
-  const realToday = new Date();
-  const hasTodayInView = billingWindow.days.some(
-    (d) =>
-      d.getDate() === realToday.getDate() &&
-      d.getMonth() === realToday.getMonth() &&
-      d.getFullYear() === realToday.getFullYear()
-  );
+  const simPeriodSummary = useMemo(() => {
+    let baseCost = 0;
+    let baseKwh = 0;
+    let simCost = 0;
+    let simKwh = 0;
+    let customSimCount = 0;
+
+    billingWindow.days.forEach((dayDate) => {
+      const dKey = formatDateToKey(dayDate);
+      const metrics = computeSimulatedDayMetrics(dKey, dayDate, simulatedUsageMap[dKey] || [], appliances, DEFAULT_EFFECTIVE_RATE);
+      baseCost += metrics.baselineCost;
+      baseKwh += metrics.baselineKwh;
+      simCost += metrics.cost;
+      simKwh += metrics.kwh;
+      if (metrics.isCustomSimulated) customSimCount++;
+    });
+
+    const savings = baseCost - simCost;
+    const savingsPct = baseCost > 0 ? ((savings / baseCost) * 100).toFixed(1) : "0.0";
+
+    return {
+      baselinePeriodCost: Number(baseCost.toFixed(2)),
+      baselinePeriodKwh: Number(baseKwh.toFixed(2)),
+      simulatedPeriodCost: Number(simCost.toFixed(2)),
+      simulatedPeriodKwh: Number(simKwh.toFixed(2)),
+      periodSavings: Number(savings.toFixed(2)),
+      periodSavingsPct: savingsPct,
+      simulatedDaysCount: customSimCount,
+      totalDays: billingWindow.days.length,
+    };
+  }, [billingWindow.days, simulatedUsageMap, appliances]);
+
+  // Calendar Grid Setup
+  const firstDayOfPeriod = billingWindow.days[0];
+  const firstDayIndex = firstDayOfPeriod.getDay();
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2.5, sm: 3 } }}>
-      {/* 1. Header Banner & Simulate Schedule Action */}
-      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+      {/* 1. Header with Mode Toggle & Actions */}
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: "-0.02em", display: "flex", alignItems: "center", gap: 1.5 }}>
             <Box
@@ -184,7 +240,7 @@ export const SmartCalendar: React.FC = () => {
                 width: 40,
                 height: 40,
                 borderRadius: 1.25,
-                bgcolor: "primary.main",
+                bgcolor: calendarTab === "actual" ? "success.main" : "primary.main",
                 color: "#ffffff",
                 display: "inline-flex",
                 alignItems: "center",
@@ -192,137 +248,122 @@ export const SmartCalendar: React.FC = () => {
                 flexShrink: 0,
               }}
             >
-              <CalendarIcon sx={{ color: "#ffd54f" }} />
+              {calendarTab === "actual" ? <TimelineIcon /> : <ScienceIcon />}
             </Box>
-            Smart Energy Calendar & Simulation
+            Smart Energy Calendar
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-            Plan daily appliance schedules, compare baseline quotas against simulated scenarios, and project month-end bill savings.
+            {calendarTab === "actual"
+              ? "Actual Tracker: Verified stopwatch sessions, real-time circuit switches, and authentic measured telemetry."
+              : "Simulation Plan: Design what-if schedules, test appliance runtimes, and forecast Meralco monthly quotas."}
           </Typography>
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap" }}>
+          {/* Top Segmented Navigation Tab */}
+          <Paper
+            variant="outlined"
+            sx={{
+              display: "flex",
+              p: 0.5,
+              borderRadius: 2,
+              bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
+            }}
+          >
+            <Button
+              size="small"
+              onClick={() => handleTabChange("actual")}
+              startIcon={<TimerIcon />}
+              sx={{
+                borderRadius: 1.5,
+                fontWeight: 800,
+                px: 2,
+                py: 0.6,
+                textTransform: "none",
+                bgcolor: calendarTab === "actual" ? (theme) => theme.palette.mode === "dark" ? "rgba(52, 211, 153, 0.2)" : "rgba(16, 185, 129, 0.15)" : "transparent",
+                color: calendarTab === "actual" ? "#34d399" : "text.secondary",
+                "&:hover": {
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(52, 211, 153, 0.25)" : "rgba(16, 185, 129, 0.2)",
+                },
+              }}
+            >
+              Actual Tracker (Live)
+            </Button>
+            <Button
+              size="small"
+              onClick={() => handleTabChange("simulation")}
+              startIcon={<ScienceIcon />}
+              sx={{
+                borderRadius: 1.5,
+                fontWeight: 800,
+                px: 2,
+                py: 0.6,
+                textTransform: "none",
+                bgcolor: calendarTab === "simulation" ? (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.2)" : "rgba(13, 148, 136, 0.15)" : "transparent",
+                color: calendarTab === "simulation" ? "primary.main" : "text.secondary",
+                "&:hover": {
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.2)",
+                },
+              }}
+            >
+              Simulation Plan (What-If)
+            </Button>
+          </Paper>
+
+          {/* Billing Period Selector */}
           <Button
             variant="outlined"
             size="small"
-            startIcon={<DateRangeIcon sx={{ color: billingConfig.mode !== "calendar_month" ? "primary.main" : "#ffd54f" }} />}
+            startIcon={<DateRangeIcon />}
             onClick={() => setIsBillingModalOpen(true)}
-            sx={{
-              borderRadius: 1.25,
-              fontWeight: 800,
-              px: 2,
-              py: 0.85,
-              borderColor: billingConfig.mode !== "calendar_month" ? "primary.main" : "divider",
-              bgcolor: billingConfig.mode !== "calendar_month"
-                ? (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.12)" : "rgba(13, 148, 136, 0.08)"
-                : (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
-              color: billingConfig.mode !== "calendar_month" ? "primary.main" : "text.primary",
-              boxShadow: billingConfig.mode !== "calendar_month" ? "0 2px 8px rgba(0, 229, 201, 0.2)" : "none",
-              "&:hover": {
-                borderColor: "primary.light",
-                bgcolor: billingConfig.mode !== "calendar_month"
-                  ? (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.2)" : "rgba(13, 148, 136, 0.15)"
-                  : (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9",
-              },
-            }}
+            sx={{ borderRadius: 1.25, fontWeight: 700, px: 2, py: 0.8 }}
           >
             {billingConfig.mode === "recurring_cycle"
-              ? `Billing Cycle (Day ${billingConfig.cycleStartDay})`
+              ? `Cycle (Day ${billingConfig.cycleStartDay})`
               : billingConfig.mode === "custom_range"
               ? "Custom Range"
-              : "Billing Period: Month"}
+              : "Monthly Period"}
           </Button>
 
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<SparklesIcon sx={{ color: "#ffd54f" }} />}
-            onClick={() => setIsRoutineAutofillOpen(true)}
-            sx={{
-              borderRadius: 1.25,
-              fontWeight: 800,
-              px: 2,
-              py: 0.85,
-              bgcolor: "primary.main",
-              color: "#ffffff",
-              boxShadow: "0 4px 14px rgba(0, 229, 201, 0.25)",
-              "&:hover": {
-                bgcolor: "primary.dark",
-              },
-            }}
-          >
-            Simulate Schedule
-          </Button>
+          {/* Simulate Appliance Button (Visible in Simulation Tab) */}
+          {calendarTab === "simulation" && (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<ScienceIcon />}
+              onClick={() => setIsSimulateApplianceOpen(true)}
+              sx={{
+                borderRadius: 1.25,
+                fontWeight: 800,
+                px: 2,
+                py: 0.8,
+                bgcolor: "primary.main",
+                color: "#ffffff",
+                boxShadow: "0 4px 14px rgba(0, 229, 201, 0.25)",
+              }}
+            >
+              Simulate Appliance
+            </Button>
+          )}
         </Box>
       </Box>
 
-      {/* 1.5. Space Switcher Bento Pill Bar */}
+      {/* 2. Space Switcher Bento Pill Bar */}
       {spaces.length > 1 && (
-        <Box
-          sx={{
-            p: { xs: 0.75, sm: 1 },
-            borderRadius: 2,
-            bgcolor: (theme) => (theme.palette.mode === "dark" ? "#14171c" : "background.paper"),
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: (theme) =>
-              theme.palette.mode === "dark" ? "none" : "0 2px 8px rgba(15, 23, 42, 0.04)",
-            display: "flex",
-            alignItems: "center",
-            gap: { xs: 0.75, sm: 1 },
-            overflowX: "auto",
-            "&::-webkit-scrollbar": { height: 4 },
-            "&::-webkit-scrollbar-thumb": { bgcolor: "divider", borderRadius: 2 },
-          }}
-        >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, overflowX: "auto", pb: 0.5 }}>
           <Button
             size="small"
             onClick={() => setSelectedSpaceId("all")}
-            startIcon={<PublicIcon sx={{ fontSize: 15 }} />}
+            startIcon={<StoreIcon sx={{ fontSize: 15 }} />}
             sx={{
-              px: { xs: 1.5, sm: 2 },
-              py: { xs: 0.45, sm: 0.6 },
+              px: 2,
+              py: 0.5,
               borderRadius: 2,
               fontSize: "0.75rem",
               fontWeight: 700,
               textTransform: "none",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              bgcolor: (theme) =>
-                selectedSpaceId === "all"
-                  ? theme.palette.mode === "dark"
-                    ? "rgba(0, 229, 201, 0.15)"
-                    : "rgba(13, 148, 136, 0.1)"
-                  : "transparent",
-              color: (theme) =>
-                selectedSpaceId === "all"
-                  ? theme.palette.mode === "dark"
-                    ? "#00e5c9"
-                    : "#0f766e"
-                  : "text.secondary",
-              border: "1px solid",
-              borderColor: (theme) =>
-                selectedSpaceId === "all"
-                  ? theme.palette.mode === "dark"
-                    ? "rgba(0, 229, 201, 0.4)"
-                    : "rgba(13, 148, 136, 0.3)"
-                  : "transparent",
-              "&:hover": {
-                bgcolor: (theme) =>
-                  selectedSpaceId === "all"
-                    ? theme.palette.mode === "dark"
-                      ? "rgba(0, 229, 201, 0.2)"
-                      : "rgba(13, 148, 136, 0.15)"
-                    : theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.05)"
-                    : "#f1f5f9",
-                color: (theme) =>
-                  selectedSpaceId === "all"
-                    ? theme.palette.mode === "dark"
-                      ? "#00e5c9"
-                      : "#0f766e"
-                    : "text.primary",
-              },
+              bgcolor: selectedSpaceId === "all" ? (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.15)" : "rgba(13, 148, 136, 0.1)" : "transparent",
+              color: selectedSpaceId === "all" ? "primary.main" : "text.secondary",
             }}
           >
             All Spaces ({allAppliances.length})
@@ -336,57 +377,16 @@ export const SmartCalendar: React.FC = () => {
                 key={space.id}
                 size="small"
                 onClick={() => setSelectedSpaceId(space.id)}
-                startIcon={
-                  space.tariff_type === "commercial" ? (
-                    <StoreIcon sx={{ fontSize: 15 }} />
-                  ) : (
-                    <HomeIcon sx={{ fontSize: 15 }} />
-                  )
-                }
+                startIcon={space.tariff_type === "commercial" ? <StoreIcon sx={{ fontSize: 15 }} /> : <HomeIcon sx={{ fontSize: 15 }} />}
                 sx={{
-                  px: { xs: 1.5, sm: 2 },
-                  py: { xs: 0.45, sm: 0.6 },
+                  px: 2,
+                  py: 0.5,
                   borderRadius: 2,
                   fontSize: "0.75rem",
                   fontWeight: 700,
                   textTransform: "none",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  bgcolor: (theme) =>
-                    isSelected
-                      ? theme.palette.mode === "dark"
-                        ? "rgba(0, 229, 201, 0.15)"
-                        : "rgba(13, 148, 136, 0.1)"
-                      : "transparent",
-                  color: (theme) =>
-                    isSelected
-                      ? theme.palette.mode === "dark"
-                        ? "#00e5c9"
-                        : "#0f766e"
-                      : "text.secondary",
-                  border: "1px solid",
-                  borderColor: (theme) =>
-                    isSelected
-                      ? theme.palette.mode === "dark"
-                        ? "rgba(0, 229, 201, 0.4)"
-                        : "rgba(13, 148, 136, 0.3)"
-                      : "transparent",
-                  "&:hover": {
-                    bgcolor: (theme) =>
-                      isSelected
-                        ? theme.palette.mode === "dark"
-                          ? "rgba(0, 229, 201, 0.2)"
-                          : "rgba(13, 148, 136, 0.15)"
-                        : theme.palette.mode === "dark"
-                        ? "rgba(255, 255, 255, 0.05)"
-                        : "#f1f5f9",
-                    color: (theme) =>
-                      isSelected
-                        ? theme.palette.mode === "dark"
-                          ? "#00e5c9"
-                          : "#0f766e"
-                        : "text.primary",
-                  },
+                  bgcolor: isSelected ? (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.15)" : "rgba(13, 148, 136, 0.1)" : "transparent",
+                  color: isSelected ? "primary.main" : "text.secondary",
                 }}
               >
                 {space.name} ({count})
@@ -396,158 +396,129 @@ export const SmartCalendar: React.FC = () => {
         </Box>
       )}
 
-      {/* 2. TOP KPI CARDS: BASELINE VS SIMULATED TELEMETRY */}
-      <Grid container spacing={{ xs: 1.5, sm: 2 }} data-tour="calendar-kpi-summary">
-        {/* Card 1: Baseline Projected Period */}
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <Paper
-            sx={{
-              p: 2,
-              borderRadius: 1.25,
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.75)" : "#ffffff",
-              border: "1px solid",
-              borderColor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
-              boxShadow: (theme) =>
-                theme.palette.mode === "dark" ? "none" : "0 2px 10px rgba(15, 23, 42, 0.04)",
-            }}
-          >
-            <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <ClockIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#818cf8" : "#6366f1" }} />
-              Baseline {billingConfig.mode === "calendar_month" ? "Month" : "Cycle"}
-            </Typography>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 900,
-                color: (theme) => (theme.palette.mode === "dark" ? "#a5b4fc" : "#4f46e5"),
-                mt: 0.5,
-                fontFamily: "monospace",
-              }}
-            >
-              ~₱{periodSummary.baselinePeriodCost.toFixed(2)}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              {billingConfig.mode === "calendar_month" ? "Full-month" : "Billing cycle"} quota ({periodSummary.baselinePeriodKwh} kWh)
-            </Typography>
-          </Paper>
-        </Grid>
+      {/* 3. Top KPI Cards */}
+      {calendarTab === "actual" ? (
+        /* Actual Tracker KPI Cards */
+        <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: "divider" }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase" }}>
+                ACTUAL SPEND TO DATE
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "#34d399", mt: 0.5, fontFamily: "monospace" }}>
+                ₱{actualPeriodSummary.actualCost.toFixed(2)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                Verified measured sessions
+              </Typography>
+            </Paper>
+          </Grid>
 
-        {/* Card 2: Simulated Period Bill */}
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <Paper
-            sx={{
-              p: 2,
-              borderRadius: 1.25,
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.75)" : "#ffffff",
-              border: "1px solid",
-              borderColor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.25)",
-              boxShadow: (theme) =>
-                theme.palette.mode === "dark" ? "none" : "0 2px 10px rgba(15, 23, 42, 0.04)",
-            }}
-          >
-            <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <BoltIcon sx={{ fontSize: 16, color: (theme) => theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488" }} />
-              Simulated {billingConfig.mode === "calendar_month" ? "Month" : "Cycle"}
-            </Typography>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 900,
-                color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
-                mt: 0.5,
-                fontFamily: "monospace",
-              }}
-            >
-              ₱{periodSummary.simulatedPeriodCost.toFixed(2)}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              With planned routines ({periodSummary.simulatedPeriodKwh} kWh)
-            </Typography>
-          </Paper>
-        </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: "divider" }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase" }}>
+                MEASURED ENERGY
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "warning.main", mt: 0.5, fontFamily: "monospace" }}>
+                {actualPeriodSummary.actualKwh} kWh
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                Across {actualPeriodSummary.loggedDaysCount} logged day(s)
+              </Typography>
+            </Paper>
+          </Grid>
 
-        {/* Card 3: Projected Savings */}
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <Paper
-            sx={{
-              p: 2,
-              borderRadius: 1.25,
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.75)" : "#ffffff",
-              border: "1px solid",
-              borderColor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
-              boxShadow: (theme) =>
-                theme.palette.mode === "dark" ? "none" : "0 2px 10px rgba(15, 23, 42, 0.04)",
-            }}
-          >
-            <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <SavingsIcon sx={{ fontSize: 16, color: periodSummary.periodSavings >= 0 ? "#34d399" : "#fbbf24" }} /> Projected Savings
-            </Typography>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 900,
-                color: periodSummary.periodSavings >= 0 ? "#34d399" : "#f59e0b",
-                mt: 0.5,
-                fontFamily: "monospace",
-              }}
-            >
-              {periodSummary.periodSavings >= 0
-                ? `-₱${periodSummary.periodSavings.toFixed(2)}`
-                : `+₱${Math.abs(periodSummary.periodSavings).toFixed(2)}`}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              {periodSummary.periodSavings >= 0
-                ? `${periodSummary.periodSavingsPct}% reduction vs baseline`
-                : `${Math.abs(periodSummary.periodSavingsPct)}% higher vs baseline`}
-            </Typography>
-          </Paper>
-        </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: actualPeriodSummary.runningCircuitsCount > 0 ? "#34d399" : "divider" }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase" }}>
+                CIRCUITS STATUS
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: actualPeriodSummary.runningCircuitsCount > 0 ? "#34d399" : "text.secondary", mt: 0.5, fontFamily: "monospace" }}>
+                {actualPeriodSummary.runningCircuitsCount > 0 ? `${actualPeriodSummary.runningCircuitsCount} Stopwatch Active` : "All Idle"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                Real-time active load
+              </Typography>
+            </Paper>
+          </Grid>
 
-        {/* Card 4: Simulation Coverage */}
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <Paper
-            sx={{
-              p: 2,
-              borderRadius: 1.25,
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.75)" : "#ffffff",
-              border: "1px solid",
-              borderColor: (theme) =>
-                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
-              boxShadow: (theme) =>
-                theme.palette.mode === "dark" ? "none" : "0 2px 10px rgba(15, 23, 42, 0.04)",
-            }}
-          >
-            <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.75 }}>
-              <CheckCircleIcon sx={{ fontSize: 16, color: "#ffd54f" }} />
-              {billingConfig.mode === "calendar_month" ? "Simulation Coverage" : "Cycle Coverage"}
-            </Typography>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 900,
-                color: (theme) => (theme.palette.mode === "dark" ? "#ffd54f" : "#d97706"),
-                mt: 0.5,
-                fontFamily: "monospace",
-              }}
-            >
-              {periodSummary.simulatedDaysCount} / {periodSummary.totalDays} Days
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem", display: "block" }}>
-              {Math.round((periodSummary.simulatedDaysCount / periodSummary.totalDays) * 100)}% of timeframe tailored
-            </Typography>
-          </Paper>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: "divider" }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase" }}>
+                TIMEFRAME DAYS
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "info.main", mt: 0.5, fontFamily: "monospace" }}>
+                {actualPeriodSummary.loggedDaysCount} / {actualPeriodSummary.totalDays} Days
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                Days with verified records
+              </Typography>
+            </Paper>
+          </Grid>
         </Grid>
-      </Grid>
+      ) : (
+        /* Simulation Plan KPI Cards */
+        <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: "divider" }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase" }}>
+                BASELINE QUOTA
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "#818cf8", mt: 0.5, fontFamily: "monospace" }}>
+                ~₱{simPeriodSummary.baselinePeriodCost.toFixed(2)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                Routine defaults ({simPeriodSummary.baselinePeriodKwh} kWh)
+              </Typography>
+            </Paper>
+          </Grid>
 
-      {/* 3. Calendar Controls & Month/Cycle Navigator Card */}
-      <Card data-tour="calendar-billing-period" sx={{ p: 2, borderRadius: 1.5 }}>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: "primary.main" }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase" }}>
+                SIMULATED PERIOD BILL
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main", mt: 0.5, fontFamily: "monospace" }}>
+                ₱{simPeriodSummary.simulatedPeriodCost.toFixed(2)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                With tailored schedules ({simPeriodSummary.simulatedPeriodKwh} kWh)
+              </Typography>
+            </Paper>
+          </Grid>
+
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: "divider" }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase" }}>
+                SIMULATED SAVINGS
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: simPeriodSummary.periodSavings >= 0 ? "#34d399" : "#f59e0b", mt: 0.5, fontFamily: "monospace" }}>
+                {simPeriodSummary.periodSavings >= 0 ? `Saves ₱${simPeriodSummary.periodSavings.toFixed(2)}` : `+₱${Math.abs(simPeriodSummary.periodSavings).toFixed(2)}`}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                {simPeriodSummary.periodSavingsPct}% delta vs baseline
+              </Typography>
+            </Paper>
+          </Grid>
+
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: "divider" }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase" }}>
+                CUSTOM PLAN COVERAGE
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "#ffd54f", mt: 0.5, fontFamily: "monospace" }}>
+                {simPeriodSummary.simulatedDaysCount} / {simPeriodSummary.totalDays} Days
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                Days with tailored plans
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* 4. Calendar Controls Navigator */}
+      <Card sx={{ p: 2, borderRadius: 1.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <IconButton onClick={handlePrevPeriod} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
@@ -559,27 +530,9 @@ export const SmartCalendar: React.FC = () => {
                 {billingWindow.label}
               </Typography>
               {billingWindow.subLabel && (
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75, mt: 0.25 }}>
-                  <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700, fontSize: "0.7rem" }}>
-                    {billingWindow.subLabel}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    label="Edit"
-                    onClick={() => setIsBillingModalOpen(true)}
-                    sx={{
-                      height: 18,
-                      fontSize: "0.625rem",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                      bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.15)" : "rgba(13, 148, 136, 0.1)",
-                      color: "primary.main",
-                      "&:hover": {
-                        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.2)",
-                      }
-                    }}
-                  />
-                </Box>
+                <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 700, fontSize: "0.7rem", display: "block" }}>
+                  {billingWindow.subLabel}
+                </Typography>
               )}
             </Box>
 
@@ -588,99 +541,47 @@ export const SmartCalendar: React.FC = () => {
             </IconButton>
           </Box>
 
-          {/* Visual Legend */}
-          <Box data-tour="calendar-legend" sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#818cf8" }} />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                ~₱ Baseline
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#00e5c9" }} />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                ₱ Simulated
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#34d399" }} />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                Savings Diff
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#fbbf24" }} />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-                Heavy Peak Load
-              </Typography>
-            </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            {calendarTab === "actual" ? (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#34d399" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                  Logged Actuals
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#818cf8" }} />
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                    ~₱ Routine Quota
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#00e5c9" }} />
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                    Custom Simulation
+                  </Typography>
+                </Box>
+              </>
+            )}
           </Box>
         </Box>
       </Card>
 
-      {/* 4. Mobile Responsive View Mode Segmented Pill (xs & sm only) */}
-      <Box
-        sx={{
-          display: { xs: "flex", md: "none" },
-          justifyContent: "center",
-          alignItems: "center",
-          gap: 1,
-          p: 0.75,
-          bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f1f5f9"),
-          borderRadius: 2,
-          border: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", mr: 0.5 }}>
-          Cell Display:
-        </Typography>
-        <Button
-          size="small"
-          variant={mobileViewMode === "projected" ? "contained" : "text"}
-          onClick={() => setMobileViewMode("projected")}
-          sx={{
-            borderRadius: 1.5,
-            fontSize: "0.72rem",
-            fontWeight: 700,
-            textTransform: "none",
-            py: 0.35,
-            px: 1.5,
-          }}
-        >
-          Baseline
-        </Button>
-        <Button
-          size="small"
-          variant={mobileViewMode === "simulated" ? "contained" : "text"}
-          onClick={() => setMobileViewMode("simulated")}
-          sx={{
-            borderRadius: 1.5,
-            fontSize: "0.72rem",
-            fontWeight: 700,
-            textTransform: "none",
-            py: 0.35,
-            px: 1.5,
-          }}
-        >
-          Simulated
-        </Button>
-      </Box>
-
-      {/* 5. Monthly Grid View */}
-      <Card data-tour="calendar-grid" sx={{ p: { xs: 1, sm: 2.5 }, borderRadius: 1.5 }}>
-        {/* Day of week headers */}
-        <Grid container columns={7} spacing={{ xs: 0.5, sm: 1 }} sx={{ mb: 1, textAlign: "center" }}>
+      {/* 5. Calendar Month Grid */}
+      <Card sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: 1.5 }}>
+        {/* Days of week header */}
+        <Grid container columns={7} spacing={{ xs: 0.5, sm: 1 }} sx={{ mb: 1 }}>
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
-            <Grid size={1} key={day}>
+            <Grid size={1} key={day} sx={{ textAlign: "center", py: 0.5 }}>
               <Typography
                 variant="caption"
                 sx={{
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: idx === 0 || idx === 6 ? "primary.light" : "text.secondary",
                   textTransform: "uppercase",
                   fontSize: { xs: "0.625rem", sm: "0.6875rem" },
-                  letterSpacing: "0.02em",
                 }}
               >
                 {day}
@@ -691,7 +592,7 @@ export const SmartCalendar: React.FC = () => {
 
         {/* Days grid */}
         <Grid container columns={7} spacing={{ xs: 0.5, sm: 1 }}>
-          {/* Empty cells before 1st day */}
+          {/* Empty spacer cells */}
           {Array.from({ length: firstDayIndex }).map((_, idx) => (
             <Grid size={1} key={`empty-${idx}`}>
               <Box sx={{ minHeight: { xs: 76, sm: 98 }, opacity: 0.2 }} />
@@ -700,254 +601,161 @@ export const SmartCalendar: React.FC = () => {
 
           {/* Actual day cells */}
           {billingWindow.days.map((dayDate, idx) => {
-              const dayNum = dayDate.getDate();
-              const isCurrentToday =
-                dayNum === realToday.getDate() &&
-                dayDate.getMonth() === realToday.getMonth() &&
-                dayDate.getFullYear() === realToday.getFullYear();
-              const isTourTarget = hasTodayInView ? isCurrentToday : idx === 0;
-              const dateKey = formatDateToKey(dayDate);
-              const metrics = computeDayMetrics(
+            const dayNum = dayDate.getDate();
+            const dateKey = formatDateToKey(dayDate);
+            const isCurrentToday = dateKey === realTodayKey;
+            const isFuture = dateKey > realTodayKey;
+
+            // In Actual Tracker tab
+            if (calendarTab === "actual") {
+              const actualMetrics = computeActualDayMetrics(
                 dateKey,
-                dayDate,
                 dailyUsageMap[dateKey] || [],
                 appliances,
-                events,
                 DEFAULT_EFFECTIVE_RATE
               );
 
               return (
-                <Grid size={1} key={`day-${dateKey}-${idx}`}>
+                <Grid size={1} key={`actual-${dateKey}-${idx}`}>
                   <Paper
-                    data-tour={isTourTarget ? "calendar-day-click" : undefined}
+                    variant="outlined"
+                    onClick={() => {
+                      if (!isFuture) {
+                        setSelectedDateForActualModal(dayDate);
+                      }
+                    }}
+                    sx={{
+                      minHeight: { xs: 76, sm: 98 },
+                      p: { xs: 0.5, sm: 1 },
+                      borderRadius: 1.5,
+                      cursor: isFuture ? "not-allowed" : "pointer",
+                      opacity: isFuture ? 0.45 : 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      position: "relative",
+                      bgcolor: isCurrentToday
+                        ? (theme) => (theme.palette.mode === "dark" ? "rgba(52, 211, 153, 0.12)" : "rgba(16, 185, 129, 0.08)")
+                        : actualMetrics.isLogged
+                        ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#ffffff")
+                        : "background.paper",
+                      borderColor: isCurrentToday
+                        ? "#34d399"
+                        : actualMetrics.isLogged
+                        ? (theme) => (theme.palette.mode === "dark" ? "rgba(52, 211, 153, 0.3)" : "rgba(16, 185, 129, 0.25)")
+                        : "divider",
+                      "&:hover": {
+                        borderColor: isFuture ? "divider" : "#34d399",
+                        transform: isFuture ? "none" : "translateY(-2px)",
+                      },
+                    }}
+                  >
+                    {/* Header */}
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: isCurrentToday ? 900 : 700, color: isCurrentToday ? "#34d399" : "text.primary" }}>
+                          {dayNum}
+                        </Typography>
+                        {isCurrentToday && (
+                          <Chip label="TODAY" size="small" sx={{ height: 16, fontSize: "0.5rem", fontWeight: 900, bgcolor: "#34d399", color: "#fff" }} />
+                        )}
+                      </Box>
+                      {actualMetrics.hasActiveLiveCircuits && (
+                        <Tooltip title="Stopwatch Running Live">
+                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#34d399", animation: "pulse 1.5s infinite" }} />
+                        </Tooltip>
+                      )}
+                    </Box>
+
+                    {/* Content */}
+                    <Box sx={{ textAlign: "right", mt: 1 }}>
+                      {isFuture ? (
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.625rem" }}>
+                          Future Day
+                        </Typography>
+                      ) : actualMetrics.isLogged ? (
+                        <>
+                          <Typography variant="body2" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#34d399" }}>
+                            ₱{actualMetrics.cost.toFixed(2)}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.625rem" }}>
+                            {actualMetrics.kwh.toFixed(1)} kWh • {actualMetrics.applianceCount} dev
+                          </Typography>
+                        </>
+                      ) : (
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.625rem" }}>
+                          No sessions
+                        </Typography>
+                      )}
+                    </Box>
+                  </Paper>
+                </Grid>
+              );
+            }
+
+            // In Simulation Plan tab
+            const simMetrics = computeSimulatedDayMetrics(
+              dateKey,
+              dayDate,
+              simulatedUsageMap[dateKey] || [],
+              appliances,
+              DEFAULT_EFFECTIVE_RATE
+            );
+
+            return (
+              <Grid size={1} key={`sim-${dateKey}-${idx}`}>
+                <Paper
                   variant="outlined"
-                  onClick={() => setSelectedDateForModal(dayDate)}
+                  onClick={() => setSelectedDateForSimModal(dayDate)}
                   sx={{
                     minHeight: { xs: 76, sm: 98 },
-                    p: { xs: 0.5, sm: 1, md: 1.25 },
-                    borderRadius: { xs: 1, sm: 1.25 },
+                    p: { xs: 0.5, sm: 1 },
+                    borderRadius: 1.5,
                     cursor: "pointer",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "space-between",
                     position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
                     bgcolor: isCurrentToday
-                      ? (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(0, 229, 201, 0.15)"
-                            : "rgba(13, 148, 136, 0.08)"
-                      : metrics.isSimulated || metrics.isLogged
-                      ? (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(0, 229, 201, 0.06)"
-                            : "rgba(13, 148, 136, 0.05)"
+                      ? (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.15)" : "rgba(13, 148, 136, 0.08)")
+                      : simMetrics.isCustomSimulated
+                      ? (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.06)" : "rgba(13, 148, 136, 0.05)")
                       : "background.paper",
-                    border: isCurrentToday ? "2px solid" : "1px solid",
                     borderColor: isCurrentToday
                       ? "primary.main"
-                      : metrics.isSimulated || metrics.isLogged
-                      ? (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(0, 229, 201, 0.35)"
-                            : "rgba(13, 148, 136, 0.3)"
+                      : simMetrics.isCustomSimulated
+                      ? "primary.main"
                       : "divider",
-                    boxShadow: isCurrentToday
-                      ? (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "0 0 16px rgba(0, 229, 201, 0.35), 0 0 4px rgba(0, 229, 201, 0.2)"
-                            : "0 0 16px rgba(13, 148, 136, 0.25), 0 2px 8px rgba(13, 148, 136, 0.15)"
-                      : "none",
                     "&:hover": {
                       borderColor: "primary.light",
                       transform: "translateY(-2px)",
-                      boxShadow: isCurrentToday
-                        ? (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "0 0 20px rgba(0, 229, 201, 0.45), 0 4px 12px rgba(0, 229, 201, 0.2)"
-                              : "0 0 20px rgba(13, 148, 136, 0.35), 0 4px 12px rgba(13, 148, 136, 0.2)"
-                        : (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "0 4px 12px rgba(0, 229, 201, 0.15)"
-                              : "0 4px 12px rgba(13, 148, 136, 0.12)",
                     },
                   }}
                 >
-                  {/* TODAY badge */}
-                  {isCurrentToday && (
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        display: "flex",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          bgcolor: "primary.main",
-                          color: "#fff",
-                          fontSize: { xs: "0.5rem", sm: "0.5625rem" },
-                          fontWeight: 900,
-                          px: 0.75,
-                          py: 0.1,
-                          borderRadius: "0 0 4px 4px",
-                          letterSpacing: "0.06em",
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        TODAY
-                      </Box>
-                    </Box>
-                  )}
-
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: isCurrentToday ? 0.75 : 0 }}>
-                    <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
-                      {billingWindow.isCrossMonth && (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontSize: { xs: "0.55rem", sm: "0.625rem" },
-                            fontWeight: 800,
-                            color: isCurrentToday ? "primary.main" : "text.secondary",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.02em",
-                          }}
-                        >
-                          {dayDate.toLocaleDateString("en-US", { month: "short" })}
-                        </Typography>
-                      )}
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: isCurrentToday ? 900 : 700,
-                          color: isCurrentToday ? "primary.main" : "text.primary",
-                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                          lineHeight: 1.2,
-                        }}
-                      >
+                  {/* Header */}
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: isCurrentToday ? 900 : 700, color: isCurrentToday ? "primary.main" : "text.primary" }}>
                         {dayNum}
                       </Typography>
-                      {(metrics.isSimulated || metrics.isLogged) && (
-                        <Tooltip title="Custom Simulation Active">
-                          <Box sx={{ width: { xs: 5, sm: 6 }, height: { xs: 5, sm: 6 }, borderRadius: "50%", bgcolor: "#00e5c9" }} />
-                        </Tooltip>
+                      {isCurrentToday && (
+                        <Chip label="TODAY" size="small" sx={{ height: 16, fontSize: "0.5rem", fontWeight: 900, bgcolor: "primary.main", color: "#fff" }} />
                       )}
                     </Box>
-
-                    {metrics.isPeak ? (
-                      <Tooltip title="Heavy Load Day">
-                        <FlameIcon sx={{ fontSize: { xs: 13, sm: 15 }, color: "warning.main" }} />
+                    {simMetrics.isCustomSimulated && (
+                      <Tooltip title="Custom Simulation Plan Active">
+                        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#00e5c9" }} />
                       </Tooltip>
-                    ) : (
-                      <ClockIcon sx={{ fontSize: { xs: 11, sm: 13 }, color: metrics.isSimulated ? "primary.main" : "text.secondary" }} />
                     )}
                   </Box>
 
-                  {/* DESKTOP VIEW: Dual values (Baseline vs Simulated) */}
-                  <Box sx={{ display: { xs: "none", md: "block" }, textAlign: "right", mt: 0.5 }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "text.secondary",
-                          fontSize: "0.6875rem",
-                          fontFamily: "monospace",
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        ~₱{metrics.baselineCost.toFixed(2)}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontWeight: 800,
-                          fontFamily: "monospace",
-                          color: (theme) =>
-                            metrics.isSimulated
-                              ? theme.palette.mode === "dark"
-                                ? "#00e5c9"
-                                : "#0d9488"
-                              : theme.palette.mode === "dark"
-                              ? "#ffd54f"
-                              : "#d97706",
-                          fontSize: "0.8125rem",
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        ₱{metrics.cost.toFixed(2)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 0.25 }}>
-                      {metrics.savings !== 0 ? (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontSize: "0.625rem",
-                            fontWeight: 800,
-                            fontFamily: "monospace",
-                            color: metrics.savings > 0 ? "#34d399" : "#fbbf24",
-                          }}
-                        >
-                          {metrics.savings > 0 ? `-₱${metrics.savings.toFixed(0)}` : `+₱${Math.abs(metrics.savings).toFixed(0)}`}
-                        </Typography>
-                      ) : (
-                        <Box />
-                      )}
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "text.secondary",
-                          fontSize: "0.625rem",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {metrics.kwh} kWh
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {/* MOBILE VIEW: Segmented display based on mobileViewMode */}
-                  <Box sx={{ display: { xs: "block", md: "none" }, textAlign: "right", mt: 0.5 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontWeight: 800,
-                        fontFamily: "monospace",
-                        color: (theme) =>
-                          mobileViewMode === "simulated"
-                            ? theme.palette.mode === "dark"
-                              ? "#00e5c9"
-                              : "#0d9488"
-                            : theme.palette.mode === "dark"
-                            ? "#a5b4fc"
-                            : "#4f46e5",
-                        display: "block",
-                        fontSize: "0.6875rem",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        lineHeight: 1.1,
-                      }}
-                    >
-                      {mobileViewMode === "projected"
-                        ? `~₱${Math.round(metrics.baselineCost)}`
-                        : `₱${Math.round(metrics.cost)}`}
+                  {/* Content */}
+                  <Box sx={{ textAlign: "right", mt: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 900, fontFamily: "monospace", color: "primary.main" }}>
+                      ₱{simMetrics.cost.toFixed(2)}
                     </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: "text.secondary",
-                        fontSize: "0.55rem",
-                        display: "block",
-                        lineHeight: 1,
-                        mt: 0.25,
-                      }}
-                    >
-                      {metrics.kwh} kWh
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.625rem" }}>
+                      {simMetrics.kwh.toFixed(1)} kWh
                     </Typography>
                   </Box>
                 </Paper>
@@ -957,42 +765,53 @@ export const SmartCalendar: React.FC = () => {
         </Grid>
       </Card>
 
-      {/* Date Analytics Modal (Tab 1: Donut Breakdown "Hati" + Tab 2: Simulated Day Plan) */}
-      {selectedDateForModal && (
+      {/* MODAL 1: Actual Tab Day Inspector with 24H Timeline & Stopwatch Switches */}
+      {selectedDateForActualModal && (
         <DateAnalyticsModal
-          isOpen={Boolean(selectedDateForModal)}
-          onClose={() => setSelectedDateForModal(null)}
-          selectedDate={selectedDateForModal}
+          isOpen={Boolean(selectedDateForActualModal)}
+          onClose={() => setSelectedDateForActualModal(null)}
+          selectedDate={selectedDateForActualModal}
           appliances={appliances}
-          events={events}
           initialUsageRecords={dailyUsageList}
           spaces={spaces}
           selectedSpaceId={selectedSpaceId}
+          logs={usageLogs}
           onUsageSaved={() => {
-            if (dailyUsageRes?.refetch) {
-              dailyUsageRes.refetch();
-            }
+            if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
+            if (logsRes?.refetch) logsRes.refetch();
+            if (appliancesRes?.refetch) appliancesRes.refetch();
           }}
         />
       )}
 
-      {/* Routine Defaults Autofill Modal across Date Ranges */}
-      <RoutineAutofillModal
-        isOpen={isRoutineAutofillOpen}
-        onClose={() => setIsRoutineAutofillOpen(false)}
-        currentSelectedDate={currentDate}
+      {/* MODAL 2: Simulation Tab Day Plan Inspector */}
+      {selectedDateForSimModal && (
+        <SimulatedDayModal
+          isOpen={Boolean(selectedDateForSimModal)}
+          onClose={() => setSelectedDateForSimModal(null)}
+          selectedDate={selectedDateForSimModal}
+          appliances={appliances}
+          initialSimulatedRecords={simulatedUsageList}
+          spaces={spaces}
+          selectedSpaceId={selectedSpaceId}
+          onSimulationSaved={() => {
+            if (simulatedUsageRes?.refetch) simulatedUsageRes.refetch();
+          }}
+        />
+      )}
+
+      {/* MODAL 3: Simulate Appliance Modal */}
+      <SimulateApplianceModal
+        isOpen={isSimulateApplianceOpen}
+        onClose={() => setIsSimulateApplianceOpen(false)}
         appliances={appliances}
-        spaces={spaces}
-        billingWindow={billingWindow}
-        onApplyToCurrentDay={() => {
-          if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
-        }}
-        onBatchSaved={() => {
-          if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
+        selectedDate={currentDate}
+        onSimulationSaved={() => {
+          if (simulatedUsageRes?.refetch) simulatedUsageRes.refetch();
         }}
       />
 
-      {/* Billing Period & Cutoff Settings Modal */}
+      {/* MODAL 4: Billing Period & Cutoff Settings */}
       <BillingPeriodModal
         isOpen={isBillingModalOpen}
         onClose={() => setIsBillingModalOpen(false)}

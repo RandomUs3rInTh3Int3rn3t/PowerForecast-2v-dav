@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.5.0v",
+    version: "3.5.0v",
+    git_commit_tag: "3.5.0v",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0v - Comprehensive simulation revamp: isolated simulated_appliance_usage layer from live calendar actuals, dedicated Actual Tracker vs Simulation Plan tabs, test-run stopwatch simulator, restored 24h visual stopwatch timeline with auto-logging switches, unattended stopwatch left-running alerts with midnight rollover protection, and blended predictive forecasting",
+  },
+  {
     id: "3.4.14cv",
     version: "3.4.14cv",
     git_commit_tag: "3.4.14cv",

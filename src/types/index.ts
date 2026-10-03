@@ -94,7 +94,23 @@ export interface DailyApplianceUsage {
   hours_used: number;
   kwh_consumed: number;
   estimated_cost: number;
-  source?: 'manual' | 'live_session' | 'schedule_autofill' | 'routine_default';
+  source?: 'manual' | 'live_session' | 'past_time_range' | 'schedule_autofill' | 'routine_default';
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SimulatedApplianceUsage {
+  id: string;
+  user_id?: string | null;
+  appliance_id: string;
+  usage_date: string; // YYYY-MM-DD
+  hours_used: number;
+  kwh_consumed: number;
+  estimated_cost: number;
+  start_hour?: number | null;
+  end_hour?: number | null;
+  source?: 'simulation_plan' | 'test_run' | 'schedule_autofill' | 'routine_default';
   notes?: string | null;
   created_at?: string;
   updated_at?: string;

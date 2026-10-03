@@ -87,7 +87,7 @@ export function useNotifications({
     triggerNotificationVibration(urgency);
   }, []);
 
-  // 1. Extended Continuous Runtime Monitor (Every 30s)
+  // 1. Unattended Stopwatch & Extended Continuous Runtime Monitor (Every 30s)
   useEffect(() => {
     const isRuntimeAlertActive = prefs.enabled && (prefs.runtimeAlert ?? prefs.stopwatchAlert ?? true);
     if (!isRuntimeAlertActive) return;
@@ -95,14 +95,14 @@ export function useNotifications({
     const checkActiveCircuits = () => {
       const running = appliances.filter((a) => a.is_currently_on && a.last_turned_on_at);
       const now = Date.now();
-      const thresholdHours = prefs.runtimeThresholdHours ?? prefs.stopwatchThresholdHours ?? 4;
+      const thresholdHours = prefs.stopwatchThresholdHours ?? prefs.runtimeThresholdHours ?? 2;
       const thresholdMs = thresholdHours * 3600 * 1000;
 
       running.forEach((app) => {
         const startTime = new Date(app.last_turned_on_at!).getTime();
         const elapsedMs = now - startTime;
 
-        // In Proactive/Strict level: Heavy appliances (>1000W) alert earlier at half threshold
+        // In Proactive/Strict level: Heavy appliances (>1000W) alert earlier at half threshold (min 30m)
         const isHeavy = (app.watts * (app.quantity || 1)) >= 1000;
         const adjustedThresholdMs =
           (prefs.notificationLevel === "strict" || prefs.notificationLevel === "proactive") && isHeavy
@@ -111,7 +111,7 @@ export function useNotifications({
 
         if (elapsedMs >= adjustedThresholdMs) {
           const hoursElapsed = Math.floor(elapsedMs / (3600 * 1000));
-          const alertKey = `runtime-${app.id}-${hoursElapsed}`;
+          const alertKey = `stopwatch-running-${app.id}-${hoursElapsed}`;
 
           if (!sentAlertsRef.current.has(alertKey)) {
             sentAlertsRef.current.add(alertKey);
@@ -119,12 +119,12 @@ export function useNotifications({
             const hours = (elapsedMs / (3600 * 1000)).toFixed(1);
             const kwh = ((app.watts * (app.quantity || 1) * (elapsedMs / (3600 * 1000))) / 1000).toFixed(2);
             const cost = (parseFloat(kwh) * 14.8261).toFixed(2);
-            const urgency = isHeavy || parseFloat(hours) >= 4 ? "critical" : "high";
+            const urgency = isHeavy || parseFloat(hours) >= 3 ? "critical" : "high";
 
             sendNotification({
-              title: `⚡ Extended Runtime Alert: ${app.name} (${app.watts}W)`,
-              body: `Active for ${hours} hrs (${kwh} kWh / ~₱${cost}). Did you leave it running?`,
-              tag: `runtime-${app.id}`,
+              title: `⏱️ Stopwatch Left Running: ${app.name} (${app.watts}W)`,
+              body: `Still active after ${hours} hrs (${kwh} kWh / ~₱${cost}). Did you forget to turn off the stopwatch?`,
+              tag: `stopwatch-running-${app.id}`,
               urgency,
             });
           }

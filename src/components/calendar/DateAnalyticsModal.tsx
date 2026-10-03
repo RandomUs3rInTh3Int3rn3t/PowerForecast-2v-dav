@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -14,30 +14,36 @@ import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import Tooltip from "@mui/material/Tooltip";
 import Grid from "@mui/material/Grid";
-import LinearProgress from "@mui/material/LinearProgress";
+import Switch from "@mui/material/Switch";
+import TextField from "@mui/material/TextField";
 import {
   Close as CloseIcon,
-  Bolt as BoltIcon,
+  Timeline as TimelineIcon,
   PieChart as PieChartIcon,
-  Tune as TuneIcon,
-  RestartAlt as ResetIcon,
-  Save as SaveIcon,
   CalendarMonth as CalendarIcon,
-  TrendingDown as TrendingDownIcon,
-  CheckCircle as CheckCircleIcon,
   Add as PlusIcon,
-  Remove as MinusIcon,
+  Delete as DeleteIcon,
+  Bolt as BoltIcon,
+  Timer as TimerIcon,
 } from "@mui/icons-material";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "recharts";
-import { UserAppliance, DailyApplianceUsage, ApplianceList } from "../../types";
+import { UserAppliance, DailyApplianceUsage, ApplianceList, ApplianceUsageLog } from "../../types";
 import {
   formatDateToKey,
+  splitSessionAcrossDays,
   calculateApplianceKwh,
   calculateCost,
   DEFAULT_EFFECTIVE_RATE,
-  batchSaveDailyUsage,
 } from "../../lib/dailyUsageService";
+import {
+  switchOnCircuit,
+  switchOffCircuit,
+  addManualPastSession,
+  deleteSessionLog,
+  getEffectiveApplianceRate,
+} from "../../lib/sessionService";
 import { useToast } from "../common/ToastProvider";
+import { useLiveTicker, formatElapsedHms } from "../../hooks/useLiveTicker";
 
 interface DateAnalyticsModalProps {
   isOpen: boolean;
@@ -48,21 +54,27 @@ interface DateAnalyticsModalProps {
   initialUsageRecords?: DailyApplianceUsage[];
   spaces?: ApplianceList[];
   selectedSpaceId?: string;
-  logs?: any[];
+  logs?: ApplianceUsageLog[];
   onUsageSaved?: () => void;
 }
 
+interface TimelineSessionBlock {
+  id: string;
+  logId?: string;
+  rawLog?: ApplianceUsageLog;
+  type: "logged_session" | "live_stopwatch";
+  startHour: number;
+  endHour: number;
+  durationHours: number;
+  kwh: number;
+  cost: number;
+  startTimeStr: string;
+  endTimeStr: string;
+}
+
 const PIE_COLORS = [
-  "#00e5c9", // Cyan / Teal Primary
-  "#38bdf8", // Sky Blue
-  "#a78bfa", // Purple
-  "#fbbf24", // Amber
-  "#34d399", // Emerald
-  "#f472b6", // Pink
-  "#f97316", // Orange
-  "#818cf8", // Indigo
-  "#a3e635", // Lime
-  "#e879f9", // Fuchsia
+  "#00e5c9", "#38bdf8", "#a78bfa", "#fbbf24", "#34d399",
+  "#f472b6", "#f97316", "#818cf8", "#a3e635", "#e879f9",
 ];
 
 export const DateAnalyticsModal: React.FC<DateAnalyticsModalProps> = ({
@@ -73,13 +85,16 @@ export const DateAnalyticsModal: React.FC<DateAnalyticsModalProps> = ({
   initialUsageRecords = [],
   spaces = [],
   selectedSpaceId = "all",
+  logs = [],
   onUsageSaved,
 }) => {
   const [activeTab, setActiveTab] = useState<number>(0);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
   const { showSuccess, showError, showInfo } = useToast();
 
   const dateKey = formatDateToKey(selectedDate);
+  const todayKey = formatDateToKey(new Date());
+  const isToday = dateKey === todayKey;
+
   const formattedDate = selectedDate.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -87,8 +102,8 @@ export const DateAnalyticsModal: React.FC<DateAnalyticsModalProps> = ({
     year: "numeric",
   });
 
-  // Filter active appliances for the selected space
-  const activeAppliances = useMemo(() => {
+  // Filter active appliances by selected space
+  const filteredAppliances = useMemo(() => {
     const list =
       selectedSpaceId === "all"
         ? appliances
@@ -96,155 +111,218 @@ export const DateAnalyticsModal: React.FC<DateAnalyticsModalProps> = ({
     return list.filter((a) => a.is_active !== false);
   }, [appliances, selectedSpaceId]);
 
-  // Initial simulated hours map from database records or baseline routines
-  const [simulatedHours, setSimulatedHours] = useState<Record<string, number>>({});
+  // Live 1-second ticker when modal is open and today has active circuits
+  const hasAnyRunningCircuit = useMemo(
+    () => isToday && filteredAppliances.some((a) => a.is_currently_on),
+    [isToday, filteredAppliances]
+  );
+  const nowTicker = useLiveTicker(isOpen && hasAnyRunningCircuit);
 
-  useEffect(() => {
-    if (isOpen) {
-      const recordsForDay = initialUsageRecords.filter((r) => r.usage_date === dateKey);
-      const initialMap: Record<string, number> = {};
+  // Modal State: Past Session Logging
+  const [isPastModalOpen, setIsPastModalOpen] = useState(false);
+  const [targetPastApp, setTargetPastApp] = useState<UserAppliance | null>(null);
+  const [pastStartHour, setPastStartHour] = useState("08:00");
+  const [pastEndHour, setPastEndHour] = useState("10:00");
 
-      activeAppliances.forEach((app) => {
-        const found = recordsForDay.find((r) => r.appliance_id === app.id);
-        if (found) {
-          initialMap[app.id] = Number(found.hours_used) || 0;
-        } else {
-          // Default to registered baseline hours
-          initialMap[app.id] = Number(app.hours_per_day) || 0;
+  // Modal State: Session Inspection / Deletion
+  const [inspectingSession, setInspectingSession] = useState<{
+    block: TimelineSessionBlock;
+    appliance: UserAppliance;
+  } | null>(null);
+
+  // Compute 24-Hour Stopwatch Activity Timeline Data
+  const timelineData = useMemo(() => {
+    return filteredAppliances.map((app) => {
+      const sessionBlocks: TimelineSessionBlock[] = [];
+
+      // 1. Logged/Recorded sessions from database
+      (logs || []).forEach((log) => {
+        if (log.appliance_id !== app.id) return;
+        const start = new Date(log.started_at);
+        const end = log.ended_at ? new Date(log.ended_at) : new Date(start.getTime() + (log.duration_minutes || 60) * 60000);
+        const slices = splitSessionAcrossDays(start, end);
+        const matchingSlice = slices.find((s) => s.dateKey === dateKey);
+
+        if (matchingSlice && matchingSlice.hours > 0) {
+          const appKwh = calculateApplianceKwh(app, matchingSlice.hours);
+          const appCost = calculateCost(appKwh, getEffectiveApplianceRate(app));
+
+          sessionBlocks.push({
+            id: `log-${log.id}-${matchingSlice.startHourFrac}`,
+            logId: log.id,
+            rawLog: log,
+            type: "logged_session",
+            startHour: matchingSlice.startHourFrac,
+            endHour: matchingSlice.endHourFrac,
+            durationHours: matchingSlice.hours,
+            kwh: appKwh,
+            cost: appCost,
+            startTimeStr: matchingSlice.startTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            endTimeStr: matchingSlice.endTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          });
         }
       });
 
-      setSimulatedHours(initialMap);
-    }
-  }, [isOpen, dateKey, initialUsageRecords, activeAppliances]);
+      // 2. Currently Turned ON Stopwatch session (if Today)
+      if (isToday && app.is_currently_on && app.last_turned_on_at) {
+        const start = new Date(app.last_turned_on_at);
+        const now = new Date(nowTicker);
+        if (!isNaN(start.getTime()) && now > start) {
+          const slices = splitSessionAcrossDays(start, now);
+          const matchingSlice = slices.find((s) => s.dateKey === dateKey);
 
-  // Handle hour adjustments
-  const handleUpdateHours = (appId: string, delta: number) => {
-    setSimulatedHours((prev) => {
-      const current = prev[appId] ?? 0;
-      const next = Math.max(0, Math.min(24, Math.round((current + delta) * 2) / 2));
-      return { ...prev, [appId]: next };
-    });
-  };
+          if (matchingSlice && matchingSlice.hours > 0) {
+            const appKwh = calculateApplianceKwh(app, matchingSlice.hours);
+            const appCost = calculateCost(appKwh, getEffectiveApplianceRate(app));
 
-  const handleSetExactHours = (appId: string, hours: number) => {
-    setSimulatedHours((prev) => ({
-      ...prev,
-      [appId]: Math.max(0, Math.min(24, hours)),
-    }));
-  };
-
-  // Revert all appliances on this date to their default baseline hours
-  const handleResetToBaseline = () => {
-    const baselineMap: Record<string, number> = {};
-    activeAppliances.forEach((app) => {
-      baselineMap[app.id] = Number(app.hours_per_day) || 0;
-    });
-    setSimulatedHours(baselineMap);
-    showInfo("Reset all appliances to registered baseline quotas.");
-  };
-
-  // Calculations: Baseline vs Simulated
-  const {
-    baselineTotalCost,
-    baselineTotalKwh,
-    simulatedTotalCost,
-    simulatedTotalKwh,
-    peakConcurrentWatts,
-    savings,
-    applianceBreakdown,
-    pieChartData,
-  } = useMemo(() => {
-    let baseCost = 0;
-    let baseKwh = 0;
-    let simCost = 0;
-    let simKwh = 0;
-    let peakWatts = 0;
-
-    const breakdown = activeAppliances.map((app) => {
-      const bHours = Number(app.hours_per_day) || 0;
-      const sHours = simulatedHours[app.id] !== undefined ? simulatedHours[app.id] : bHours;
-
-      const appBaseKwh = calculateApplianceKwh(app, bHours);
-      const appBaseCost = calculateCost(appBaseKwh, DEFAULT_EFFECTIVE_RATE);
-
-      const appSimKwh = calculateApplianceKwh(app, sHours);
-      const appSimCost = calculateCost(appSimKwh, DEFAULT_EFFECTIVE_RATE);
-
-      baseKwh += appBaseKwh;
-      baseCost += appBaseCost;
-      simKwh += appSimKwh;
-      simCost += appSimCost;
-
-      if (sHours > 0) {
-        peakWatts += (app.watts || 0) * (app.quantity || 1);
+            sessionBlocks.push({
+              id: `live-${app.id}`,
+              type: "live_stopwatch",
+              startHour: matchingSlice.startHourFrac,
+              endHour: matchingSlice.endHourFrac,
+              durationHours: matchingSlice.hours,
+              kwh: appKwh,
+              cost: appCost,
+              startTimeStr: matchingSlice.startTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              endTimeStr: "Now (Live)",
+            });
+          }
+        }
       }
 
+      sessionBlocks.sort((a, b) => a.startHour - b.startHour);
+
+      const totalH = sessionBlocks.reduce((acc, s) => acc + s.durationHours, 0);
+      const totalK = sessionBlocks.reduce((acc, s) => acc + s.kwh, 0);
+      const totalC = sessionBlocks.reduce((acc, s) => acc + s.cost, 0);
+
       return {
-        app,
-        baseHours: bHours,
-        simHours: sHours,
-        baseKwh: appBaseKwh,
-        baseCost: appBaseCost,
-        kwh: appSimKwh,
-        cost: appSimCost,
-        isModified: sHours !== bHours,
+        appliance: app,
+        sessions: sessionBlocks,
+        totalHours: totalH,
+        totalKwh: totalK,
+        totalCost: totalC,
       };
     });
+  }, [filteredAppliances, logs, dateKey, isToday, nowTicker]);
 
-    // Sort descending by consumption for the ranked list
-    breakdown.sort((a, b) => b.kwh - a.kwh);
+  // Overall Day Totals from Timeline Data
+  const daySummary = useMemo(() => {
+    let totKwh = 0;
+    let totCost = 0;
+    let runningCount = 0;
 
-    // Prepare Recharts Pie data
-    const pieData = breakdown
-      .filter((item) => item.kwh > 0)
+    timelineData.forEach((item) => {
+      totKwh += item.totalKwh;
+      totCost += item.totalCost;
+      if (item.appliance.is_currently_on) runningCount++;
+    });
+
+    // Breakdown for Pie Chart
+    const pieItems = timelineData
+      .filter((item) => item.totalKwh > 0)
       .map((item, idx) => ({
-        name: item.app.name,
-        value: Number(item.kwh.toFixed(3)),
-        cost: item.cost,
-        percentage: simKwh > 0 ? ((item.kwh / simKwh) * 100).toFixed(1) : "0",
+        name: item.appliance.name,
+        value: Number(item.totalKwh.toFixed(3)),
+        cost: Number(item.totalCost.toFixed(2)),
+        percentage: totKwh > 0 ? ((item.totalKwh / totKwh) * 100).toFixed(1) : "0",
         color: PIE_COLORS[idx % PIE_COLORS.length],
       }));
 
     return {
-      baselineTotalCost: Number(baseCost.toFixed(2)),
-      baselineTotalKwh: Number(baseKwh.toFixed(2)),
-      simulatedTotalCost: Number(simCost.toFixed(2)),
-      simulatedTotalKwh: Number(simKwh.toFixed(2)),
-      peakConcurrentWatts: peakWatts,
-      savings: Number((baseCost - simCost).toFixed(2)),
-      applianceBreakdown: breakdown,
-      pieChartData: pieData,
+      dayTotalCost: Number(totCost.toFixed(2)),
+      dayTotalKwh: Number(totKwh.toFixed(2)),
+      runningAppliancesCount: runningCount,
+      pieChartData: pieItems,
     };
-  }, [activeAppliances, simulatedHours]);
+  }, [timelineData]);
 
-  // Save the day simulation to database
-  const handleSaveSimulation = async () => {
-    setIsSaving(true);
+  // Live Power Switch Toggle
+  const handleTogglePower = async (app: UserAppliance) => {
+    if (!isToday) {
+      showInfo("Live stopwatch switches can only be operated on today's date.");
+      return;
+    }
+
+    if (app.is_currently_on) {
+      const res = await switchOffCircuit(app);
+      if (res.success) {
+        showSuccess(
+          `Stopped stopwatch for ${app.name}: ${res.durationMinutes} mins (~₱${res.cost.toFixed(2)}) auto-logged to today!`,
+          "Session Logged"
+        );
+        if (onUsageSaved) onUsageSaved();
+      }
+    } else {
+      const res = await switchOnCircuit(app);
+      if (res.success) {
+        showInfo(`Started stopwatch for ${app.name}. Live tracking active.`);
+        if (onUsageSaved) onUsageSaved();
+      }
+    }
+  };
+
+  // Open Past Session Modal
+  const handleOpenPastSessionModal = (app: UserAppliance) => {
+    setTargetPastApp(app);
+    setIsPastModalOpen(true);
+  };
+
+  // Save Past Session
+  const handleSavePastSession = async () => {
+    if (!targetPastApp) return;
+
+    const [sh, sm] = pastStartHour.split(":").map(Number);
+    const [eh, em] = pastEndHour.split(":").map(Number);
+
+    const [y, m, d] = dateKey.split("-").map(Number);
+    const start = new Date(y, m - 1, d, sh, sm, 0);
+    const end = new Date(y, m - 1, d, eh, em, 0);
+
+    if (end <= start) {
+      showError("End time must be after start time!");
+      return;
+    }
+
     try {
-      const entriesToSave = activeAppliances.map((app) => {
-        const hours = simulatedHours[app.id] !== undefined ? simulatedHours[app.id] : (Number(app.hours_per_day) || 0);
-
-        return {
-          appliance_id: app.id,
-          hours_used: hours,
-          watts: app.watts,
-          quantity: app.quantity || 1,
-          source: "schedule_autofill" as const,
-          notes: `Simulated day override (${hours}h)`,
-          user_id: app.user_id || null,
-        };
+      const res = await addManualPastSession({
+        appliance: targetPastApp,
+        startDate: start,
+        endDate: end,
       });
 
-      await batchSaveDailyUsage(dateKey, entriesToSave);
-
-      showSuccess(`Saved simulation plan for ${formattedDate}!`, "Simulation Saved");
+      showSuccess(`Added ${res.totalMinutes} min past session for ${targetPastApp.name}!`);
+      setIsPastModalOpen(false);
       if (onUsageSaved) onUsageSaved();
-      onClose();
     } catch (err: any) {
-      showError(`Failed to save simulation: ${err?.message || "Unknown error"}`);
-    } finally {
-      setIsSaving(false);
+      showError(`Failed to save past session: ${err?.message}`);
+    }
+  };
+
+  // Delete Session Block
+  const handleDeleteSession = async () => {
+    if (!inspectingSession || !inspectingSession.block.logId) return;
+    const { block, appliance } = inspectingSession;
+    const logId = block.logId;
+    if (!logId) return;
+
+    const start = block.rawLog?.started_at ? new Date(block.rawLog.started_at) : new Date();
+    const end = block.rawLog?.ended_at ? new Date(block.rawLog.ended_at) : new Date();
+
+    const ok = await deleteSessionLog({
+      logId,
+      appliance,
+      durationMinutes: Math.round(block.durationHours * 60),
+      startTime: start,
+      endTime: end,
+    });
+
+    if (ok) {
+      showSuccess(`Deleted session for ${appliance.name}.`);
+      setInspectingSession(null);
+      if (onUsageSaved) onUsageSaved();
+    } else {
+      showError("Failed to delete session log.");
     }
   };
 
@@ -257,7 +335,7 @@ export const DateAnalyticsModal: React.FC<DateAnalyticsModalProps> = ({
       slotProps={{
         paper: {
           sx: {
-            borderRadius: 2,
+            borderRadius: 2.5,
             bgcolor: "background.paper",
             boxShadow: (theme) =>
               theme.palette.mode === "dark"
@@ -301,396 +379,267 @@ export const DateAnalyticsModal: React.FC<DateAnalyticsModalProps> = ({
               {formattedDate}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Daily Consumption Insight & Schedule Simulation
+              {isToday ? "Live Stopwatch Tracking & Actual Usage Timeline" : "Actual Measured Usage & Stopwatch Logs"}
             </Typography>
           </Box>
         </Box>
-        <IconButton onClick={onClose} size="small" sx={{ color: "text.secondary" }}>
+        <IconButton size="small" onClick={onClose}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
 
       <Divider />
 
-      {/* 2. Top Diagnostic Metrics Bar */}
-      <Box sx={{ p: { xs: 2, sm: 2.5 }, bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.6)" : "#f8fafc") }}>
-        <Grid container spacing={1.5}>
-          <Grid size={{ xs: 6, sm: 3 }}>
-            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.25, textAlign: "center" }}>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, display: "block" }}>
-                DAY TOTAL BILL
+      <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+        {/* KPI Strip */}
+        <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+          <Grid size={{ xs: 6, sm: 4 }}>
+            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, textAlign: "center" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                ACTUAL DAY COST
               </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 900, fontFamily: "monospace", color: "primary.main" }}>
-                ₱{simulatedTotalCost.toFixed(2)}
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "primary.main" }}>
+                ₱{daySummary.dayTotalCost.toFixed(2)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                @ ₱14.82/kWh rate
-              </Typography>
-            </Paper>
-          </Grid>
-
-          <Grid size={{ xs: 6, sm: 3 }}>
-            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.25, textAlign: "center" }}>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, display: "block" }}>
-                CONSUMPTION
-              </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 900, fontFamily: "monospace", color: (theme) => (theme.palette.mode === "dark" ? "#ffd54f" : "#d97706") }}>
-                {simulatedTotalKwh.toFixed(2)} kWh
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                {activeAppliances.length} Devices active
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Verified Measured Total
               </Typography>
             </Paper>
           </Grid>
 
-          <Grid size={{ xs: 6, sm: 3 }}>
-            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.25, textAlign: "center" }}>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, display: "block" }}>
-                PEAK LOAD
+          <Grid size={{ xs: 6, sm: 4 }}>
+            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, textAlign: "center" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                MEASURED USAGE
               </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 900, fontFamily: "monospace", color: (theme) => (theme.palette.mode === "dark" ? "#38bdf8" : "#0284c7") }}>
-                {peakConcurrentWatts} W
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "warning.main" }}>
+                {daySummary.dayTotalKwh.toFixed(2)} kWh
               </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                Max Concurrent Draw
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Cumulative Stopwatch Sum
               </Typography>
             </Paper>
           </Grid>
 
-          <Grid size={{ xs: 6, sm: 3 }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 1.5,
-                borderRadius: 1.25,
-                textAlign: "center",
-                borderColor: savings > 0 ? "success.main" : "divider",
-                bgcolor: savings > 0 ? (theme) => (theme.palette.mode === "dark" ? "rgba(52, 211, 153, 0.08)" : "rgba(16, 185, 129, 0.05)") : "transparent",
-              }}
-            >
-              <Typography variant="caption" sx={{ color: savings > 0 ? "success.main" : "text.secondary", fontWeight: 700, display: "block" }}>
-                SIMULATION SAVINGS
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, textAlign: "center" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                CIRCUIT STATUS
               </Typography>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 900,
-                  fontFamily: "monospace",
-                  color: savings > 0 ? "success.main" : savings < 0 ? "warning.main" : "text.secondary",
-                }}
-              >
-                {savings > 0 ? `-₱${savings.toFixed(2)}` : savings < 0 ? `+₱${Math.abs(savings).toFixed(2)}` : "₱0.00"}
+              <Typography variant="h6" sx={{ fontWeight: 900, color: daySummary.runningAppliancesCount > 0 ? "#34d399" : "text.secondary" }}>
+                {isToday
+                  ? daySummary.runningAppliancesCount > 0
+                    ? `${daySummary.runningAppliancesCount} Running Active`
+                    : "All Circuits Idle"
+                  : "Completed Day"}
               </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                vs ₱{baselineTotalCost.toFixed(2)} baseline
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {isToday ? "Real-time Telemetry" : "Historical Record"}
               </Typography>
             </Paper>
           </Grid>
         </Grid>
-      </Box>
 
-      {/* 3. Navigation Tabs */}
-      <Box sx={{ px: { xs: 2, sm: 3 }, borderBottom: "1px solid", borderColor: "divider" }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
-          sx={{
-            minHeight: 44,
-            "& .MuiTab-root": {
-              textTransform: "none",
-              fontWeight: 800,
-              fontSize: "0.8125rem",
-              minHeight: 44,
-              py: 1,
-            },
-          }}
-        >
-          <Tab icon={<PieChartIcon fontSize="small" />} iconPosition="start" label="Daily Breakdown (Hati)" />
-          <Tab icon={<TuneIcon fontSize="small" />} iconPosition="start" label="Simulated Day Plan" />
-        </Tabs>
-      </Box>
+        {/* Tabs */}
+        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
+            <Tab icon={<TimelineIcon fontSize="small" />} iconPosition="start" label="24-Hour Stopwatch Activity Timeline" />
+            <Tab icon={<PieChartIcon fontSize="small" />} iconPosition="start" label="Actual Breakdown (Hati)" />
+          </Tabs>
+        </Box>
 
-      {/* 4. Tab Content */}
-      <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
-        {/* TAB 0: PIE GRAPH / DONUT CHART BREAKDOWN */}
+        {/* TAB 0: 24-HOUR STOPWATCH TIMELINE */}
         {activeTab === 0 && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {pieChartData.length === 0 ? (
-              <Box sx={{ py: 6, textAlign: "center" }}>
-                <BoltIcon sx={{ fontSize: 44, color: "text.secondary", opacity: 0.4, mb: 1 }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                  No active energy load on this date
-                </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  All appliances have 0 operating hours simulated for this day.
-                </Typography>
-              </Box>
-            ) : (
-              <Grid container spacing={3} sx={{ alignItems: "center" }}>
-                {/* Donut / Pie Chart Visual */}
-                <Grid size={{ xs: 12, md: 5 }}>
-                  <Box sx={{ height: 260, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieChartData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={65}
-                          outerRadius={95}
-                          paddingAngle={3}
-                        >
-                          {pieChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload || !payload.length) return null;
-                            const data = payload[0].payload;
-                            return (
-                              <Paper
-                                sx={{
-                                  p: 1.25,
-                                  borderRadius: 1,
-                                  bgcolor: "background.paper",
-                                  border: "1px solid",
-                                  borderColor: "divider",
-                                  boxShadow: 4,
-                                }}
-                              >
-                                <Typography variant="caption" sx={{ fontWeight: 800, display: "block", color: data.color }}>
-                                  {data.name}
-                                </Typography>
-                                <Typography variant="caption" sx={{ display: "block", fontWeight: 700 }}>
-                                  {data.value} kWh ({data.percentage}%)
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
-                                  ₱{Number(data.cost).toFixed(2)}
-                                </Typography>
-                              </Paper>
-                            );
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    {/* Centered Energy Load Metric */}
-                    <Box sx={{ position: "absolute", textAlign: "center", pointerEvents: "none" }}>
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.6875rem", display: "block" }}>
-                        TOTAL LOAD
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
-                        {simulatedTotalKwh.toFixed(1)}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.625rem" }}>
-                        kWh / day
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-
-                {/* Ranked Breakdown List */}
-                <Grid size={{ xs: 12, md: 7 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", letterSpacing: "0.05em", mb: 1.5, display: "block" }}>
-                    ENERGY LOAD HATI (RANKED BY CONSUMPTION):
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Header & Legend */}
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Toggle switch ON to start stopwatch. Toggling OFF auto-logs session to this day.
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <Box sx={{ width: 10, height: 10, borderRadius: 1, bgcolor: "#34d399" }} />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#34d399", fontSize: "0.6875rem" }}>
+                    Live Running
                   </Typography>
-
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
-                    {applianceBreakdown.map((item, idx) => {
-                      const sharePct = simulatedTotalKwh > 0 ? (item.kwh / simulatedTotalKwh) * 100 : 0;
-                      const color = PIE_COLORS[idx % PIE_COLORS.length];
-
-                      return (
-                        <Paper
-                          key={item.app.id}
-                          variant="outlined"
-                          sx={{
-                            p: 1.25,
-                            borderRadius: 1.25,
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 0.75,
-                            transition: "all 0.15s ease",
-                            "&:hover": {
-                              borderColor: color,
-                            },
-                          }}
-                        >
-                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
-                              <Box>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.8125rem", lineHeight: 1.2 }}>
-                                  {item.app.name}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                                  {item.app.room_location || "General"} • {item.app.watts}W • {item.simHours}h
-                                </Typography>
-                              </Box>
-                            </Box>
-                            <Box sx={{ textAlign: "right" }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 900, fontFamily: "monospace", fontSize: "0.8125rem" }}>
-                                ₱{item.cost.toFixed(2)}
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                                {item.kwh.toFixed(2)} kWh ({sharePct.toFixed(1)}%)
-                              </Typography>
-                            </Box>
-                          </Box>
-
-                          <LinearProgress
-                            variant="determinate"
-                            value={Math.min(100, sharePct)}
-                            sx={{
-                              height: 4,
-                              borderRadius: 2,
-                              bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0"),
-                              "& .MuiLinearProgress-bar": {
-                                bgcolor: color,
-                                borderRadius: 2,
-                              },
-                            }}
-                          />
-                        </Paper>
-                      );
-                    })}
-                  </Box>
-                </Grid>
-              </Grid>
-            )}
-          </Box>
-        )}
-
-        {/* TAB 1: SIMULATED DAY PLAN OVERRIDES */}
-        {activeTab === 1 && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                  Adjust Operating Hours for {formattedDate}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Fine-tune individual appliance hours to simulate different schedules or what-if scenarios.
-                </Typography>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <Box sx={{ width: 10, height: 10, borderRadius: 1, bgcolor: "#818cf8" }} />
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#818cf8", fontSize: "0.6875rem" }}>
+                    Logged Session
+                  </Typography>
+                </Box>
               </Box>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<ResetIcon />}
-                onClick={handleResetToBaseline}
-                sx={{ borderRadius: 1, textTransform: "none", fontWeight: 700 }}
-              >
-                Reset to Baseline
-              </Button>
             </Box>
 
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, maxHeight: 380, overflowY: "auto", pr: 0.5 }}>
-              {applianceBreakdown.map((item) => {
-                const currentH = item.simHours;
-                const isModified = item.isModified;
+            {/* 24-Hour Time Axis Labels */}
+            <Box sx={{ pl: { xs: 0, sm: "240px" }, pr: 1 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                {["12 AM", "3 AM", "6 AM", "9 AM", "12 PM", "3 PM", "6 PM", "9 PM", "12 AM"].map((label, idx) => (
+                  <Typography key={idx} variant="caption" sx={{ fontSize: "0.625rem", color: "text.secondary", fontFamily: "monospace" }}>
+                    {label}
+                  </Typography>
+                ))}
+              </Box>
+            </Box>
+
+            {/* Appliance Timeline Rows */}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, maxHeight: 420, overflowY: "auto", pr: 0.5 }}>
+              {timelineData.map(({ appliance, sessions, totalHours, totalCost }) => {
+                const isRunning = isToday && appliance.is_currently_on;
+                const runningMs = isRunning && appliance.last_turned_on_at ? Math.max(0, nowTicker - new Date(appliance.last_turned_on_at).getTime()) : 0;
 
                 return (
                   <Paper
-                    key={item.app.id}
+                    key={appliance.id}
                     variant="outlined"
                     sx={{
                       p: 1.5,
-                      borderRadius: 1.25,
+                      borderRadius: 2,
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      flexWrap: "wrap",
+                      flexDirection: { xs: "column", sm: "row" },
+                      alignItems: { xs: "stretch", sm: "center" },
                       gap: 1.5,
-                      borderColor: isModified ? "primary.main" : "divider",
-                      bgcolor: isModified
-                        ? (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.04)" : "rgba(13, 148, 136, 0.03)")
+                      borderColor: isRunning ? "#34d399" : "divider",
+                      bgcolor: isRunning
+                        ? (theme) => (theme.palette.mode === "dark" ? "rgba(52, 211, 153, 0.05)" : "rgba(16, 185, 129, 0.04)")
                         : "background.paper",
                     }}
                   >
-                    <Box sx={{ minWidth: 180 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                          {item.app.name}
+                    {/* Left: Info + Live Switch */}
+                    <Box sx={{ minWidth: { xs: "100%", sm: 225 }, maxWidth: { xs: "100%", sm: 225 } }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <Typography noWrap variant="body2" sx={{ fontWeight: 800 }}>
+                          {appliance.name}
                         </Typography>
-                        {isModified && (
-                          <Chip
-                            label="Modified"
+                        {isToday ? (
+                          <Switch
                             size="small"
-                            color="primary"
-                            sx={{ height: 18, fontSize: "0.625rem", fontWeight: 800 }}
+                            checked={Boolean(isRunning)}
+                            onChange={() => handleTogglePower(appliance)}
+                            color="success"
+                          />
+                        ) : (
+                          <Chip
+                            label="+ Log"
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleOpenPastSessionModal(appliance)}
+                            sx={{ height: 20, fontSize: "0.625rem", cursor: "pointer" }}
                           />
                         )}
                       </Box>
-                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                        Baseline: {item.baseHours}h/day • {item.app.watts}W
-                      </Typography>
+
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mt: 0.25 }}>
+                        <Chip
+                          label={`${appliance.watts}W`}
+                          size="small"
+                          sx={{ height: 18, fontSize: "0.625rem", fontWeight: 700 }}
+                        />
+                        {isRunning ? (
+                          <Typography variant="caption" sx={{ color: "#34d399", fontWeight: 800, fontFamily: "monospace" }}>
+                            ⏱ {formatElapsedHms(runningMs)}
+                          </Typography>
+                        ) : (
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                            {totalHours > 0 ? `${totalHours.toFixed(1)}h (₱${totalCost.toFixed(2)})` : "No sessions"}
+                          </Typography>
+                        )}
+                      </Box>
                     </Box>
 
-                    {/* Quick Stepper & Presets */}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleUpdateHours(item.app.id, -0.5)}
-                          disabled={currentH <= 0}
-                          sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 0.5 }}
-                        >
-                          <MinusIcon fontSize="small" />
-                        </IconButton>
-
-                        <Typography
-                          variant="subtitle2"
+                    {/* Right: 24-Hour Visual Track Bar */}
+                    <Box
+                      sx={{
+                        flex: 1,
+                        height: 32,
+                        borderRadius: 1.5,
+                        bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.04)"),
+                        border: "1px solid",
+                        borderColor: "divider",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {/* Grid Lines */}
+                      {[12.5, 25, 37.5, 50, 62.5, 75, 87.5].map((pct) => (
+                        <Box
+                          key={pct}
                           sx={{
-                            width: 54,
-                            textAlign: "center",
-                            fontWeight: 900,
-                            fontFamily: "monospace",
+                            position: "absolute",
+                            left: `${pct}%`,
+                            top: 0,
+                            bottom: 0,
+                            width: "1px",
+                            bgcolor: "rgba(255, 255, 255, 0.05)",
+                            pointerEvents: "none",
                           }}
-                        >
-                          {currentH}h
-                        </Typography>
+                        />
+                      ))}
 
-                        <IconButton
-                          size="small"
-                          onClick={() => handleUpdateHours(item.app.id, 0.5)}
-                          disabled={currentH >= 24}
-                          sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 0.5 }}
-                        >
-                          <PlusIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
+                      {/* Meralco Peak Window Overlays (11 AM - 4 PM & 6 PM - 9 PM) */}
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          left: `${(11 / 24) * 100}%`,
+                          width: `${(5 / 24) * 100}%`,
+                          top: 0,
+                          bottom: 0,
+                          bgcolor: "rgba(245, 158, 11, 0.08)",
+                          borderLeft: "1px dashed rgba(245, 158, 11, 0.2)",
+                          borderRight: "1px dashed rgba(245, 158, 11, 0.2)",
+                          pointerEvents: "none",
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          left: `${(18 / 24) * 100}%`,
+                          width: `${(3 / 24) * 100}%`,
+                          top: 0,
+                          bottom: 0,
+                          bgcolor: "rgba(239, 68, 68, 0.08)",
+                          borderLeft: "1px dashed rgba(239, 68, 68, 0.2)",
+                          borderRight: "1px dashed rgba(239, 68, 68, 0.2)",
+                          pointerEvents: "none",
+                        }}
+                      />
 
-                      {/* Presets */}
-                      <Box sx={{ display: "flex", gap: 0.5 }}>
-                        {[0, 2, 4, 8, 12].map((preset) => (
-                          <Chip
-                            key={preset}
-                            label={`${preset}h`}
-                            size="small"
-                            variant={currentH === preset ? "filled" : "outlined"}
-                            color={currentH === preset ? "primary" : "default"}
-                            onClick={() => handleSetExactHours(item.app.id, preset)}
-                            sx={{
-                              height: 24,
-                              fontSize: "0.6875rem",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                            }}
-                          />
-                        ))}
-                      </Box>
-                    </Box>
+                      {/* Session Blocks */}
+                      {sessions.map((block) => {
+                        const leftPct = Math.max(0, Math.min(100, (block.startHour / 24) * 100));
+                        const widthPct = Math.max(1.5, Math.min(100 - leftPct, ((block.endHour - block.startHour) / 24) * 100));
+                        const isLive = block.type === "live_stopwatch";
 
-                    {/* Individual Cost Preview */}
-                    <Box sx={{ textAlign: "right", minWidth: 90 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 900, fontFamily: "monospace" }}>
-                        ₱{item.cost.toFixed(2)}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                        {item.kwh.toFixed(2)} kWh
-                      </Typography>
+                        return (
+                          <Tooltip
+                            key={block.id}
+                            title={`${block.startTimeStr} – ${block.endTimeStr} (${block.durationHours.toFixed(1)}h • ₱${block.cost.toFixed(2)})`}
+                          >
+                            <Box
+                              onClick={() => {
+                                if (block.logId) {
+                                  setInspectingSession({ block, appliance });
+                                }
+                              }}
+                              sx={{
+                                position: "absolute",
+                                left: `${leftPct}%`,
+                                width: `${widthPct}%`,
+                                top: 3,
+                                bottom: 3,
+                                borderRadius: 1,
+                                bgcolor: isLive ? "#34d399" : "#6366f1",
+                                cursor: block.logId ? "pointer" : "default",
+                                transition: "all 0.15s",
+                                "&:hover": {
+                                  filter: "brightness(1.15)",
+                                },
+                              }}
+                            />
+                          </Tooltip>
+                        );
+                      })}
                     </Box>
                   </Paper>
                 );
@@ -698,27 +647,127 @@ export const DateAnalyticsModal: React.FC<DateAnalyticsModalProps> = ({
             </Box>
           </Box>
         )}
+
+        {/* TAB 1: ACTUAL BREAKDOWN (HATI) PIE */}
+        {activeTab === 1 && (
+          <Box sx={{ minHeight: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {daySummary.pieChartData.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                No measured stopwatch usage recorded on this day.
+              </Typography>
+            ) : (
+              <Grid container spacing={2} sx={{ alignItems: "center" }}>
+                <Grid size={{ xs: 12, sm: 6 }} sx={{ height: 260 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={daySummary.pieChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={95}
+                        paddingAngle={3}
+                      >
+                        {daySummary.pieChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Box sx={{ maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
+                    {daySummary.pieChartData.map((d) => (
+                      <Box key={d.name} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: d.color }} />
+                          <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                            {d.name}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" sx={{ fontFamily: "monospace", fontWeight: 800 }}>
+                          {d.percentage}% (₱{d.cost.toFixed(2)})
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Grid>
+              </Grid>
+            )}
+          </Box>
+        )}
       </DialogContent>
 
       <Divider />
 
-      {/* 5. Footer Actions */}
-      <DialogActions sx={{ p: 2, px: 3, display: "flex", justifyContent: "space-between" }}>
+      <DialogActions sx={{ p: 2, px: 3 }}>
         <Button variant="outlined" onClick={onClose} sx={{ borderRadius: 1.25, fontWeight: 700 }}>
           Close
         </Button>
-
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={isSaving ? undefined : <SaveIcon />}
-          onClick={handleSaveSimulation}
-          disabled={isSaving}
-          sx={{ borderRadius: 1.25, fontWeight: 800, px: 3 }}
-        >
-          {isSaving ? "Saving Simulation..." : "Save Day Simulation"}
-        </Button>
       </DialogActions>
+
+      {/* SUB-MODAL 1: Add Past Session */}
+      <Dialog open={isPastModalOpen} onClose={() => setIsPastModalOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: "1rem" }}>
+          Log Past Session: {targetPastApp?.name}
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Add a completed session if you forgot to start the stopwatch.
+          </Typography>
+          <TextField
+            label="Start Time"
+            type="time"
+            size="small"
+            value={pastStartHour}
+            onChange={(e) => setPastStartHour(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            fullWidth
+          />
+          <TextField
+            label="End Time"
+            type="time"
+            size="small"
+            value={pastEndHour}
+            onChange={(e) => setPastEndHour(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setIsPastModalOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSavePastSession}>Save Session</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* SUB-MODAL 2: Inspect / Delete Session Block */}
+      <Dialog open={Boolean(inspectingSession)} onClose={() => setInspectingSession(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: "1rem" }}>
+          Session: {inspectingSession?.appliance.name}
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              Time: {inspectingSession?.block.startTimeStr} – {inspectingSession?.block.endTimeStr}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+              Duration: {inspectingSession?.block.durationHours.toFixed(2)} hrs
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+              Consumed: {inspectingSession?.block.kwh.toFixed(3)} kWh (~₱{inspectingSession?.block.cost.toFixed(2)})
+            </Typography>
+          </Paper>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+          <Button color="error" startIcon={<DeleteIcon />} onClick={handleDeleteSession}>
+            Delete Session
+          </Button>
+          <Button onClick={() => setInspectingSession(null)}>Done</Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 };

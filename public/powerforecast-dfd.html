@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PowerForecast Refine — Complete Gane &amp; Sarson Data Flow Diagrams</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ───────── DESIGN TOKENS ───────── */
+    :root {
+      --bg-canvas: #f1f5f9;
+      --bg-sheet: #ffffff;
+      --border-sheet: #e2e8f0;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --toolbar-bg: #ffffff;
+      --toolbar-border: #e2e8f0;
+      --btn-bg: #f8fafc;
+      --btn-border: #cbd5e1;
+      --btn-text: #334155;
+      --btn-hover-bg: #e2e8f0;
+      --tab-active-bg: #2563eb;
+      --tab-active-text: #ffffff;
+      --tab-inactive-bg: #f1f5f9;
+      --tab-inactive-text: #64748b;
+      --shadow-sheet: 0 10px 25px -5px rgba(0,0,0,.08), 0 8px 10px -6px rgba(0,0,0,.04);
+    }
+    [data-theme="dark"] {
+      --bg-canvas: #0f172a;
+      --bg-sheet: #1e293b;
+      --border-sheet: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --toolbar-bg: #1e293b;
+      --toolbar-border: #334155;
+      --btn-bg: #334155;
+      --btn-border: #475569;
+      --btn-text: #e2e8f0;
+      --btn-hover-bg: #475569;
+      --tab-active-bg: #3b82f6;
+      --tab-active-text: #ffffff;
+      --tab-inactive-bg: #1e293b;
+      --tab-inactive-text: #94a3b8;
+      --shadow-sheet: 0 10px 25px -5px rgba(0,0,0,.4);
+    }
+
+    /* ───────── RESET & BASE ───────── */
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg-canvas);color:var(--text-main);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 60px;transition:background .25s,color .25s}
+
+    /* ───────── TOP BAR ───────── */
+    .top-bar{position:sticky;top:0;z-index:100;width:100%;background:var(--toolbar-bg);border-bottom:1px solid var(--toolbar-border);padding:10px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 4px rgba(0,0,0,.03)}
+    .brand-section{display:flex;align-items:center;gap:12px}
+    .brand-title{font-size:15px;font-weight:700;color:var(--text-main);display:flex;align-items:center;gap:8px}
+    .badge{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:9999px;letter-spacing:.2px}
+    .badge-method{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+    [data-theme="dark"] .badge-method{background:#1e3a8a;color:#93c5fd;border-color:#2563eb}
+    .controls-section{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;gap:5px;background:var(--btn-bg);color:var(--btn-text);border:1px solid var(--btn-border);border-radius:6px;padding:6px 10px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none;font-family:inherit}
+    .btn:hover{background:var(--btn-hover-bg);border-color:var(--text-muted)}
+    .btn-primary{background:#2563eb;color:#fff;border-color:#1d4ed8}
+    .btn-primary:hover{background:#1d4ed8}
+
+    /* ───────── TAB NAVIGATION ───────── */
+    .tab-nav{width:100%;max-width:1200px;padding:20px 20px 0;display:flex;gap:4px;flex-wrap:wrap}
+    .tab-btn{padding:8px 16px;font-size:12.5px;font-weight:600;border:1px solid var(--border-sheet);border-bottom:none;border-radius:8px 8px 0 0;background:var(--tab-inactive-bg);color:var(--tab-inactive-text);cursor:pointer;transition:all .15s;font-family:inherit}
+    .tab-btn.active{background:var(--tab-active-bg);color:var(--tab-active-text);border-color:var(--tab-active-bg)}
+    .tab-btn:hover:not(.active){background:var(--btn-hover-bg);color:var(--text-main)}
+
+    /* ───────── DOCUMENT VIEWPORT ───────── */
+    .document-viewport{width:100%;max-width:1200px;padding:0 20px}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+
+    .sheet-card{width:100%;background:var(--bg-sheet);border:1px solid var(--border-sheet);border-radius:0 8px 8px 8px;box-shadow:var(--shadow-sheet);padding:24px;position:relative;overflow:hidden}
+    .svg-container{width:100%;display:flex;justify-content:center;cursor:grab;user-select:none;overflow:hidden}
+    .svg-container:active{cursor:grabbing}
+    .svg-container svg{width:100%;height:auto;max-height:80vh;transition:transform .2s cubic-bezier(.16,1,.3,1);transform-origin:center center}
+
+    /* ───────── SPEC TABLE ───────── */
+    .docs-section{width:100%;max-width:1200px;margin-top:28px;background:var(--bg-sheet);border:1px solid var(--border-sheet);border-radius:8px;padding:28px;box-shadow:var(--shadow-sheet)}
+    .docs-header{font-size:18px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+    .docs-sub{font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.5}
+    .legend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:24px}
+    .legend-card{border:1px solid var(--border-sheet);border-radius:6px;padding:14px;background:var(--btn-bg)}
+    .legend-title{font-size:13px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+    .legend-swatch{width:13px;height:13px;border-radius:3px;display:inline-block}
+    .swatch-entity{background:#a4c2f4;border:1.5px solid #6b97c2}
+    .swatch-process{background:#fff;border:1.5px solid #6b97c2}
+    .swatch-store{background:#b8d4f8;border:1.5px solid #8e9aaf}
+    .swatch-flow{background:#c45d73}
+    .swatch-context{background:#dbeafe;border:1.5px solid #3b82f6;border-radius:50%}
+    .legend-desc{font-size:11.5px;color:var(--text-muted);line-height:1.5}
+    .spec-table{width:100%;border-collapse:collapse;font-size:12px;text-align:left;margin-top:14px}
+    .spec-table th,.spec-table td{padding:9px 12px;border-bottom:1px solid var(--border-sheet)}
+    .spec-table th{background:var(--btn-bg);font-weight:600;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+    .tag-id{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11.5px;padding:2px 6px;background:#e2e8f0;border-radius:4px;color:#334155}
+    [data-theme="dark"] .tag-id{background:#334155;color:#cbd5e1}
+
+    /* ───────── SVG SHARED STYLES ───────── */
+    .dfd-svg .title-main{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:32px;font-weight:800;fill:#222b35;letter-spacing:-.5px}
+    .dfd-svg .title-sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:14px;fill:#4a5568}
+    .dfd-svg .entity-box{fill:#a4c2f4;stroke:#6b97c2;stroke-width:1.6px}
+    .dfd-svg .entity-text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13px;font-weight:600;fill:#1c3550;text-anchor:middle}
+    .dfd-svg .proc-bg{fill:#fff;stroke:#6b97c2;stroke-width:1.6px;rx:8px;ry:8px}
+    .dfd-svg .proc-header{fill:#a4c2f4;stroke:#6b97c2;stroke-width:1.6px}
+    .dfd-svg .proc-bottom{fill:#a4c2f4;stroke:#6b97c2;stroke-width:1.6px}
+    .dfd-svg .proc-id-text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13.5px;font-weight:700;fill:#1a3652;text-anchor:middle}
+    .dfd-svg .proc-name{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13px;font-weight:600;fill:#1a202c;text-anchor:middle}
+    .dfd-svg .store-id-box{fill:#8e9aaf;stroke:#6b97c2;stroke-width:1.6px}
+    .dfd-svg .store-id-text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13px;font-weight:700;fill:#fff;text-anchor:middle}
+    .dfd-svg .store-body{fill:#b8d4f8;stroke:#6b97c2;stroke-width:1.6px}
+    .dfd-svg .store-name{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:12px;font-weight:600;fill:#1c3550;text-anchor:middle}
+    .dfd-svg .flow-line{fill:none;stroke:#c45d73;stroke-width:1.6px;stroke-linejoin:round;stroke-linecap:round}
+    .dfd-svg .flow-text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:8.8px;font-weight:700;fill:#2d3748;letter-spacing:.35px}
+    .dfd-svg .footer-text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:8px;font-weight:600;fill:#94a3b8;text-anchor:end;letter-spacing:.5px}
+    .dfd-svg .context-process{fill:#dbeafe;stroke:#3b82f6;stroke-width:2px}
+    .dfd-svg .context-text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:15px;font-weight:700;fill:#1e3a8a;text-anchor:middle}
+    .dfd-svg .context-id{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:11px;font-weight:800;fill:#3b82f6;text-anchor:middle}
+
+    /* ───────── PRINT ───────── */
+    @media print{
+      body{background:#fff!important;padding:0!important}
+      .top-bar,.tab-nav,.docs-section,.btn,.controls-section{display:none!important}
+      .document-viewport{max-width:100%!important;padding:0!important}
+      .tab-panel{display:block!important;page-break-after:always}
+      .sheet-card{border:none!important;box-shadow:none!important;padding:0!important;border-radius:0!important}
+      .svg-container svg{max-height:100vh!important;width:100%!important}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ TOP BAR ═══════════════ -->
+<header class="top-bar">
+  <div class="brand-section">
+    <span class="brand-title">⚡ PowerForecast Refine</span>
+    <span class="badge badge-method">Gane &amp; Sarson DFD v2.6</span>
+  </div>
+  <div class="controls-section">
+    <button class="btn" onclick="zoomIn()">🔍 In</button>
+    <button class="btn" onclick="zoomOut()">🔍 Out</button>
+    <button class="btn" onclick="resetView()">↺ Reset</button>
+    <button class="btn" id="btn-theme" onclick="toggleTheme()">🌓 Theme</button>
+    <a class="btn" href="powerforecast-gane-sarson-dfd.svg" download="PowerForecast-DFD-Level1.svg">📄 SVG</a>
+    <button class="btn btn-primary" onclick="window.print()">📥 Print / PDF</button>
+  </div>
+</header>
+
+<!-- ═══════════════ TAB NAVIGATION ═══════════════ -->
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('ctx')">Context Diagram (Level 0)</button>
+  <button class="tab-btn" onclick="switchTab('l1')">Level 1 DFD</button>
+  <button class="tab-btn" onclick="switchTab('l2p1')">Level 2 — Process 1</button>
+  <button class="tab-btn" onclick="switchTab('l2p2')">Level 2 — Process 2</button>
+  <button class="tab-btn" onclick="switchTab('l2p3')">Level 2 — Process 3</button>
+</nav>
+
+<!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+<main class="document-viewport">
+
+<!-- ╔══════════════════════════════════════════════════════════════╗ -->
+<!-- ║  TAB 1: CONTEXT DIAGRAM (LEVEL 0)                          ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════╝ -->
+<div class="tab-panel active" id="panel-ctx">
+<div class="sheet-card">
+<div class="svg-container" data-panel="ctx">
+<svg class="dfd-svg" viewBox="0 0 1000 720">
+  <defs>
+    <marker id="a0" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 1.5L8 5 0 8.5z" fill="#c45d73"/></marker>
+    <filter id="sh0" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity=".06"/></filter>
+  </defs>
+  <!-- Canvas -->
+  <rect width="1000" height="720" fill="#f8fafc"/>
+  <rect x="20" y="20" width="960" height="680" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh0)"/>
+
+  <!-- Header -->
+  <text x="500" y="62" class="title-main" text-anchor="middle" font-size="28">Context Diagram (Level 0)</text>
+  <text x="500" y="86" class="title-sub" text-anchor="middle">PowerForecast Refine — Showing the system boundary and all external entities.</text>
+
+  <!-- Central Process 0 -->
+  <circle cx="500" cy="380" r="90" class="context-process"/>
+  <text x="500" y="370" class="context-text">PowerForecast</text>
+  <text x="500" y="392" class="context-text">Refine System</text>
+  <text x="500" y="415" class="context-id">0</text>
+
+  <!-- Entity: User / Consumer (Left) -->
+  <rect x="50" y="250" width="160" height="52" class="entity-box" rx="3"/>
+  <text x="130" y="281" class="entity-text">User / Consumer</text>
+
+  <!-- Entity: Gemini Vision AI (Top-Left) -->
+  <rect x="170" y="110" width="165" height="48" class="entity-box" rx="3"/>
+  <text x="252" y="139" class="entity-text">Gemini Vision AI</text>
+
+  <!-- Entity: DOE PELP Registry (Top-Right) -->
+  <rect x="660" y="110" width="165" height="48" class="entity-box" rx="3"/>
+  <text x="742" y="139" class="entity-text">DOE PELP Registry</text>
+
+  <!-- Entity: Electric Utility (Bottom-Left) -->
+  <rect x="50" y="490" width="175" height="52" class="entity-box" rx="3"/>
+  <text x="137" y="514" class="entity-text">Electric Utility</text>
+  <text x="137" y="530" class="entity-text" font-size="11">(Meralco)</text>
+
+  <!-- Entity: Notification Service (Right) -->
+  <rect x="760" y="340" width="175" height="52" class="entity-box" rx="3"/>
+  <text x="847" y="363" class="entity-text">Notification Service</text>
+  <text x="847" y="379" class="entity-text" font-size="11">(Resend &amp; Web Push)</text>
+
+  <!-- FLOWS -->
+  <!-- User -> System -->
+  <line x1="210" y1="265" x2="415" y2="340" class="flow-line" marker-end="url(#a0)"/>
+  <text x="260" y="278" class="flow-text">APPLIANCE SPECS, PHOTOS, ROUTINES,</text>
+  <text x="260" y="289" class="flow-text">STOPWATCH LOGS, ACTUAL UTILITY BILL</text>
+
+  <!-- System -> User -->
+  <line x1="415" y1="395" x2="210" y2="290" class="flow-line" marker-end="url(#a0)"/>
+  <text x="230" y="365" class="flow-text">ONBOARDING CONFIRMATION, ITEMIZED</text>
+  <text x="230" y="376" class="flow-text">ERC BILL, 24H LOAD CURVE, MAPE SCORE</text>
+
+  <!-- Gemini -> System -->
+  <line x1="310" y1="158" x2="460" y2="300" class="flow-line" marker-end="url(#a0)"/>
+  <text x="330" y="195" class="flow-text">OCR EXTRACTED SPECS</text>
+  <text x="330" y="206" class="flow-text">(WATTS, MODEL, VOLTS)</text>
+
+  <!-- DOE PELP -> System -->
+  <line x1="695" y1="158" x2="545" y2="300" class="flow-line" marker-end="url(#a0)"/>
+  <text x="610" y="195" class="flow-text">CERTIFIED CSPF</text>
+  <text x="610" y="206" class="flow-text">EFFICIENCY RATINGS</text>
+
+  <!-- Utility -> System -->
+  <line x1="225" y1="505" x2="425" y2="435" class="flow-line" marker-end="url(#a0)"/>
+  <text x="238" y="498" class="flow-text">UNBUNDLED TARIFF SCHEDULES</text>
+
+  <!-- System -> Utility -->
+  <line x1="425" y1="450" x2="225" y2="525" class="flow-line" marker-end="url(#a0)"/>
+  <text x="238" y="518" class="flow-text" transform="translate(0,30)">ESTIMATED GRID DEMAND</text>
+
+  <!-- System -> Notification -->
+  <line x1="588" y1="365" x2="752" y2="365" class="flow-line" marker-end="url(#a0)"/>
+  <text x="605" y="358" class="flow-text">BUDGET &amp; PEAK ALERTS,</text>
+  <text x="605" y="369" class="flow-text">TRANSACTIONAL DIGESTS</text>
+
+  <!-- Footer -->
+  <text x="950" y="682" class="footer-text">© 2026 POWERFORECAST REFINE — CONTEXT DIAGRAM (LEVEL 0)</text>
+</svg>
+</div></div></div>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗ -->
+<!-- ║  TAB 2: LEVEL 1 DFD                                        ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════╝ -->
+<div class="tab-panel" id="panel-l1">
+<div class="sheet-card">
+<div class="svg-container" data-panel="l1">
+<svg class="dfd-svg" viewBox="0 0 1120 1140">
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 1.5L8 5 0 8.5z" fill="#c45d73"/></marker>
+    <filter id="sh1" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity=".06"/></filter>
+  </defs>
+  <rect width="1120" height="1140" fill="#f8fafc"/>
+  <rect x="25" y="25" width="1070" height="1090" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh1)"/>
+
+  <text x="560" y="72" class="title-main" text-anchor="middle">Level 1 Data Flow Diagram</text>
+  <text x="560" y="100" class="title-sub" text-anchor="middle">Using the Gane &amp; Sarson method — PowerForecast Refine information system.</text>
+
+  <!-- ENTITIES -->
+  <g><rect x="450" y="130" width="170" height="48" class="entity-box" rx="3"/><text x="535" y="159" class="entity-text">Gemini Vision AI</text></g>
+  <g><rect x="670" y="130" width="170" height="48" class="entity-box" rx="3"/><text x="755" y="159" class="entity-text">DOE PELP Registry</text></g>
+  <g><rect x="85" y="215" width="165" height="52" class="entity-box" rx="3"/><text x="167" y="246" class="entity-text">User / Consumer</text></g>
+  <g><rect x="830" y="365" width="175" height="52" class="entity-box" rx="3"/><text x="917" y="388" class="entity-text">Notification Service</text><text x="917" y="405" class="entity-text" font-size="11">(Resend &amp; Web Push)</text></g>
+  <g><rect x="85" y="525" width="165" height="52" class="entity-box" rx="3"/><text x="167" y="556" class="entity-text">Electric Utility (Meralco)</text></g>
+
+  <!-- PROCESS 1 -->
+  <g>
+    <rect x="440" y="270" width="190" height="96" class="proc-bg"/>
+    <path d="M440 278A8 8 0 01 448 270H622A8 8 0 01 630 278V295H440Z" class="proc-header"/>
+    <rect x="440" y="270" width="30" height="25" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="455" y="287" class="proc-id-text">1</text>
+    <path d="M440 357H630V358A8 8 0 01 622 366H448A8 8 0 01 440 358Z" class="proc-bottom"/>
+    <text x="535" y="325" class="proc-name">Appliance Ingestion</text>
+    <text x="535" y="343" class="proc-name">&amp; Specification System</text>
+  </g>
+
+  <!-- PROCESS 2 -->
+  <g>
+    <rect x="440" y="515" width="190" height="96" class="proc-bg"/>
+    <path d="M440 523A8 8 0 01 448 515H622A8 8 0 01 630 523V540H440Z" class="proc-header"/>
+    <rect x="440" y="515" width="30" height="25" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="455" y="532" class="proc-id-text">2</text>
+    <path d="M440 602H630V603A8 8 0 01 622 611H448A8 8 0 01 440 603Z" class="proc-bottom"/>
+    <text x="535" y="567" class="proc-name">Daily Usage &amp; Smart</text>
+    <text x="535" y="585" class="proc-name">Calendar Control System</text>
+  </g>
+
+  <!-- PROCESS 3 -->
+  <g>
+    <rect x="440" y="780" width="190" height="96" class="proc-bg"/>
+    <path d="M440 788A8 8 0 01 448 780H622A8 8 0 01 630 788V805H440Z" class="proc-header"/>
+    <rect x="440" y="780" width="30" height="25" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="455" y="797" class="proc-id-text">3</text>
+    <path d="M440 867H630V868A8 8 0 01 622 876H448A8 8 0 01 440 868Z" class="proc-bottom"/>
+    <text x="535" y="832" class="proc-name">Energy Modeling &amp;</text>
+    <text x="535" y="850" class="proc-name">Accuracy Reconciliation</text>
+  </g>
+
+  <!-- DATA STORES -->
+  <g><rect x="790" y="295" width="36" height="46" class="store-id-box"/><text x="808" y="323" class="store-id-text">D</text><rect x="826" y="295" width="170" height="46" class="store-body"/><text x="911" y="323" class="store-name">User Profiles &amp; Cache</text></g>
+  <g><rect x="85" y="380" width="36" height="46" class="store-id-box"/><text x="103" y="408" class="store-id-text">D</text><rect x="121" y="380" width="160" height="46" class="store-body"/><text x="201" y="408" class="store-name">Appliance Catalog Specs</text></g>
+  <g><rect x="205" y="650" width="36" height="46" class="store-id-box"/><text x="223" y="678" class="store-id-text">D</text><rect x="241" y="650" width="145" height="46" class="store-body"/><text x="313" y="678" class="store-name">Appliance Inventory</text></g>
+  <g><rect x="440" y="650" width="36" height="46" class="store-id-box"/><text x="458" y="678" class="store-id-text">D</text><rect x="476" y="650" width="154" height="46" class="store-body"/><text x="553" y="678" class="store-name">Daily Usage Logs</text></g>
+  <g><rect x="675" y="650" width="36" height="46" class="store-id-box"/><text x="693" y="678" class="store-id-text">D</text><rect x="711" y="650" width="145" height="46" class="store-body"/><text x="783" y="678" class="store-name">Tariff Matrix</text></g>
+  <g><rect x="210" y="930" width="36" height="46" class="store-id-box"/><text x="228" y="958" class="store-id-text">D</text><rect x="246" y="930" width="180" height="46" class="store-body"/><text x="336" y="958" class="store-name">Reconciled Metrics (MAPE)</text></g>
+  <g><rect x="645" y="930" width="36" height="46" class="store-id-box"/><text x="663" y="958" class="store-id-text">D</text><rect x="681" y="930" width="180" height="46" class="store-body"/><text x="771" y="958" class="store-name">Unbundled Bill Records</text></g>
+
+  <!-- FLOWS -->
+  <line x1="250" y1="230" x2="432" y2="230" class="flow-line"/><line x1="432" y1="230" x2="432" y2="280" class="flow-line" marker-end="url(#a1)"/>
+  <text x="270" y="223" class="flow-text">APPLIANCE SPECS &amp; PHOTOS</text>
+
+  <path d="M440 320L290 320 290 255 258 255" class="flow-line" marker-end="url(#a1)"/>
+  <text x="270" y="313" class="flow-text">ONBOARDING CONFIRMATION</text>
+
+  <line x1="510" y1="178" x2="510" y2="262" class="flow-line" marker-end="url(#a1)"/>
+  <text x="502" y="225" class="flow-text" text-anchor="end">OCR EXTRACTED SPECS</text>
+
+  <path d="M740 178 740 220 570 220 570 262" class="flow-line" marker-end="url(#a1)"/>
+  <text x="610" y="213" class="flow-text">CERTIFIED CSPF RATINGS</text>
+
+  <line x1="630" y1="318" x2="782" y2="318" class="flow-line" marker-end="url(#a1)"/>
+  <text x="645" y="311" class="flow-text">USER PROFILE &amp; PREFERENCES</text>
+
+  <path d="M440 350 330 350 330 403 289 403" class="flow-line" marker-end="url(#a1)"/>
+  <text x="338" y="380" class="flow-text">CATALOG SPECS</text>
+
+  <line x1="535" y1="366" x2="535" y2="507" class="flow-line" marker-end="url(#a1)"/>
+  <text x="543" y="445" class="flow-text">RATED WATTAGE &amp; DUTY ATTRIBUTES</text>
+
+  <path d="M210 267 210 340 380 340 380 500 432 500" class="flow-line" marker-end="url(#a1)"/>
+  <text x="220" y="333" class="flow-text">DAILY ROUTINES &amp; STOPWATCH LOGS</text>
+
+  <line x1="250" y1="540" x2="432" y2="540" class="flow-line" marker-end="url(#a1)"/>
+  <text x="260" y="533" class="flow-text">MERALCO TARIFF RATES</text>
+
+  <line x1="440" y1="565" x2="258" y2="565" class="flow-line" marker-end="url(#a1)"/>
+  <text x="260" y="580" class="flow-text">ESTIMATED GRID DEMAND</text>
+
+  <path d="M630 550 800 550 800 395 822 395" class="flow-line" marker-end="url(#a1)"/>
+  <text x="645" y="543" class="flow-text">BUDGET &amp; PEAK ALERTS</text>
+
+  <path d="M917 365 917 115 60 115 60 240 77 240" class="flow-line" marker-end="url(#a1)"/>
+  <text x="490" y="110" class="flow-text" text-anchor="middle">TRANSACTIONAL NOTIFICATIONS &amp; DISPATCHED DIGESTS</text>
+
+  <path d="M480 611 480 632 315 632 315 642" class="flow-line" marker-end="url(#a1)"/>
+  <text x="325" y="627" class="flow-text">REGISTERED APPLIANCES</text>
+
+  <line x1="535" y1="611" x2="535" y2="642" class="flow-line" marker-end="url(#a1)"/>
+  <text x="543" y="632" class="flow-text">DAILY KWH LOGS</text>
+
+  <path d="M590 611 590 632 770 632 770 642" class="flow-line" marker-end="url(#a1)"/>
+  <text x="635" y="627" class="flow-text">RATE TIERS &amp; VAT</text>
+
+  <line x1="535" y1="696" x2="535" y2="772" class="flow-line" marker-end="url(#a1)"/>
+  <text x="543" y="742" class="flow-text">CONSOLIDATED 24H LOAD PROFILE</text>
+
+  <path d="M140 267 140 360 360 360 360 760 432 760" class="flow-line" marker-end="url(#a1)"/>
+  <text x="148" y="353" class="flow-text">ACTUAL UTILITY BILL (KWH &amp; CHARGES)</text>
+
+  <path d="M480 876 480 905 336 905 336 922" class="flow-line" marker-end="url(#a1)"/>
+  <text x="345" y="900" class="flow-text">MAPE SCORE &amp; PHANTOM BUFFER</text>
+
+  <path d="M590 876 590 905 755 905 755 922" class="flow-line" marker-end="url(#a1)"/>
+  <text x="625" y="900" class="flow-text">7-PART UNBUNDLED RECORDS</text>
+
+  <path d="M440 825 48 825 48 250 77 250" class="flow-line" marker-end="url(#a1)"/>
+  <text x="56" y="818" class="flow-text">ITEMIZED ERC BILL &amp; 24H LOAD CURVE</text>
+
+  <path d="M440 850 35 850 35 230 77 230" class="flow-line" marker-end="url(#a1)"/>
+  <text x="43" y="843" class="flow-text">MAPE ACCURACY VALIDATION (≥90%)</text>
+
+  <text x="1065" y="1092" class="footer-text">© 2026 POWERFORECAST REFINE — LEVEL 1 DFD</text>
+</svg>
+</div></div></div>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗ -->
+<!-- ║  TAB 3: LEVEL 2 — PROCESS 1 DECOMPOSITION                 ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════╝ -->
+<div class="tab-panel" id="panel-l2p1">
+<div class="sheet-card">
+<div class="svg-container" data-panel="l2p1">
+<svg class="dfd-svg" viewBox="0 0 1060 820">
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 1.5L8 5 0 8.5z" fill="#c45d73"/></marker>
+    <filter id="sh2" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity=".06"/></filter>
+  </defs>
+  <rect width="1060" height="820" fill="#f8fafc"/>
+  <rect x="20" y="20" width="1020" height="780" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh2)"/>
+
+  <text x="530" y="62" class="title-main" text-anchor="middle" font-size="26">Level 2 DFD — Process 1 Decomposition</text>
+  <text x="530" y="86" class="title-sub" text-anchor="middle">Appliance Ingestion &amp; Specification System — Sub-process detail.</text>
+
+  <!-- External Entities -->
+  <g><rect x="55" y="200" width="155" height="48" class="entity-box" rx="3"/><text x="132" y="229" class="entity-text">User / Consumer</text></g>
+  <g><rect x="55" y="400" width="155" height="48" class="entity-box" rx="3"/><text x="132" y="429" class="entity-text">Gemini Vision AI</text></g>
+  <g><rect x="55" y="560" width="155" height="48" class="entity-box" rx="3"/><text x="132" y="589" class="entity-text">DOE PELP Registry</text></g>
+
+  <!-- Sub-Process 1.1 -->
+  <g>
+    <rect x="310" y="170" width="200" height="88" class="proc-bg"/>
+    <path d="M310 178A8 8 0 01 318 170H502A8 8 0 01 510 178V192H310Z" class="proc-header"/>
+    <rect x="310" y="170" width="34" height="22" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="327" y="186" class="proc-id-text" font-size="12">1.1</text>
+    <path d="M310 249H510V250A8 8 0 01 502 258H318A8 8 0 01 310 250Z" class="proc-bottom"/>
+    <text x="410" y="220" class="proc-name">Photo Capture &amp;</text>
+    <text x="410" y="236" class="proc-name">Upload Interface</text>
+  </g>
+
+  <!-- Sub-Process 1.2 -->
+  <g>
+    <rect x="310" y="370" width="200" height="88" class="proc-bg"/>
+    <path d="M310 378A8 8 0 01 318 370H502A8 8 0 01 510 378V392H310Z" class="proc-header"/>
+    <rect x="310" y="370" width="34" height="22" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="327" y="386" class="proc-id-text" font-size="12">1.2</text>
+    <path d="M310 449H510V450A8 8 0 01 502 458H318A8 8 0 01 310 450Z" class="proc-bottom"/>
+    <text x="410" y="420" class="proc-name">Gemini Vision</text>
+    <text x="410" y="436" class="proc-name">OCR Parsing</text>
+  </g>
+
+  <!-- Sub-Process 1.3 -->
+  <g>
+    <rect x="310" y="540" width="200" height="88" class="proc-bg"/>
+    <path d="M310 548A8 8 0 01 318 540H502A8 8 0 01 510 548V562H310Z" class="proc-header"/>
+    <rect x="310" y="540" width="34" height="22" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="327" y="556" class="proc-id-text" font-size="12">1.3</text>
+    <path d="M310 619H510V620A8 8 0 01 502 628H318A8 8 0 01 310 620Z" class="proc-bottom"/>
+    <text x="410" y="590" class="proc-name">DOE CSPF</text>
+    <text x="410" y="606" class="proc-name">Cross-Validation</text>
+  </g>
+
+  <!-- Sub-Process 1.4 -->
+  <g>
+    <rect x="310" y="700" width="200" height="80" class="proc-bg"/>
+    <path d="M310 708A8 8 0 01 318 700H502A8 8 0 01 510 708V720H310Z" class="proc-header"/>
+    <rect x="310" y="700" width="34" height="20" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="327" y="714" class="proc-id-text" font-size="12">1.4</text>
+    <path d="M310 771H510V772A8 8 0 01 502 780H318A8 8 0 01 310 772Z" class="proc-bottom"/>
+    <text x="410" y="748" class="proc-name">Catalog Storage &amp; Onboarding</text>
+  </g>
+
+  <!-- Data Stores -->
+  <g><rect x="700" y="220" width="36" height="42" class="store-id-box"/><text x="718" y="246" class="store-id-text">D</text><rect x="736" y="220" width="170" height="42" class="store-body"/><text x="821" y="246" class="store-name">User Profiles &amp; Cache</text></g>
+  <g><rect x="700" y="570" width="36" height="42" class="store-id-box"/><text x="718" y="596" class="store-id-text">D</text><rect x="736" y="570" width="170" height="42" class="store-body"/><text x="821" y="596" class="store-name">Appliance Catalog Specs</text></g>
+
+  <!-- Flows -->
+  <line x1="210" y1="215" x2="302" y2="215" class="flow-line" marker-end="url(#a2)"/>
+  <text x="218" y="208" class="flow-text">NAMEPLATE PHOTOS &amp; MANUAL SPECS</text>
+
+  <line x1="410" y1="258" x2="410" y2="362" class="flow-line" marker-end="url(#a2)"/>
+  <text x="418" y="315" class="flow-text">RAW IMAGE DATA</text>
+
+  <line x1="210" y1="424" x2="302" y2="414" class="flow-line" marker-end="url(#a2)"/>
+  <text x="218" y="440" class="flow-text">OCR RESPONSE (WATTS, MODEL)</text>
+
+  <line x1="410" y1="458" x2="410" y2="532" class="flow-line" marker-end="url(#a2)"/>
+  <text x="418" y="498" class="flow-text">PARSED SPEC ATTRIBUTES</text>
+
+  <line x1="210" y1="584" x2="302" y2="584" class="flow-line" marker-end="url(#a2)"/>
+  <text x="218" y="577" class="flow-text">CSPF CERTIFIED RATINGS</text>
+
+  <line x1="410" y1="628" x2="410" y2="692" class="flow-line" marker-end="url(#a2)"/>
+  <text x="418" y="665" class="flow-text">VALIDATED &amp; ENRICHED SPECS</text>
+
+  <path d="M510 230 620 230 620 241 692 241" class="flow-line" marker-end="url(#a2)"/>
+  <text x="540" y="224" class="flow-text">USER ONBOARDING STATE</text>
+
+  <path d="M510 740 620 740 620 591 692 591" class="flow-line" marker-end="url(#a2)"/>
+  <text x="540" y="735" class="flow-text">CATALOG RECORD</text>
+
+  <!-- Output to Process 2 (dashed boundary arrow) -->
+  <line x1="410" y1="780" x2="410" y2="800" class="flow-line" stroke-dasharray="4,3"/>
+  <text x="418" y="798" class="flow-text" fill="#3b82f6">→ TO PROCESS 2: RATED WATTAGE &amp; DUTY ATTRIBUTES</text>
+
+  <!-- Return to User -->
+  <path d="M310 750 130 750 130 256" class="flow-line" marker-end="url(#a2)"/>
+  <text x="138" y="685" class="flow-text">ONBOARDING CONFIRMATION</text>
+
+  <text x="1010" y="790" class="footer-text">LEVEL 2 — PROCESS 1 DECOMPOSITION</text>
+</svg>
+</div></div></div>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗ -->
+<!-- ║  TAB 4: LEVEL 2 — PROCESS 2 DECOMPOSITION                 ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════╝ -->
+<div class="tab-panel" id="panel-l2p2">
+<div class="sheet-card">
+<div class="svg-container" data-panel="l2p2">
+<svg class="dfd-svg" viewBox="0 0 1060 900">
+  <defs>
+    <marker id="a3" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 1.5L8 5 0 8.5z" fill="#c45d73"/></marker>
+    <filter id="sh3" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity=".06"/></filter>
+  </defs>
+  <rect width="1060" height="900" fill="#f8fafc"/>
+  <rect x="20" y="20" width="1020" height="860" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh3)"/>
+
+  <text x="530" y="62" class="title-main" text-anchor="middle" font-size="26">Level 2 DFD — Process 2 Decomposition</text>
+  <text x="530" y="86" class="title-sub" text-anchor="middle">Daily Usage &amp; Smart Calendar Control System — Sub-process detail.</text>
+
+  <!-- External Entities -->
+  <g><rect x="55" y="150" width="155" height="48" class="entity-box" rx="3"/><text x="132" y="179" class="entity-text">User / Consumer</text></g>
+  <g><rect x="55" y="520" width="175" height="48" class="entity-box" rx="3"/><text x="142" y="544" class="entity-text">Electric Utility</text><text x="142" y="558" class="entity-text" font-size="11">(Meralco)</text></g>
+  <g><rect x="810" y="150" width="175" height="48" class="entity-box" rx="3"/><text x="897" y="172" class="entity-text">Notification Service</text><text x="897" y="186" class="entity-text" font-size="11">(Resend &amp; Web Push)</text></g>
+
+  <!-- Sub-Process 2.1 -->
+  <g>
+    <rect x="310" y="130" width="200" height="80" class="proc-bg"/>
+    <path d="M310 138A8 8 0 01 318 130H502A8 8 0 01 510 138V150H310Z" class="proc-header"/>
+    <rect x="310" y="130" width="34" height="20" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="327" y="144" class="proc-id-text" font-size="12">2.1</text>
+    <path d="M310 201H510V202A8 8 0 01 502 210H318A8 8 0 01 310 202Z" class="proc-bottom"/>
+    <text x="410" y="178" class="proc-name">Stopwatch &amp; Timer</text>
+    <text x="410" y="194" class="proc-name">Usage Tracker</text>
+  </g>
+
+  <!-- Sub-Process 2.2 -->
+  <g>
+    <rect x="310" y="280" width="200" height="80" class="proc-bg"/>
+    <path d="M310 288A8 8 0 01 318 280H502A8 8 0 01 510 288V300H310Z" class="proc-header"/>
+    <rect x="310" y="280" width="34" height="20" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="327" y="294" class="proc-id-text" font-size="12">2.2</text>
+    <path d="M310 351H510V352A8 8 0 01 502 360H318A8 8 0 01 310 352Z" class="proc-bottom"/>
+    <text x="410" y="328" class="proc-name">Smart Calendar</text>
+    <text x="410" y="344" class="proc-name">Schedule Manager</text>
+  </g>
+
+  <!-- Sub-Process 2.3 -->
+  <g>
+    <rect x="310" y="490" width="200" height="88" class="proc-bg"/>
+    <path d="M310 498A8 8 0 01 318 490H502A8 8 0 01 510 498V512H310Z" class="proc-header"/>
+    <rect x="310" y="490" width="34" height="22" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="327" y="506" class="proc-id-text" font-size="12">2.3</text>
+    <path d="M310 569H510V570A8 8 0 01 502 578H318A8 8 0 01 310 570Z" class="proc-bottom"/>
+    <text x="410" y="540" class="proc-name">kWh Computation &amp;</text>
+    <text x="410" y="556" class="proc-name">Load Profiling Engine</text>
+  </g>
+
+  <!-- Sub-Process 2.4 -->
+  <g>
+    <rect x="620" y="320" width="200" height="80" class="proc-bg"/>
+    <path d="M620 328A8 8 0 01 628 320H812A8 8 0 01 820 328V340H620Z" class="proc-header"/>
+    <rect x="620" y="320" width="34" height="20" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="637" y="334" class="proc-id-text" font-size="12">2.4</text>
+    <path d="M620 391H820V392A8 8 0 01 812 400H628A8 8 0 01 620 392Z" class="proc-bottom"/>
+    <text x="720" y="368" class="proc-name">Budget &amp; Peak</text>
+    <text x="720" y="384" class="proc-name">Alert Monitor</text>
+  </g>
+
+  <!-- Data Stores -->
+  <g><rect x="120" y="680" width="36" height="42" class="store-id-box"/><text x="138" y="706" class="store-id-text">D</text><rect x="156" y="680" width="145" height="42" class="store-body"/><text x="228" y="706" class="store-name">Appliance Inventory</text></g>
+  <g><rect x="380" y="680" width="36" height="42" class="store-id-box"/><text x="398" y="706" class="store-id-text">D</text><rect x="416" y="680" width="140" height="42" class="store-body"/><text x="486" y="706" class="store-name">Daily Usage Logs</text></g>
+  <g><rect x="640" y="680" width="36" height="42" class="store-id-box"/><text x="658" y="706" class="store-id-text">D</text><rect x="676" y="680" width="140" height="42" class="store-body"/><text x="746" y="706" class="store-name">Tariff Matrix</text></g>
+
+  <!-- Flows -->
+  <!-- From Process 1 (input boundary) -->
+  <line x1="410" y1="110" x2="410" y2="122" class="flow-line" stroke-dasharray="4,3" marker-end="url(#a3)"/>
+  <text x="418" y="108" class="flow-text" fill="#3b82f6">FROM PROCESS 1: RATED WATTAGE &amp; DUTY ATTRIBUTES</text>
+
+  <!-- User -> 2.1 -->
+  <line x1="210" y1="165" x2="302" y2="165" class="flow-line" marker-end="url(#a3)"/>
+  <text x="218" y="158" class="flow-text">STOPWATCH TOGGLES &amp; TIMER INPUTS</text>
+
+  <!-- User -> 2.2 -->
+  <path d="M170 198 170 310 302 310" class="flow-line" marker-end="url(#a3)"/>
+  <text x="178" y="268" class="flow-text">CALENDAR EVENTS &amp; SCHEDULES</text>
+
+  <!-- 2.1 -> D: Usage Logs -->
+  <path d="M410 210 410 240 486 240 486 672" class="flow-line" marker-end="url(#a3)"/>
+  <text x="420" y="238" class="flow-text">TIMED USAGE RECORDS</text>
+
+  <!-- 2.2 -> D: Usage Logs -->
+  <path d="M410 360 410 420 460 420 460 672" class="flow-line" marker-end="url(#a3)"/>
+  <text x="418" y="413" class="flow-text">SCHEDULED USAGE PROJECTIONS</text>
+
+  <!-- D: Appliance Inventory -> 2.3 -->
+  <path d="M228 680 228 534 302 534" class="flow-line" marker-end="url(#a3)"/>
+  <text x="234" y="630" class="flow-text">APPLIANCE LOAD PROFILES</text>
+
+  <!-- D: Usage Logs -> 2.3 -->
+  <line x1="486" y1="680" x2="486" y2="578" class="flow-line" marker-end="url(#a3)"/>
+  <text x="494" y="640" class="flow-text">DAILY USAGE DATA</text>
+
+  <!-- Meralco -> 2.3 -->
+  <line x1="230" y1="544" x2="302" y2="534" class="flow-line" marker-end="url(#a3)"/>
+  <text x="238" y="558" class="flow-text">TARIFF RATE SCHEDULES</text>
+
+  <!-- 2.3 -> D: Tariff Matrix -->
+  <path d="M510 550 580 550 580 701 668 701" class="flow-line" marker-end="url(#a3)"/>
+  <text x="518" y="543" class="flow-text">COMPUTED RATE TIERS &amp; VAT</text>
+
+  <!-- 2.3 -> 2.4 -->
+  <path d="M510 520 580 520 580 365 612 365" class="flow-line" marker-end="url(#a3)"/>
+  <text x="518" y="513" class="flow-text">HOURLY KWH &amp; COST ESTIMATES</text>
+
+  <!-- 2.4 -> Notification Service -->
+  <line x1="820" y1="350" x2="820" y2="198" class="flow-line" marker-end="url(#a3)"/>
+  <text x="828" y="270" class="flow-text">BUDGET THRESHOLD</text>
+  <text x="828" y="281" class="flow-text">&amp; PEAK ALERTS</text>
+
+  <!-- Output to Process 3 (boundary) -->
+  <line x1="410" y1="578" x2="410" y2="620" class="flow-line"/>
+  <text x="418" y="610" class="flow-text" fill="#3b82f6">→ TO PROCESS 3:</text>
+  <text x="418" y="621" class="flow-text" fill="#3b82f6">AGGREGATED 24H LOAD PROFILE</text>
+
+  <text x="1010" y="868" class="footer-text">LEVEL 2 — PROCESS 2 DECOMPOSITION</text>
+</svg>
+</div></div></div>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗ -->
+<!-- ║  TAB 5: LEVEL 2 — PROCESS 3 DECOMPOSITION                 ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════╝ -->
+<div class="tab-panel" id="panel-l2p3">
+<div class="sheet-card">
+<div class="svg-container" data-panel="l2p3">
+<svg class="dfd-svg" viewBox="0 0 1060 820">
+  <defs>
+    <marker id="a4" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 1.5L8 5 0 8.5z" fill="#c45d73"/></marker>
+    <filter id="sh4" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity=".06"/></filter>
+  </defs>
+  <rect width="1060" height="820" fill="#f8fafc"/>
+  <rect x="20" y="20" width="1020" height="780" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh4)"/>
+
+  <text x="530" y="62" class="title-main" text-anchor="middle" font-size="26">Level 2 DFD — Process 3 Decomposition</text>
+  <text x="530" y="86" class="title-sub" text-anchor="middle">Energy Modeling &amp; Accuracy Reconciliation — Sub-process detail.</text>
+
+  <!-- External Entity -->
+  <g><rect x="55" y="420" width="155" height="48" class="entity-box" rx="3"/><text x="132" y="449" class="entity-text">User / Consumer</text></g>
+
+  <!-- Sub-Process 3.1 -->
+  <g>
+    <rect x="350" y="140" width="210" height="80" class="proc-bg"/>
+    <path d="M350 148A8 8 0 01 358 140H552A8 8 0 01 560 148V160H350Z" class="proc-header"/>
+    <rect x="350" y="140" width="34" height="20" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="367" y="154" class="proc-id-text" font-size="12">3.1</text>
+    <path d="M350 211H560V212A8 8 0 01 552 220H358A8 8 0 01 350 212Z" class="proc-bottom"/>
+    <text x="455" y="188" class="proc-name">Load Aggregation &amp;</text>
+    <text x="455" y="204" class="proc-name">24-Hour Curve Builder</text>
+  </g>
+
+  <!-- Sub-Process 3.2 -->
+  <g>
+    <rect x="350" y="330" width="210" height="88" class="proc-bg"/>
+    <path d="M350 338A8 8 0 01 358 330H552A8 8 0 01 560 338V352H350Z" class="proc-header"/>
+    <rect x="350" y="330" width="34" height="22" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="367" y="346" class="proc-id-text" font-size="12">3.2</text>
+    <path d="M350 409H560V410A8 8 0 01 552 418H358A8 8 0 01 350 410Z" class="proc-bottom"/>
+    <text x="455" y="380" class="proc-name">ERC 7-Part Unbundled</text>
+    <text x="455" y="396" class="proc-name">Charge Calculator</text>
+  </g>
+
+  <!-- Sub-Process 3.3 -->
+  <g>
+    <rect x="350" y="530" width="210" height="88" class="proc-bg"/>
+    <path d="M350 538A8 8 0 01 358 530H552A8 8 0 01 560 538V552H350Z" class="proc-header"/>
+    <rect x="350" y="530" width="34" height="22" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3"/>
+    <text x="367" y="546" class="proc-id-text" font-size="12">3.3</text>
+    <path d="M350 609H560V610A8 8 0 01 552 618H358A8 8 0 01 350 610Z" class="proc-bottom"/>
+    <text x="455" y="580" class="proc-name">MAPE Accuracy</text>
+    <text x="455" y="596" class="proc-name">Reconciliation Engine</text>
+  </g>
+
+  <!-- Data Stores -->
+  <g><rect x="740" y="200" width="36" height="42" class="store-id-box"/><text x="758" y="226" class="store-id-text">D</text><rect x="776" y="200" width="140" height="42" class="store-body"/><text x="846" y="226" class="store-name">Tariff Matrix</text></g>
+  <g><rect x="740" y="480" width="36" height="42" class="store-id-box"/><text x="758" y="506" class="store-id-text">D</text><rect x="776" y="480" width="170" height="42" class="store-body"/><text x="861" y="506" class="store-name">Unbundled Bill Records</text></g>
+  <g><rect x="740" y="600" width="36" height="42" class="store-id-box"/><text x="758" y="626" class="store-id-text">D</text><rect x="776" y="600" width="180" height="42" class="store-body"/><text x="866" y="626" class="store-name">Reconciled Metrics (MAPE)</text></g>
+
+  <!-- Flows -->
+  <!-- Input from Process 2 (boundary) -->
+  <line x1="455" y1="110" x2="455" y2="132" class="flow-line" stroke-dasharray="4,3" marker-end="url(#a4)"/>
+  <text x="463" y="108" class="flow-text" fill="#3b82f6">FROM PROCESS 2: CONSOLIDATED 24H LOAD PROFILE</text>
+
+  <!-- 3.1 -> 3.2 -->
+  <line x1="455" y1="220" x2="455" y2="322" class="flow-line" marker-end="url(#a4)"/>
+  <text x="463" y="275" class="flow-text">24-HOUR LOAD CURVE DATA</text>
+
+  <!-- D: Tariff Matrix -> 3.2 -->
+  <path d="M740 221 630 221 630 365 568 365" class="flow-line" marker-end="url(#a4)"/>
+  <text x="640" y="214" class="flow-text">UNBUNDLED RATE TIERS</text>
+
+  <!-- 3.2 -> D: Unbundled Bill Records -->
+  <path d="M560 390 650 390 650 501 732 501" class="flow-line" marker-end="url(#a4)"/>
+  <text x="568" y="383" class="flow-text">7-PART ITEMIZED CHARGES</text>
+
+  <!-- 3.2 -> 3.3 -->
+  <line x1="455" y1="418" x2="455" y2="522" class="flow-line" marker-end="url(#a4)"/>
+  <text x="463" y="475" class="flow-text">COMPUTED BILL TOTAL</text>
+
+  <!-- User -> 3.3 (Actual Bill) -->
+  <line x1="210" y1="444" x2="342" y2="560" class="flow-line" marker-end="url(#a4)"/>
+  <text x="218" y="478" class="flow-text">ACTUAL MERALCO BILL</text>
+  <text x="218" y="489" class="flow-text">(KWH &amp; PESO AMOUNT)</text>
+
+  <!-- 3.3 -> D: Reconciled Metrics -->
+  <path d="M560 580 650 580 650 621 732 621" class="flow-line" marker-end="url(#a4)"/>
+  <text x="568" y="573" class="flow-text">MAPE SCORE &amp; PHANTOM BUFFER</text>
+
+  <!-- 3.3 -> User: Accuracy Metric -->
+  <path d="M350 600 130 600 130 476" class="flow-line" marker-end="url(#a4)"/>
+  <text x="138" y="560" class="flow-text">MAPE ACCURACY VALIDATION (≥90%)</text>
+
+  <!-- 3.2 -> User: Itemized Bill -->
+  <path d="M350 400 100 400 100 460" class="flow-line" marker-end="url(#a4)"/>
+  <text x="108" y="395" class="flow-text">ITEMIZED ERC BILL RECEIPT &amp; 24H LOAD CURVE</text>
+
+  <text x="1010" y="790" class="footer-text">LEVEL 2 — PROCESS 3 DECOMPOSITION</text>
+</svg>
+</div></div></div>
+
+</main>
+
+<!-- ═══════════════ SPECIFICATION SECTION ═══════════════ -->
+<section class="docs-section" id="spec-section">
+  <h2 class="docs-header">📐 Complete DFD Specification — Capstone Architecture</h2>
+  <p class="docs-sub">
+    This document contains the formal, complete Data Flow Diagram hierarchy for PowerForecast Refine,
+    modeled using the Gane &amp; Sarson notation — Context Diagram (Level 0), Level 1 DFD, and Level 2
+    decompositions for all three core processes. Suitable for Chapter 3: System Design &amp; Methodology.
+  </p>
+
+  <div class="legend-grid">
+    <div class="legend-card">
+      <div class="legend-title"><span class="legend-swatch swatch-context"></span> Context Process (Level 0)</div>
+      <div class="legend-desc">A single circle representing the entire system boundary, showing only external entity interactions.</div>
+    </div>
+    <div class="legend-card">
+      <div class="legend-title"><span class="legend-swatch swatch-entity"></span> External Entities</div>
+      <div class="legend-desc">Actors or systems outside the boundary: User, Meralco, DOE PELP, Gemini AI, Resend notifications.</div>
+    </div>
+    <div class="legend-card">
+      <div class="legend-title"><span class="legend-swatch swatch-process"></span> Gane &amp; Sarson Processes</div>
+      <div class="legend-desc">Numbered rounded rectangles with partitioned top ID bands (1, 2, 3 or 1.1, 1.2, etc.).</div>
+    </div>
+    <div class="legend-card">
+      <div class="legend-title"><span class="legend-swatch swatch-store"></span> Data Stores (D)</div>
+      <div class="legend-desc">Left "D" ID-compartmented blocks holding persistent records in Supabase/PostgreSQL.</div>
+    </div>
+    <div class="legend-card">
+      <div class="legend-title"><span class="legend-swatch swatch-flow"></span> Data Flows</div>
+      <div class="legend-desc">Orthogonal rose/coral directed paths with clean uppercase labels.</div>
+    </div>
+  </div>
+
+  <table class="spec-table">
+    <thead>
+      <tr><th>Diagram</th><th>Process ID</th><th>Subsystem</th><th>Primary Inputs</th><th>Primary Outputs</th></tr>
+    </thead>
+    <tbody>
+      <tr><td rowspan="3"><span class="tag-id">Level 1</span></td><td><span class="tag-id">1</span></td><td><strong>Appliance Ingestion &amp; Specification</strong></td><td>Photos, User Specs, OCR, CSPF</td><td>Catalog Specs, Rated Wattage</td></tr>
+      <tr><td><span class="tag-id">2</span></td><td><strong>Daily Usage &amp; Smart Calendar</strong></td><td>Routines, Stopwatch, Tariffs</td><td>kWh Logs, Load Profiles, Alerts</td></tr>
+      <tr><td><span class="tag-id">3</span></td><td><strong>Energy Modeling &amp; Reconciliation</strong></td><td>24h Load Profiles, Actual Bills</td><td>ERC Bill, MAPE Score</td></tr>
+      <tr><td rowspan="4"><span class="tag-id">Level 2: P1</span></td><td><span class="tag-id">1.1</span></td><td>Photo Capture &amp; Upload</td><td>Nameplate Photos, Manual Input</td><td>Raw Image Data</td></tr>
+      <tr><td><span class="tag-id">1.2</span></td><td>Gemini Vision OCR Parsing</td><td>Raw Images, OCR API Response</td><td>Parsed Spec Attributes</td></tr>
+      <tr><td><span class="tag-id">1.3</span></td><td>DOE CSPF Cross-Validation</td><td>Parsed Specs, CSPF Ratings</td><td>Validated &amp; Enriched Specs</td></tr>
+      <tr><td><span class="tag-id">1.4</span></td><td>Catalog Storage &amp; Onboarding</td><td>Validated Specs</td><td>Catalog Record, Onboarding Confirmation</td></tr>
+      <tr><td rowspan="4"><span class="tag-id">Level 2: P2</span></td><td><span class="tag-id">2.1</span></td><td>Stopwatch &amp; Timer Tracker</td><td>Stopwatch Toggles, Timer Inputs</td><td>Timed Usage Records</td></tr>
+      <tr><td><span class="tag-id">2.2</span></td><td>Smart Calendar Manager</td><td>Calendar Events &amp; Schedules</td><td>Scheduled Usage Projections</td></tr>
+      <tr><td><span class="tag-id">2.3</span></td><td>kWh Computation Engine</td><td>Load Profiles, Usage Data, Tariffs</td><td>Hourly kWh, Cost Estimates, Rate Tiers</td></tr>
+      <tr><td><span class="tag-id">2.4</span></td><td>Budget &amp; Peak Alert Monitor</td><td>Hourly kWh &amp; Cost Estimates</td><td>Budget Threshold &amp; Peak Alerts</td></tr>
+      <tr><td rowspan="3"><span class="tag-id">Level 2: P3</span></td><td><span class="tag-id">3.1</span></td><td>Load Aggregation &amp; 24h Curve Builder</td><td>Consolidated Daily kWh</td><td>24-Hour Load Curve Data</td></tr>
+      <tr><td><span class="tag-id">3.2</span></td><td>ERC 7-Part Unbundled Calculator</td><td>Load Curve, Rate Tiers</td><td>7-Part Itemized Charges</td></tr>
+      <tr><td><span class="tag-id">3.3</span></td><td>MAPE Accuracy Reconciliation</td><td>Computed Total, Actual Bill</td><td>MAPE Score (&ge;90%), Phantom Buffer</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<script>
+  /* ── Theme ── */
+  let theme = localStorage.getItem('pf-dfd-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  function toggleTheme() {
+    theme = theme === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('pf-dfd-theme', theme);
+  }
+
+  /* ── Tabs ── */
+  const panels = { ctx: 'panel-ctx', l1: 'panel-l1', l2p1: 'panel-l2p1', l2p2: 'panel-l2p2', l2p3: 'panel-l2p3' };
+  function switchTab(id) {
+    Object.values(panels).forEach(p => document.getElementById(p).classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(panels[id]).classList.add('active');
+    event.currentTarget.classList.add('active');
+    resetView();
+  }
+
+  /* ── Zoom / Pan ── */
+  let scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0;
+  function activeSvg() {
+    const panel = document.querySelector('.tab-panel.active .svg-container svg');
+    return panel;
+  }
+  function apply() { const s = activeSvg(); if (s) s.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; }
+  function zoomIn() { scale = Math.min(scale * 1.25, 3.5); apply(); }
+  function zoomOut() { scale = Math.max(scale / 1.25, 0.5); apply(); }
+  function resetView() { scale = 1; tx = 0; ty = 0; apply(); }
+
+  document.addEventListener('mousedown', e => {
+    if (!e.target.closest('.svg-container')) return;
+    dragging = true; sx = e.clientX - tx; sy = e.clientY - ty;
+  });
+  document.addEventListener('mousemove', e => { if (!dragging) return; tx = e.clientX - sx; ty = e.clientY - sy; apply(); });
+  document.addEventListener('mouseup', () => { dragging = false; });
+  document.querySelectorAll('.svg-container').forEach(c => {
+    c.addEventListener('wheel', e => { e.preventDefault(); scale = Math.min(Math.max(scale * (e.deltaY < 0 ? 1.1 : .9), .5), 3.5); apply(); }, { passive: false });
+  });
+</script>
+</body>
+</html>

@@ -366,161 +366,6 @@ export async function batchSaveDailyUsage(
   }
 }
 
-/**
- * Batch saves appliance routine baseline defaults across a multi-day date range (e.g. Aug 1 - Aug 23 or Aug 1 - Aug 31)
- */
-export async function batchSaveDailyUsageAcrossRange(params: {
-  startDate: Date;
-  endDate: Date;
-  appliances: UserAppliance[];
-  effectiveRate?: number;
-  source?: "routine_default" | "manual";
-  overwriteExisting?: boolean;
-  excludeToday?: boolean;
-  userId?: string | null;
-}): Promise<{ success: boolean; totalDays: number; totalRows: number }> {
-  const {
-    startDate,
-    endDate,
-    appliances,
-    effectiveRate = DEFAULT_EFFECTIVE_RATE,
-    source = "routine_default",
-    overwriteExisting = true,
-    excludeToday = false,
-    userId = null,
-  } = params;
-
-  if (appliances.length === 0 || endDate < startDate) {
-    return { success: true, totalDays: 0, totalRows: 0 };
-  }
-
-  // Generate list of dates in the range
-  const dateKeys: string[] = [];
-  const current = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-  const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-  const todayKey = formatDateToKey(new Date());
-
-  while (current <= end) {
-    const dKey = formatDateToKey(current);
-    if (!excludeToday || dKey !== todayKey) {
-      dateKeys.push(dKey);
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  if (dateKeys.length === 0) {
-    return { success: true, totalDays: 0, totalRows: 0 };
-  }
-
-  // If not overwriting existing, find dates that already have logged data
-  let existingKeys = new Set<string>();
-  if (!overwriteExisting) {
-    try {
-      const { data } = await supabaseClient
-        .from("daily_appliance_usage")
-        .select("usage_date, appliance_id")
-        .in("usage_date", dateKeys);
-
-      if (data) {
-        data.forEach((row: any) => existingKeys.add(`${row.usage_date}_${row.appliance_id}`));
-      }
-    } catch (e) {
-      devLog.warn("DailyUsageService", "Could not check existing records:", e);
-    }
-  }
-
-  const allRows: any[] = [];
-  const sessionLogRows: any[] = [];
-
-  dateKeys.forEach((dKey) => {
-    const isPastOrToday = dKey <= todayKey;
-    const [y, m, d] = dKey.split("-").map(Number);
-
-    appliances.forEach((app) => {
-      if (!overwriteExisting && existingKeys.has(`${dKey}_${app.id}`)) {
-        return; // skip existing
-      }
-
-      const hours = Math.max(0, Math.min(24, Number(app.hours_per_day) || 0));
-      const kwh = calculateApplianceKwh(app, hours);
-      const cost = calculateCost(kwh, effectiveRate);
-
-      allRows.push({
-        appliance_id: app.id,
-        usage_date: dKey,
-        hours_used: hours,
-        kwh_consumed: kwh,
-        estimated_cost: cost,
-        source,
-        notes: `Routine default baseline (${hours}h/day)`,
-        user_id: app.user_id || userId,
-        updated_at: new Date().toISOString(),
-      });
-
-      // If date is in the past, also log a tangible timestamped session in appliance_usage_logs
-      if (isPastOrToday && hours > 0) {
-        const startHour = app.start_hour !== undefined ? app.start_hour : 8;
-        const startTime = new Date(y, m - 1, d, startHour, 0, 0);
-        const durationMinutes = Math.round(hours * 60);
-        const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
-
-        sessionLogRows.push({
-          appliance_id: app.id,
-          user_id: app.user_id || userId,
-          started_at: startTime.toISOString(),
-          ended_at: endTime.toISOString(),
-          duration_minutes: durationMinutes,
-          kwh_consumed: kwh,
-          estimated_cost: cost,
-          source: "routine_autofill",
-        });
-      }
-    });
-  });
-
-  if (allRows.length === 0) {
-    return { success: true, totalDays: dateKeys.length, totalRows: 0 };
-  }
-
-  try {
-    // 1. Chunk inserts for daily_appliance_usage in batches of 200 rows
-    const chunkSize = 200;
-    for (let i = 0; i < allRows.length; i += chunkSize) {
-      const chunk = allRows.slice(i, i + chunkSize);
-      const { error } = await supabaseClient
-        .from("daily_appliance_usage")
-        .upsert(chunk, {
-          onConflict: "user_id,appliance_id,usage_date",
-        });
-
-      if (error) {
-        devLog.error("DailyUsageService", `Error bulk upserting chunk ${i}: ${error.message}`, error);
-        return { success: false, totalDays: dateKeys.length, totalRows: i };
-      }
-    }
-
-    // 2. Also insert corresponding timestamped session logs into appliance_usage_logs
-    if (sessionLogRows.length > 0) {
-      for (let i = 0; i < sessionLogRows.length; i += chunkSize) {
-        const logChunk = sessionLogRows.slice(i, i + chunkSize);
-        const { error: logErr } = await supabaseClient
-          .from("appliance_usage_logs")
-          .insert(logChunk);
-
-        if (logErr) {
-          devLog.warn("DailyUsageService", `Non-fatal: could not write session logs batch: ${logErr.message}`);
-        }
-      }
-    }
-
-    devLog.info("DailyUsageService", `Successfully batch saved ${allRows.length} rows across ${dateKeys.length} days (${sessionLogRows.length} session logs created).`);
-    return { success: true, totalDays: dateKeys.length, totalRows: allRows.length };
-  } catch (err: any) {
-    devLog.error("DailyUsageService", `Exception in batchSaveDailyUsageAcrossRange: ${err?.message}`, err);
-    return { success: false, totalDays: dateKeys.length, totalRows: 0 };
-  }
-}
-
 
 export interface DaySessionSlice {
   dateKey: string;
@@ -1075,6 +920,28 @@ export async function reconcileOvernightRunningStopwatches(
   };
 }
 
+export interface ActualDayMetricSummary {
+  kwh: number;
+  cost: number;
+  isLogged: boolean;
+  isPeak: boolean;
+  applianceCount: number;
+  hasActiveLiveCircuits: boolean;
+  source: "actual_logged" | "live_running" | "no_records";
+}
+
+export interface SimulatedDayMetricSummary {
+  kwh: number;
+  cost: number;
+  baselineKwh: number;
+  baselineCost: number;
+  savings: number;
+  isCustomSimulated: boolean;
+  isPeak: boolean;
+  applianceCount: number;
+  source: "custom_simulation" | "routine_baseline";
+}
+
 export interface DayMetricSummary {
   kwh: number;
   cost: number;
@@ -1085,13 +952,143 @@ export interface DayMetricSummary {
   isSimulated: boolean;
   isPeak: boolean;
   applianceCount: number;
-  source: "actual_logged" | "simulation" | "projected_routine" | "projected_schedule";
+  source: "actual_logged" | "simulation" | "projected_routine" | "projected_schedule" | "no_records";
 }
 
 /**
- * Calculates day metrics for a calendar cell.
- * If actual logged or simulated rows exist -> returns Simulated/Logged sum and calculates savings vs baseline.
- * Else -> returns Projected baseline from routine inventory defaults + scheduled tasks.
+ * Calculates strictly verified actual metrics for a calendar cell in the Actual Tracker tab.
+ * Does NOT fallback to phantom projections; an empty day shows 0 / no records.
+ */
+export function computeActualDayMetrics(
+  dateKey: string,
+  loggedUsageForDay: DailyApplianceUsage[],
+  appliances: UserAppliance[],
+  effectiveRate: number = DEFAULT_EFFECTIVE_RATE
+): ActualDayMetricSummary {
+  const activeAppliances = appliances.filter((a) => a.is_active !== false);
+  const targetApplianceIds = new Set(activeAppliances.map((a) => a.id));
+  const filteredLogged = (loggedUsageForDay || []).filter((u) => targetApplianceIds.has(u.appliance_id));
+
+  let liveRunningKwh = 0;
+  let liveRunningCost = 0;
+  let hasActiveCircuits = false;
+
+  // Check if today and any circuit is actively running
+  const todayKey = formatDateToKey(new Date());
+  if (dateKey === todayKey) {
+    appliances.forEach((app) => {
+      if (app.is_currently_on && app.last_turned_on_at) {
+        hasActiveCircuits = true;
+        const start = new Date(app.last_turned_on_at);
+        const now = new Date();
+        if (!isNaN(start.getTime())) {
+          const slices = splitSessionAcrossDays(start, now);
+          const daySlice = slices.find((s) => s.dateKey === dateKey);
+          if (daySlice && daySlice.hours > 0) {
+            const appKwh = calculateApplianceKwh(app, daySlice.hours);
+            liveRunningKwh += appKwh;
+            liveRunningCost += calculateCost(appKwh, effectiveRate);
+          }
+        }
+      }
+    });
+  }
+
+  if (filteredLogged.length > 0 || liveRunningKwh > 0) {
+    const loggedKwh = filteredLogged.reduce((acc, curr) => acc + (Number(curr.kwh_consumed) || 0), 0);
+    const loggedCost = filteredLogged.reduce((acc, curr) => acc + (Number(curr.estimated_cost) || 0), 0);
+    const totalKwh = loggedKwh + liveRunningKwh;
+    const totalCost = loggedCost + liveRunningCost;
+    const activeCount = filteredLogged.filter((u) => Number(u.hours_used) > 0).length + (liveRunningKwh > 0 ? 1 : 0);
+
+    return {
+      kwh: Number(totalKwh.toFixed(2)),
+      cost: Number(totalCost.toFixed(2)),
+      isLogged: true,
+      isPeak: totalKwh > 18 || totalCost > 270,
+      applianceCount: Math.min(activeAppliances.length, activeCount),
+      hasActiveLiveCircuits: hasActiveCircuits,
+      source: filteredLogged.length > 0 ? "actual_logged" : "live_running",
+    };
+  }
+
+  return {
+    kwh: 0,
+    cost: 0,
+    isLogged: false,
+    isPeak: false,
+    applianceCount: 0,
+    hasActiveLiveCircuits: false,
+    source: "no_records",
+  };
+}
+
+/**
+ * Calculates simulated metrics for a calendar cell in the Simulation Plan tab.
+ * Reads from isolated simulated_appliance_usage rows, or projects baseline routine quota.
+ */
+export function computeSimulatedDayMetrics(
+  dateKey: string,
+  date: Date,
+  simulatedUsageForDay: Array<{ appliance_id: string; hours_used: number; kwh_consumed: number; estimated_cost: number }>,
+  appliances: UserAppliance[],
+  effectiveRate: number = DEFAULT_EFFECTIVE_RATE
+): SimulatedDayMetricSummary {
+  const activeAppliances = appliances.filter((a) => a.is_active !== false);
+  const targetApplianceIds = new Set(activeAppliances.map((a) => a.id));
+  const filteredSim = (simulatedUsageForDay || []).filter((u) => targetApplianceIds.has(u.appliance_id));
+
+  // Pure baseline quota from registered routine hours
+  const pureBaselineKwh = Number(
+    activeAppliances
+      .reduce((acc, app) => acc + calculateApplianceKwh(app, Number(app.hours_per_day) || 0), 0)
+      .toFixed(2)
+  );
+  const pureBaselineCost = Number((pureBaselineKwh * effectiveRate).toFixed(2));
+
+  // 1. If custom simulated rows exist for this date
+  if (filteredSim.length > 0) {
+    const simKwh = filteredSim.reduce((acc, curr) => acc + (Number(curr.kwh_consumed) || 0), 0);
+    const simCost = filteredSim.reduce((acc, curr) => acc + (Number(curr.estimated_cost) || 0), 0);
+    const count = filteredSim.filter((u) => Number(u.hours_used) > 0).length;
+
+    return {
+      kwh: Number(simKwh.toFixed(2)),
+      cost: Number(simCost.toFixed(2)),
+      baselineKwh: pureBaselineKwh,
+      baselineCost: pureBaselineCost,
+      savings: Number((pureBaselineCost - simCost).toFixed(2)),
+      isCustomSimulated: true,
+      isPeak: simKwh > 18 || simCost > 270,
+      applianceCount: count,
+      source: "custom_simulation",
+    };
+  }
+
+  // 2. Otherwise return standard routine baseline projection
+  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+  const projectedKwh = activeAppliances.reduce((acc, app) => {
+    const defaultHours = Number(app.hours_per_day) || 0;
+    const hours = isWeekend ? Math.min(24, defaultHours * 1.15) : defaultHours;
+    return acc + calculateApplianceKwh(app, hours);
+  }, 0);
+  const projectedCost = projectedKwh * effectiveRate;
+
+  return {
+    kwh: Number(projectedKwh.toFixed(2)),
+    cost: Number(projectedCost.toFixed(2)),
+    baselineKwh: pureBaselineKwh,
+    baselineCost: pureBaselineCost,
+    savings: 0,
+    isCustomSimulated: false,
+    isPeak: projectedKwh > 18 || projectedCost > 270,
+    applianceCount: activeAppliances.length,
+    source: "routine_baseline",
+  };
+}
+
+/**
+ * Backwards-compatible router function for legacy components
  */
 export function computeDayMetrics(
   dateKey: string,
@@ -1101,81 +1098,35 @@ export function computeDayMetrics(
   events: UserCalendarEvent[],
   effectiveRate: number = DEFAULT_EFFECTIVE_RATE
 ): DayMetricSummary {
-  const activeAppliances = appliances.filter((a) => a.is_active !== false);
-  const targetApplianceIds = new Set(activeAppliances.map((a) => a.id));
-  const filteredLogged = (loggedUsageForDay || []).filter((u) => targetApplianceIds.has(u.appliance_id));
+  const actual = computeActualDayMetrics(dateKey, loggedUsageForDay, appliances, effectiveRate);
+  const simulated = computeSimulatedDayMetrics(dateKey, date, [], appliances, effectiveRate);
 
-  // 1. Calculate Pure Baseline from default registered hours
-  const pureBaselineKwh = Number(
-    activeAppliances
-      .reduce((acc, app) => acc + calculateApplianceKwh(app, Number(app.hours_per_day) || 0), 0)
-      .toFixed(2)
-  );
-  const pureBaselineCost = Number((pureBaselineKwh * effectiveRate).toFixed(2));
-
-  // 2. If we have logged or simulated usage records in the database
-  if (filteredLogged.length > 0) {
-    const totalKwh = filteredLogged.reduce((acc, curr) => acc + (Number(curr.kwh_consumed) || 0), 0);
-    const totalCost = filteredLogged.reduce((acc, curr) => acc + (Number(curr.estimated_cost) || 0), 0);
-    const activeCount = filteredLogged.filter((u) => Number(u.hours_used) > 0).length;
-    const isSim = filteredLogged.some((r) => r.source === "schedule_autofill" || r.source === "routine_default");
-
+  if (actual.isLogged) {
     return {
-      kwh: Number(totalKwh.toFixed(2)),
-      cost: Number(totalCost.toFixed(2)),
-      baselineKwh: pureBaselineKwh,
-      baselineCost: pureBaselineCost,
-      savings: Number((pureBaselineCost - totalCost).toFixed(2)),
+      kwh: actual.kwh,
+      cost: actual.cost,
+      baselineKwh: simulated.baselineKwh,
+      baselineCost: simulated.baselineCost,
+      savings: Number((simulated.baselineCost - actual.cost).toFixed(2)),
       isLogged: true,
-      isSimulated: isSim,
-      isPeak: totalKwh > 18 || totalCost > 270,
-      applianceCount: activeCount,
-      source: isSim ? "simulation" : "actual_logged",
+      isSimulated: false,
+      isPeak: actual.isPeak,
+      applianceCount: actual.applianceCount,
+      source: "actual_logged",
     };
   }
 
-  // 3. Otherwise return Projected Baseline
-  const dayOfWeekMap: Record<number, "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat"> = {
-    0: "sun",
-    1: "mon",
-    2: "tue",
-    3: "wed",
-    4: "thu",
-    5: "fri",
-    6: "sat",
-  };
-  const dayStr = dayOfWeekMap[date.getDay()];
-  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-
-  let projectedKwh = activeAppliances.reduce((acc, app) => {
-    const defaultHours = Number(app.hours_per_day) || 0;
-    const hours = isWeekend ? Math.min(24, defaultHours * 1.15) : defaultHours;
-    return acc + calculateApplianceKwh(app, hours);
-  }, 0);
-
-  const dayEvents = (events || []).filter((e) => e.day === dayStr || e.is_recurring);
-  dayEvents.forEach((ev) => {
-    const app = appliances.find((a) => a.id === ev.appliance_id);
-    if (app && app.is_active !== false) {
-      projectedKwh += calculateApplianceKwh(app, ev.duration_hours || 1);
-    } else if (!app) {
-      projectedKwh += calculateKwh(500, ev.duration_hours || 1, 1);
-    }
-  });
-
-  const projectedCost = projectedKwh * effectiveRate;
-
   return {
-    kwh: Number(projectedKwh.toFixed(2)),
-    cost: Number(projectedCost.toFixed(2)),
-    baselineKwh: pureBaselineKwh,
-    baselineCost: pureBaselineCost,
+    kwh: simulated.kwh,
+    cost: simulated.cost,
+    baselineKwh: simulated.baselineKwh,
+    baselineCost: simulated.baselineCost,
     savings: 0,
     isLogged: false,
     isSimulated: false,
-    isPeak: projectedKwh > 18 || projectedCost > 270,
-    applianceCount: activeAppliances.length,
-    source: dayEvents.length > 0 ? "projected_schedule" : "projected_routine",
+    isPeak: simulated.isPeak,
+    applianceCount: simulated.applianceCount,
+    source: "projected_routine",
   };
 }
 

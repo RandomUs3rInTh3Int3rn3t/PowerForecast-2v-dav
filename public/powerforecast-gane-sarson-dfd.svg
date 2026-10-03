@@ -1,0 +1,278 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 1140" width="100%" height="100%">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#c45d73" />
+    </marker>
+    <filter id="card-shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+
+  <style>
+    .title-main { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 34px; font-weight: 800; fill: #222b35; letter-spacing: -0.5px; }
+    .title-sub { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14.5px; fill: #4a5568; }
+    .entity-box { fill: #a4c2f4; stroke: #6b97c2; stroke-width: 1.6px; rx: 3px; ry: 3px; }
+    .entity-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 13.5px; font-weight: 600; fill: #1c3550; text-anchor: middle; }
+    .proc-bg { fill: #ffffff; stroke: #6b97c2; stroke-width: 1.6px; rx: 8px; ry: 8px; }
+    .proc-header { fill: #a4c2f4; stroke: #6b97c2; stroke-width: 1.6px; }
+    .proc-bottom { fill: #a4c2f4; stroke: #6b97c2; stroke-width: 1.6px; }
+    .proc-id-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; font-weight: 700; fill: #1a3652; text-anchor: middle; }
+    .proc-name { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 13.5px; font-weight: 600; fill: #1a202c; text-anchor: middle; }
+    .store-id-box { fill: #8e9aaf; stroke: #6b97c2; stroke-width: 1.6px; }
+    .store-id-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 13.5px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .store-body { fill: #b8d4f8; stroke: #6b97c2; stroke-width: 1.6px; }
+    .store-name { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 12.5px; font-weight: 600; fill: #1c3550; text-anchor: middle; }
+    .flow-line { fill: none; stroke: #c45d73; stroke-width: 1.6px; stroke-linejoin: round; stroke-linecap: round; }
+    .flow-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 9px; font-weight: 700; fill: #2d3748; letter-spacing: 0.35px; }
+    .footer-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 8.5px; font-weight: 600; fill: #94a3b8; text-anchor: end; letter-spacing: 0.5px; }
+  </style>
+
+  <!-- Canvas Background -->
+  <rect x="0" y="0" width="1120" height="1140" fill="#f8fafc" />
+
+  <!-- Sheet Card Container (Neat Document Paper) -->
+  <rect x="25" y="25" width="1070" height="1090" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#card-shadow)" />
+
+  <!-- ======================================================== -->
+  <!-- DOCUMENT HEADER                                          -->
+  <!-- ======================================================== -->
+  <text x="560" y="72" class="title-main" text-anchor="middle">Example of a data flow diagram</text>
+  <text x="560" y="100" class="title-sub" text-anchor="middle">Using the Gane &amp; Sarson method, this data flow diagram shows the information system of PowerForecast Refine.</text>
+
+
+  <!-- ======================================================== -->
+  <!-- EXTERNAL ENTITIES (Soft Blue Blocks)                     -->
+  <!-- ======================================================== -->
+
+  <!-- Top Center Entity: Gemini Vision AI -->
+  <g id="entity-gemini">
+    <rect x="450" y="130" width="170" height="48" class="entity-box" />
+    <text x="535" y="159" class="entity-text">Gemini Vision AI</text>
+  </g>
+
+  <!-- Top Right Entity: DOE PELP Registry -->
+  <g id="entity-pelp">
+    <rect x="670" y="130" width="170" height="48" class="entity-box" />
+    <text x="755" y="159" class="entity-text">DOE PELP Registry</text>
+  </g>
+
+  <!-- Row 1 Left Entity: User / Consumer -->
+  <g id="entity-user">
+    <rect x="85" y="215" width="165" height="52" class="entity-box" />
+    <text x="167" y="246" class="entity-text">User / Consumer</text>
+  </g>
+
+  <!-- Row 1-2 Right Entity: Notification Service (Resend & Web Push) -->
+  <g id="entity-notification">
+    <rect x="830" y="365" width="175" height="52" class="entity-box" />
+    <text x="917" y="388" class="entity-text">Notification Service</text>
+    <text x="917" y="405" class="entity-text" font-size="11px">(Resend &amp; Web Push)</text>
+  </g>
+
+  <!-- Row 2 Left Entity: Electric Utility (Meralco) -->
+  <g id="entity-utility">
+    <rect x="85" y="525" width="165" height="52" class="entity-box" />
+    <text x="167" y="556" class="entity-text">Electric Utility (Meralco)</text>
+  </g>
+
+
+  <!-- ======================================================== -->
+  <!-- PROCESSES (Gane & Sarson Partitioned Rounded Rectangles)  -->
+  <!-- ======================================================== -->
+
+  <!-- PROCESS 1: Appliance Ingestion & Specification System -->
+  <g id="process-1">
+    <rect x="440" y="270" width="190" height="96" class="proc-bg" />
+    <path d="M 440 278 A 8 8 0 0 1 448 270 L 622 270 A 8 8 0 0 1 630 278 L 630 295 L 440 295 Z" class="proc-header" />
+    <rect x="440" y="270" width="30" height="25" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3" />
+    <text x="455" y="287" class="proc-id-text">1</text>
+    <path d="M 440 357 L 630 357 L 630 358 A 8 8 0 0 1 622 366 L 448 366 A 8 8 0 0 1 440 358 Z" class="proc-bottom" />
+    <text x="535" y="325" class="proc-name">Appliance Ingestion</text>
+    <text x="535" y="343" class="proc-name">&amp; Specification System</text>
+  </g>
+
+  <!-- PROCESS 2: Daily Usage & Smart Calendar System -->
+  <g id="process-2">
+    <rect x="440" y="515" width="190" height="96" class="proc-bg" />
+    <path d="M 440 523 A 8 8 0 0 1 448 515 L 622 515 A 8 8 0 0 1 630 523 L 630 540 L 440 540 Z" class="proc-header" />
+    <rect x="440" y="515" width="30" height="25" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3" />
+    <text x="455" y="532" class="proc-id-text">2</text>
+    <path d="M 440 602 L 630 602 L 630 603 A 8 8 0 0 1 622 611 L 448 611 A 8 8 0 0 1 440 603 Z" class="proc-bottom" />
+    <text x="535" y="567" class="proc-name">Daily Usage &amp; Smart</text>
+    <text x="535" y="585" class="proc-name">Calendar Control System</text>
+  </g>
+
+  <!-- PROCESS 3: Energy Modeling & Accuracy Reconciliation -->
+  <g id="process-3">
+    <rect x="440" y="780" width="190" height="96" class="proc-bg" />
+    <path d="M 440 788 A 8 8 0 0 1 448 780 L 622 780 A 8 8 0 0 1 630 788 L 630 805 L 440 805 Z" class="proc-header" />
+    <rect x="440" y="780" width="30" height="25" fill="#a4c2f4" stroke="#6b97c2" stroke-width="1.6" rx="3" />
+    <text x="455" y="797" class="proc-id-text">3</text>
+    <path d="M 440 867 L 630 867 L 630 868 A 8 8 0 0 1 622 876 L 448 876 A 8 8 0 0 1 440 868 Z" class="proc-bottom" />
+    <text x="535" y="832" class="proc-name">Energy Modeling &amp;</text>
+    <text x="535" y="850" class="proc-name">Accuracy Reconciliation</text>
+  </g>
+
+
+  <!-- ======================================================== -->
+  <!-- DATA STORES (D Block on Left, Soft Blue Body on Right)   -->
+  <!-- ======================================================== -->
+
+  <!-- DATA STORE Beside Process 1 (Right): User Accounts & Cache -->
+  <g id="store-user-accounts">
+    <rect x="790" y="295" width="36" height="46" class="store-id-box" />
+    <text x="808" y="323" class="store-id-text">D</text>
+    <rect x="826" y="295" width="170" height="46" class="store-body" />
+    <text x="911" y="323" class="store-name">User Profiles &amp; Cache</text>
+  </g>
+
+  <!-- DATA STORE Below User (Row 1.5 Left): Appliance Catalog & Specs -->
+  <g id="store-appliance-catalog">
+    <rect x="85" y="380" width="36" height="46" class="store-id-box" />
+    <text x="103" y="408" class="store-id-text">D</text>
+    <rect x="121" y="380" width="160" height="46" class="store-body" />
+    <text x="201" y="408" class="store-name">Appliance Catalog Specs</text>
+  </g>
+
+  <!-- ROW OF 3 DATA STORES (Below Process 2) -->
+  <!-- Store 1 (Left): Appliance Inventory -->
+  <g id="store-appliance-inv">
+    <rect x="205" y="650" width="36" height="46" class="store-id-box" />
+    <text x="223" y="678" class="store-id-text">D</text>
+    <rect x="241" y="650" width="145" height="46" class="store-body" />
+    <text x="313" y="678" class="store-name">Appliance Inventory</text>
+  </g>
+
+  <!-- Store 2 (Center): Daily Usage Logs -->
+  <g id="store-usage-logs">
+    <rect x="440" y="650" width="36" height="46" class="store-id-box" />
+    <text x="458" y="678" class="store-id-text">D</text>
+    <rect x="476" y="650" width="154" height="46" class="store-body" />
+    <text x="553" y="678" class="store-name">Daily Usage Logs</text>
+  </g>
+
+  <!-- Store 3 (Right): Tariff Matrix -->
+  <g id="store-tariff-matrix">
+    <rect x="675" y="650" width="36" height="46" class="store-id-box" />
+    <text x="693" y="678" class="store-id-text">D</text>
+    <rect x="711" y="650" width="145" height="46" class="store-body" />
+    <text x="783" y="678" class="store-name">Tariff Matrix</text>
+  </g>
+
+  <!-- ROW OF 2 DATA STORES (Below Process 3) -->
+  <!-- Store Bottom Left: Reconciled Metrics (MAPE) -->
+  <g id="store-metrics">
+    <rect x="210" y="930" width="36" height="46" class="store-id-box" />
+    <text x="228" y="958" class="store-id-text">D</text>
+    <rect x="246" y="930" width="180" height="46" class="store-body" />
+    <text x="336" y="958" class="store-name">Reconciled Metrics (MAPE)</text>
+  </g>
+
+  <!-- Store Bottom Right: Unbundled Bill Records -->
+  <g id="store-bill-records">
+    <rect x="645" y="930" width="36" height="46" class="store-id-box" />
+    <text x="663" y="958" class="store-id-text">D</text>
+    <rect x="681" y="930" width="180" height="46" class="store-body" />
+    <text x="771" y="958" class="store-name">Unbundled Bill Records</text>
+  </g>
+
+
+  <!-- ======================================================== -->
+  <!-- DATA FLOWS & ARROWS (Rose Lines & Clean Uppercase Text)  -->
+  <!-- ======================================================== -->
+
+  <!-- 1. User -> Process 1 (Appliance Specs) -->
+  <line x1="250" y1="230" x2="432" y2="230" class="flow-line" />
+  <line x1="432" y1="230" x2="432" y2="280" class="flow-line" marker-end="url(#arrow)" />
+  <text x="270" y="223" class="flow-text">APPLIANCE SPECS &amp; PHOTOS</text>
+
+  <!-- 2. Process 1 -> User (Onboarding Advice / Echo) -->
+  <path d="M 440 320 L 290 320 L 290 255 L 258 255" class="flow-line" marker-end="url(#arrow)" />
+  <text x="270" y="313" class="flow-text">ONBOARDING CONFIRMATION</text>
+
+  <!-- 3. Gemini Vision AI -> Process 1 (OCR Extracted Specs) -->
+  <line x1="510" y1="178" x2="510" y2="262" class="flow-line" marker-end="url(#arrow)" />
+  <text x="502" y="225" class="flow-text" text-anchor="end">OCR EXTRACTED SPECS</text>
+
+  <!-- 4. DOE PELP Registry -> Process 1 (CSPF & Certified Ratings) -->
+  <path d="M 740 178 L 740 220 L 570 220 L 570 262" class="flow-line" marker-end="url(#arrow)" />
+  <text x="610" y="213" class="flow-text">CERTIFIED CSPF RATINGS</text>
+
+  <!-- 5. Process 1 -> Data Store: User Profiles & Cache -->
+  <line x1="630" y1="318" x2="782" y2="318" class="flow-line" marker-end="url(#arrow)" />
+  <text x="645" y="311" class="flow-text">USER PROFILE &amp; PREFERENCES</text>
+
+  <!-- 6. Process 1 -> Data Store: Appliance Catalog Specs -->
+  <path d="M 440 350 L 330 350 L 330 403 L 289 403" class="flow-line" marker-end="url(#arrow)" />
+  <text x="338" y="380" class="flow-text">CATALOG SPECS</text>
+
+  <!-- 7. Process 1 -> Process 2 (Central Spine Flow) -->
+  <line x1="535" y1="366" x2="535" y2="507" class="flow-line" marker-end="url(#arrow)" />
+  <text x="543" y="445" class="flow-text">RATED WATTAGE &amp; DUTY ATTRIBUTES</text>
+
+  <!-- 8. User -> Process 2 (Routines & Stopwatch) -->
+  <path d="M 210 267 L 210 340 L 380 340 L 380 500 L 432 500" class="flow-line" marker-end="url(#arrow)" />
+  <text x="220" y="333" class="flow-text">DAILY ROUTINES &amp; STOPWATCH LOGS</text>
+
+  <!-- 9. Electric Utility (Meralco) -> Process 2 (Tariff Rates) -->
+  <line x1="250" y1="540" x2="432" y2="540" class="flow-line" marker-end="url(#arrow)" />
+  <text x="260" y="533" class="flow-text">MERALCO TARIFF RATES</text>
+
+  <!-- 10. Process 2 -> Electric Utility (Meralco) (Demand Estimates) -->
+  <line x1="440" y1="565" x2="258" y2="565" class="flow-line" marker-end="url(#arrow)" />
+  <text x="260" y="580" class="flow-text">ESTIMATED GRID DEMAND</text>
+
+  <!-- 11. Process 2 -> Notification Service (Budget Alerts) -->
+  <path d="M 630 550 L 800 550 L 800 395 L 822 395" class="flow-line" marker-end="url(#arrow)" />
+  <text x="645" y="543" class="flow-text">BUDGET &amp; PEAK ALERTS</text>
+
+  <!-- 12. Notification Service -> User (Emails & Web Push Alerts) -->
+  <path d="M 917 365 L 917 115 L 60 115 L 60 240 L 77 240" class="flow-line" marker-end="url(#arrow)" />
+  <text x="490" y="110" class="flow-text" text-anchor="middle">TRANSACTIONAL NOTIFICATIONS &amp; DISPATCHED DIGESTS</text>
+
+  <!-- 13. Process 2 -> Store 1: Appliance Inventory -->
+  <path d="M 480 611 L 480 632 L 315 632 L 315 642" class="flow-line" marker-end="url(#arrow)" />
+  <text x="325" y="627" class="flow-text">REGISTERED APPLIANCES</text>
+
+  <!-- 14. Process 2 -> Store 2: Daily Usage Logs -->
+  <line x1="535" y1="611" x2="535" y2="642" class="flow-line" marker-end="url(#arrow)" />
+  <text x="543" y="632" class="flow-text">DAILY KWH LOGS</text>
+
+  <!-- 15. Process 2 -> Store 3: Tariff Matrix -->
+  <path d="M 590 611 L 590 632 L 770 632 L 770 642" class="flow-line" marker-end="url(#arrow)" />
+  <text x="635" y="627" class="flow-text">RATE TIERS &amp; VAT</text>
+
+  <!-- 16. Store 2 (Usage Logs) -> Process 3 (Energy Modeling) -->
+  <line x1="535" y1="696" x2="535" y2="772" class="flow-line" marker-end="url(#arrow)" />
+  <text x="543" y="742" class="flow-text">CONSOLIDATED 24H LOAD PROFILE</text>
+
+  <!-- 17. User -> Process 3 (Actual Utility Bill) -->
+  <path d="M 140 267 L 140 360 L 360 360 L 360 760 L 432 760" class="flow-line" marker-end="url(#arrow)" />
+  <text x="148" y="353" class="flow-text">ACTUAL UTILITY BILL (KWH &amp; CHARGES)</text>
+
+  <!-- 18. Process 3 -> Store Bottom Left: Reconciled Metrics -->
+  <path d="M 480 876 L 480 905 L 336 905 L 336 922" class="flow-line" marker-end="url(#arrow)" />
+  <text x="345" y="900" class="flow-text">MAPE SCORE &amp; PHANTOM BUFFER</text>
+
+  <!-- 19. Process 3 -> Store Bottom Right: Unbundled Bill Records -->
+  <path d="M 590 876 L 590 905 L 755 905 L 755 922" class="flow-line" marker-end="url(#arrow)" />
+  <text x="625" y="900" class="flow-text">7-PART UNBUNDLED RECORDS</text>
+
+  <!-- 20. Process 3 -> User: Itemized ERC Bill Receipt & Load Curve -->
+  <path d="M 440 825 L 48 825 L 48 250 L 77 250" class="flow-line" marker-end="url(#arrow)" />
+  <text x="56" y="818" class="flow-text">ITEMIZED ERC BILL &amp; 24H LOAD CURVE</text>
+
+  <!-- 21. Process 3 -> User: Accuracy Metric -->
+  <path d="M 440 850 L 35 850 L 35 230 L 77 230" class="flow-line" marker-end="url(#arrow)" />
+  <text x="43" y="843" class="flow-text">MAPE ACCURACY VALIDATION (≥90%)</text>
+
+
+  <!-- ======================================================== -->
+  <!-- FOOTER & WATERMARK (TechTarget Publication Style)        -->
+  <!-- ======================================================== -->
+  <text x="1065" y="1092" class="footer-text">© 2026 POWERFORECAST REFINE. ALL RIGHTS RESERVED</text>
+  <g transform="translate(1072, 1083) scale(0.7)">
+    <circle cx="10" cy="10" r="8" fill="none" stroke="#94a3b8" stroke-width="1.8" />
+    <circle cx="10" cy="10" r="3.5" fill="#94a3b8" />
+  </g>
+</svg>

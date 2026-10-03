@@ -79,6 +79,7 @@ import {
   Insights as InsightsIcon,
   AutoGraph as AutoGraphIcon,
   Dashboard as DashboardIcon,
+  AccessTime as ClockIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useTour } from "../../hooks/useTour";
@@ -289,6 +290,14 @@ export const SettingsView: React.FC = () => {
     return getNotificationPreferences().emailAlertsEnabled ?? false;
   });
 
+  // Stopwatch Left-Running Alert Preferences
+  const [stopwatchAlertEnabled, setStopwatchAlertEnabled] = useState(() => {
+    return getNotificationPreferences().runtimeAlert ?? true;
+  });
+  const [stopwatchThresholdHours, setStopwatchThresholdHours] = useState<number>(() => {
+    return getNotificationPreferences().runtimeThresholdHours ?? 2;
+  });
+
   useEffect(() => {
     checkEmailDeliveryHealth().then((status) => setEmailHealth(status));
   }, []);
@@ -454,6 +463,32 @@ export const SettingsView: React.FC = () => {
     );
   };
 
+  const handleToggleStopwatchAlert = (checked: boolean) => {
+    setStopwatchAlertEnabled(checked);
+    saveNotificationPreferences({
+      runtimeAlert: checked,
+      stopwatchAlert: checked,
+    });
+    showSuccess(
+      checked
+        ? (language === "tl" ? "Aktibo na ang unattended stopwatch alerts!" : "Unattended stopwatch alerts enabled!")
+        : (language === "tl" ? "Nai-off ang stopwatch alerts." : "Unattended stopwatch alerts disabled.")
+    );
+  };
+
+  const handleChangeStopwatchThreshold = (hours: number) => {
+    setStopwatchThresholdHours(hours);
+    saveNotificationPreferences({
+      runtimeThresholdHours: hours,
+      stopwatchThresholdHours: hours,
+    });
+    showSuccess(
+      language === "tl"
+        ? `Na-set ang stopwatch alert threshold sa ${hours} oras.`
+        : `Stopwatch alert threshold updated to ${hours} hours.`
+    );
+  };
+
   const handleCopyLink = () => {
     if (!generatedInvite?.link) return;
     navigator.clipboard.writeText(generatedInvite.link);
@@ -608,6 +643,7 @@ export const SettingsView: React.FC = () => {
       if (userId) {
         try {
           await supabaseClient.from("daily_appliance_usage").delete().eq("user_id", userId);
+          await supabaseClient.from("simulated_appliance_usage").delete().eq("user_id", userId);
           await supabaseClient.from("appliance_usage_logs").delete().eq("user_id", userId);
           await supabaseClient.from("user_appliances").delete().eq("user_id", userId);
           await supabaseClient.from("user_calendar_events").delete().eq("user_id", userId);
@@ -1316,6 +1352,85 @@ export const SettingsView: React.FC = () => {
               </Button>
             )}
           </Box>
+        </Paper>
+
+        {/* 4.1 Stopwatch Left-Running & Overrun Protection */}
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            mt: 2,
+            borderRadius: 1.25,
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(0, 0, 0, 0.25)" : "rgba(248, 250, 252, 0.8)",
+            borderColor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.2)",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", sm: "center" },
+              gap: 2,
+              flexWrap: "wrap",
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1 }}>
+                <ClockIcon sx={{ color: "primary.main", fontSize: 18 }} />
+                {language === "tl" ? "Alerto Para sa Hindi Napatay na Stopwatch" : "Unattended Stopwatch & Overrun Alerts"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+                {language === "tl"
+                  ? "Nagpapadala ng alerto kapag naiwang bukas ang circuit stopwatch lampas sa itinakdang oras o lumagpas sa quota ng simulation plan."
+                  : "Notifies you when an appliance circuit stopwatch runs unattended past your limit or exceeds its planned simulation quota."}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Switch
+                checked={stopwatchAlertEnabled}
+                onChange={(e) => handleToggleStopwatchAlert(e.target.checked)}
+                color="primary"
+                size="small"
+              />
+              <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                {stopwatchAlertEnabled
+                  ? (language === "tl" ? "Naka-on" : "Active")
+                  : (language === "tl" ? "Naka-off" : "Disabled")}
+              </Typography>
+            </Box>
+          </Box>
+
+          {stopwatchAlertEnabled && (
+            <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px dashed", borderColor: "divider", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1.5 }}>
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, display: "block" }}>
+                  {language === "tl" ? "Oras Bago Mag-abiso (Runtime Limit)" : "Runtime Notification Threshold"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  {language === "tl"
+                    ? "Magpapadala ng alerto kapag tuloy-tuloy na tumatakbo ang stopwatch sa tagal na ito nang hindi pinapatay."
+                    : "Alert fires if a circuit runs continuously for this duration without being turned off."}
+                </Typography>
+              </Box>
+
+              <TextField
+                select
+                size="small"
+                value={stopwatchThresholdHours}
+                onChange={(e) => handleChangeStopwatchThreshold(Number(e.target.value))}
+                sx={{ minWidth: 170 }}
+              >
+                <MenuItem value={1}>1 {language === "tl" ? "oras" : "hour"}</MenuItem>
+                <MenuItem value={2}>2 {language === "tl" ? "oras (Inirerekomenda)" : "hours (Recommended)"}</MenuItem>
+                <MenuItem value={3}>3 {language === "tl" ? "oras" : "hours"}</MenuItem>
+                <MenuItem value={4}>4 {language === "tl" ? "oras" : "hours"}</MenuItem>
+                <MenuItem value={6}>6 {language === "tl" ? "oras" : "hours"}</MenuItem>
+              </TextField>
+            </Box>
+          )}
         </Paper>
 
         {/* Web Push Setup & Error Prevention Accordion */}

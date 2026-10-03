@@ -75,6 +75,72 @@ CREATE TABLE IF NOT EXISTS public.appliance_usage_logs (
 );
 
 -- ==============================================================================
+-- 4.1 DAILY APPLIANCE USAGE ROLLUP TABLE (Actual Measured Data)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.daily_appliance_usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    appliance_id UUID REFERENCES public.user_appliances(id) ON DELETE CASCADE NOT NULL,
+    usage_date DATE NOT NULL,
+    hours_used NUMERIC(5,2) DEFAULT 0 NOT NULL,
+    kwh_consumed NUMERIC(10,3) DEFAULT 0 NOT NULL,
+    estimated_cost NUMERIC(10,2) DEFAULT 0 NOT NULL,
+    source TEXT DEFAULT 'manual', -- 'manual' | 'live_session' | 'past_time_range'
+    notes TEXT DEFAULT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::TEXT, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::TEXT, now()) NOT NULL,
+    CONSTRAINT daily_appliance_usage_unique_day UNIQUE(user_id, appliance_id, usage_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON public.daily_appliance_usage(user_id, usage_date);
+CREATE INDEX IF NOT EXISTS idx_daily_usage_appliance ON public.daily_appliance_usage(appliance_id);
+
+ALTER TABLE public.daily_appliance_usage ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own daily usage" ON public.daily_appliance_usage;
+CREATE POLICY "Users can view own daily usage" ON public.daily_appliance_usage FOR SELECT USING (auth.uid() = user_id OR user_id IS NULL);
+DROP POLICY IF EXISTS "Users can insert own daily usage" ON public.daily_appliance_usage;
+CREATE POLICY "Users can insert own daily usage" ON public.daily_appliance_usage FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+DROP POLICY IF EXISTS "Users can update own daily usage" ON public.daily_appliance_usage;
+CREATE POLICY "Users can update own daily usage" ON public.daily_appliance_usage FOR UPDATE USING (auth.uid() = user_id OR user_id IS NULL);
+DROP POLICY IF EXISTS "Users can delete own daily usage" ON public.daily_appliance_usage;
+CREATE POLICY "Users can delete own daily usage" ON public.daily_appliance_usage FOR DELETE USING (auth.uid() = user_id OR user_id IS NULL);
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.daily_appliance_usage TO authenticated, anon;
+
+-- ==============================================================================
+-- 4.2 SIMULATED APPLIANCE USAGE TABLE (What-If & Planning Data)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.simulated_appliance_usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    appliance_id UUID REFERENCES public.user_appliances(id) ON DELETE CASCADE NOT NULL,
+    usage_date DATE NOT NULL,
+    hours_used NUMERIC(5,2) DEFAULT 0 NOT NULL,
+    kwh_consumed NUMERIC(10,3) DEFAULT 0 NOT NULL,
+    estimated_cost NUMERIC(10,2) DEFAULT 0 NOT NULL,
+    start_hour NUMERIC(4,2) DEFAULT NULL,
+    end_hour NUMERIC(4,2) DEFAULT NULL,
+    source TEXT DEFAULT 'simulation_plan', -- 'simulation_plan' | 'test_run'
+    notes TEXT DEFAULT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::TEXT, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::TEXT, now()) NOT NULL,
+    CONSTRAINT simulated_appliance_usage_unique_day UNIQUE(user_id, appliance_id, usage_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_simulated_usage_user_date ON public.simulated_appliance_usage(user_id, usage_date);
+CREATE INDEX IF NOT EXISTS idx_simulated_usage_appliance ON public.simulated_appliance_usage(appliance_id);
+
+ALTER TABLE public.simulated_appliance_usage ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own simulated usage" ON public.simulated_appliance_usage;
+CREATE POLICY "Users can view own simulated usage" ON public.simulated_appliance_usage FOR SELECT USING (auth.uid() = user_id OR user_id IS NULL);
+DROP POLICY IF EXISTS "Users can insert own simulated usage" ON public.simulated_appliance_usage;
+CREATE POLICY "Users can insert own simulated usage" ON public.simulated_appliance_usage FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+DROP POLICY IF EXISTS "Users can update own simulated usage" ON public.simulated_appliance_usage;
+CREATE POLICY "Users can update own simulated usage" ON public.simulated_appliance_usage FOR UPDATE USING (auth.uid() = user_id OR user_id IS NULL);
+DROP POLICY IF EXISTS "Users can delete own simulated usage" ON public.simulated_appliance_usage;
+CREATE POLICY "Users can delete own simulated usage" ON public.simulated_appliance_usage FOR DELETE USING (auth.uid() = user_id OR user_id IS NULL);
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.simulated_appliance_usage TO authenticated, anon;
+
+-- ==============================================================================
 -- 5. USER CALENDAR EVENTS & USAGE SCHEDULES TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.user_calendar_events (
