@@ -217,21 +217,18 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
       slotProps={{
         backdrop: {
           sx: {
-            backdropFilter: "blur(8px)",
-            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(16px)",
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
           },
         },
         paper: {
           sx: {
-            borderRadius: 2.5,
-            bgcolor: (theme) => (theme.palette.mode === "dark" ? "#13161c" : "#ffffff"),
+            borderRadius: 3,
+            bgcolor: (theme) => (theme.palette.mode === "dark" ? "#09090b" : "#ffffff"),
             backgroundImage: "none",
             border: "1px solid",
-            borderColor: (theme) => (theme.palette.mode === "dark" ? "#262c37" : "#e2e8f0"),
-            boxShadow: (theme) =>
-              theme.palette.mode === "dark"
-                ? "0 24px 64px rgba(0, 0, 0, 0.7)"
-                : "0 20px 50px rgba(0, 0, 0, 0.15)",
+            borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"),
+            boxShadow: "0 25px 60px rgba(0, 0, 0, 0.5)",
             color: "text.primary",
             maxHeight: "88vh",
             display: "flex",
@@ -249,8 +246,8 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
           alignItems: "center",
           justifyContent: "space-between",
           borderBottom: "1px solid",
-          borderColor: (theme) => (theme.palette.mode === "dark" ? "#242934" : "#e2e8f0"),
-          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#181c23" : "#f8fafc"),
+          borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"),
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#0e0e11" : "#f8fafc"),
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -258,10 +255,10 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
             sx={{
               p: 1,
               borderRadius: 2,
-              bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.12)" : "rgba(13, 148, 136, 0.1)"),
+              bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"),
               border: "1px solid",
-              borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.3)" : "rgba(13, 148, 136, 0.25)"),
-              color: "primary.main",
+              borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.1)"),
+              color: "text.primary",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -271,7 +268,7 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
           </Box>
           <Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-              <Typography variant="h6" sx={{ fontWeight: 800, fontSize: "1.1rem", color: "text.primary" }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, fontSize: "1.05rem", color: "text.primary" }}>
                 GitHub Deployment & Version Changelogs
               </Typography>
               <Chip
@@ -280,12 +277,12 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
                 sx={{
                   height: 22,
                   fontSize: "0.6875rem",
-                  fontWeight: 800,
+                  fontWeight: 700,
                   fontFamily: "monospace",
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.15)" : "rgba(13, 148, 136, 0.12)"),
-                  color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
+                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"),
+                  color: "text.primary",
                   border: "1px solid",
-                  borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.35)" : "rgba(13, 148, 136, 0.3)"),
+                  borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)"),
                 }}
               />
             </Box>
@@ -304,14 +301,14 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
             onClick={() => window.open(GITHUB_REPO_URL, "_blank", "noopener,noreferrer")}
             sx={{
               fontSize: "0.75rem",
-              fontWeight: 700,
+              fontWeight: 600,
               textTransform: "none",
               color: "text.primary",
-              borderColor: (theme) => (theme.palette.mode === "dark" ? "#2e3542" : "#cbd5e1"),
-              bgcolor: (theme) => (theme.palette.mode === "dark" ? "#1c2028" : "#ffffff"),
+              borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.12)"),
+              bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "#ffffff"),
               "&:hover": {
-                borderColor: "primary.main",
-                bgcolor: (theme) => (theme.palette.mode === "dark" ? "#242a35" : "#f1f5f9"),
+                borderColor: "text.primary",
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#f4f4f5"),
               },
             }}
           >
@@ -322,7 +319,7 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
             onClick={fetchChangelogs}
             disabled={isLoading}
             title="Refresh deployments from GitHub & Database"
-            sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
+            sx={{ color: "text.secondary", "&:hover": { color: "text.primary" } }}
           >
             <RefreshIcon sx={{ fontSize: 18, animation: isLoading ? "spin 1s linear infinite" : "none" }} />
           </IconButton>
@@ -340,9 +337,9 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
       <Box
         sx={{
           p: 2,
-          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#15181f" : "#f8fafc"),
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#0d0d10" : "#f8fafc"),
           borderBottom: "1px solid",
-          borderColor: (theme) => (theme.palette.mode === "dark" ? "#242934" : "#e2e8f0"),
+          borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"),
           display: "flex",
           flexDirection: "column",
           gap: 1.5,
@@ -370,12 +367,12 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
                   </InputAdornment>
                 ) : null,
                 sx: {
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "#1c2028" : "#ffffff"),
+                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "#141418" : "#ffffff"),
                   borderRadius: 1.5,
                   fontSize: "0.8125rem",
-                  "& fieldset": { borderColor: (theme) => (theme.palette.mode === "dark" ? "#2e3542" : "#cbd5e1") },
-                  "&:hover fieldset": { borderColor: "primary.main" },
-                  "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                  "& fieldset": { borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.12)") },
+                  "&:hover fieldset": { borderColor: "text.primary" },
+                  "&.Mui-focused fieldset": { borderColor: "text.primary" },
                 },
               },
             }}
@@ -394,15 +391,22 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
               sx={{
                 height: 24,
                 fontSize: "0.6875rem",
-                fontWeight: 700,
+                fontWeight: 600,
                 borderRadius: 1.5,
-                bgcolor: selectedTagFilter === opt.id ? "primary.main" : (theme) => (theme.palette.mode === "dark" ? "#1c2028" : "#ffffff"),
-                color: selectedTagFilter === opt.id ? "#ffffff" : "text.secondary",
+                bgcolor: selectedTagFilter === opt.id
+                  ? (theme) => (theme.palette.mode === "dark" ? "#fafafa" : "#18181b")
+                  : (theme) => (theme.palette.mode === "dark" ? "#141418" : "#ffffff"),
+                color: selectedTagFilter === opt.id
+                  ? (theme) => (theme.palette.mode === "dark" ? "#09090b" : "#fafafa")
+                  : "text.secondary",
                 border: "1px solid",
-                borderColor: selectedTagFilter === opt.id ? "primary.main" : (theme) => (theme.palette.mode === "dark" ? "#282e3a" : "#cbd5e1"),
+                borderColor: selectedTagFilter === opt.id
+                  ? "transparent"
+                  : (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"),
                 "&:hover": {
-                  bgcolor: selectedTagFilter === opt.id ? "primary.dark" : (theme) => (theme.palette.mode === "dark" ? "#242a35" : "#f1f5f9"),
-                  color: selectedTagFilter === opt.id ? "#ffffff" : "text.primary",
+                  bgcolor: selectedTagFilter === opt.id
+                    ? (theme) => (theme.palette.mode === "dark" ? "#f4f4f5" : "#27272a")
+                    : (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9"),
                 },
               }}
             />
@@ -421,7 +425,7 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
           p: 2.5,
           flex: 1,
           overflowY: "auto",
-          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#13161c" : "#f8fafc"),
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#09090b" : "#f8fafc"),
           display: "flex",
           flexDirection: "column",
           gap: 2,
@@ -429,7 +433,7 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
       >
         {isLoading && changelogs.length === 0 ? (
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 8, gap: 1.5 }}>
-            <CircularProgress size={32} sx={{ color: "primary.main" }} />
+            <CircularProgress size={32} sx={{ color: "text.primary" }} />
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
               Loading deployment audit changelogs from GitHub & Database...
             </Typography>
@@ -465,22 +469,19 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
                 variant="outlined"
                 sx={{
                   p: 2,
-                  borderRadius: 1.5,
+                  borderRadius: 2,
                   bgcolor: isCurrentRuntime
-                    ? (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.04)" : "rgba(13, 148, 136, 0.05)")
-                    : (theme) => (theme.palette.mode === "dark" ? "#181c23" : "#ffffff"),
+                    ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.02)")
+                    : (theme) => (theme.palette.mode === "dark" ? "#111114" : "#ffffff"),
                   borderColor: isCurrentRuntime
-                    ? "primary.main"
-                    : (theme) => (theme.palette.mode === "dark" ? "#242a34" : "#e2e8f0"),
+                    ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.25)" : "rgba(0, 0, 0, 0.25)")
+                    : (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"),
                   boxShadow: isCurrentRuntime
-                    ? (theme) => (theme.palette.mode === "dark" ? "0 4px 20px rgba(0, 229, 201, 0.08)" : "0 4px 16px rgba(13, 148, 136, 0.08)")
-                    : (theme) => (theme.palette.mode === "dark" ? "none" : "0 1px 3px rgba(0,0,0,0.05)"),
-                  transition: "all 0.2s ease-in-out",
+                    ? "0 4px 16px rgba(0, 0, 0, 0.1)"
+                    : "0 1px 3px rgba(0, 0, 0, 0.04)",
+                  transition: "all 0.15s ease-in-out",
                   "&:hover": {
-                    borderColor: "primary.main",
-                    bgcolor: isCurrentRuntime
-                      ? (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.06)" : "rgba(13, 148, 136, 0.08)")
-                      : (theme) => (theme.palette.mode === "dark" ? "#1b1f27" : "#ffffff"),
+                    borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.35)" : "rgba(0, 0, 0, 0.35)"),
                   },
                 }}
               >
@@ -493,18 +494,18 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
                       size="small"
                       sx={{
                         fontFamily: "monospace",
-                        fontWeight: 800,
+                        fontWeight: 700,
                         fontSize: "0.75rem",
                         bgcolor: isCurrentRuntime
-                          ? (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.18)" : "rgba(13, 148, 136, 0.12)")
-                          : (theme) => (theme.palette.mode === "dark" ? "#202530" : "#f1f5f9"),
+                          ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)")
+                          : (theme) => (theme.palette.mode === "dark" ? "#18181c" : "#f4f4f5"),
                         color: isCurrentRuntime
-                          ? (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488")
-                          : "text.primary",
+                          ? "text.primary"
+                          : "text.secondary",
                         border: "1px solid",
                         borderColor: isCurrentRuntime
-                          ? (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.45)" : "rgba(13, 148, 136, 0.35)")
-                          : (theme) => (theme.palette.mode === "dark" ? "#2e3544" : "#cbd5e1"),
+                          ? (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.15)")
+                          : (theme) => (theme.palette.mode === "dark" ? "#27272a" : "#e4e4e7"),
                       }}
                     />
                     {isCurrentRuntime && (
@@ -514,10 +515,10 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
                         sx={{
                           height: 20,
                           fontSize: "0.625rem",
-                          fontWeight: 800,
-                          bgcolor: "rgba(16, 185, 129, 0.15)",
+                          fontWeight: 700,
+                          bgcolor: "rgba(16, 185, 129, 0.12)",
                           color: "#10b981",
-                          border: "1px solid rgba(16, 185, 129, 0.3)",
+                          border: "1px solid rgba(16, 185, 129, 0.25)",
                         }}
                       />
                     )}
@@ -530,16 +531,17 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
                     {item.deployed_by && (
                       <Chip
-                        icon={<VerifiedIcon sx={{ fontSize: "12px !important", color: "#06b6d4 !important" }} />}
+                        icon={<VerifiedIcon sx={{ fontSize: "12px !important", color: "inherit !important" }} />}
                         label={item.deployed_by}
                         size="small"
                         sx={{
                           height: 20,
                           fontSize: "0.625rem",
                           fontWeight: 600,
-                          bgcolor: "rgba(6, 182, 212, 0.1)",
-                          color: (theme) => (theme.palette.mode === "dark" ? "#22d3ee" : "#0891b2"),
-                          border: "1px solid rgba(6, 182, 212, 0.2)",
+                          bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"),
+                          color: "text.secondary",
+                          border: "1px solid",
+                          borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)"),
                         }}
                       />
                     )}
@@ -550,11 +552,11 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
                         sx={{
                           p: 0.5,
                           borderRadius: 1.5,
-                          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#1e232c" : "#f1f5f9"),
+                          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#18181c" : "#f4f4f5"),
                           color: isCopied ? "#10b981" : "text.secondary",
                           border: "1px solid",
-                          borderColor: (theme) => (theme.palette.mode === "dark" ? "#29303d" : "#cbd5e1"),
-                          "&:hover": { color: "primary.main", bgcolor: (theme) => (theme.palette.mode === "dark" ? "#262c37" : "#e2e8f0") },
+                          borderColor: (theme) => (theme.palette.mode === "dark" ? "#27272a" : "#e4e4e7"),
+                          "&:hover": { color: "text.primary", borderColor: (theme) => (theme.palette.mode === "dark" ? "#3f3f46" : "#d4d4d8") },
                         }}
                       >
                         {isCopied ? <CheckIcon sx={{ fontSize: 14 }} /> : <CopyIcon sx={{ fontSize: 14 }} />}
@@ -567,11 +569,11 @@ export const SystemChangelogModal: React.FC<SystemChangelogModalProps> = ({
                         sx={{
                           p: 0.5,
                           borderRadius: 1.5,
-                          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#1e232c" : "#f1f5f9"),
+                          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#18181c" : "#f4f4f5"),
                           color: "text.secondary",
                           border: "1px solid",
-                          borderColor: (theme) => (theme.palette.mode === "dark" ? "#29303d" : "#cbd5e1"),
-                          "&:hover": { color: "primary.main", bgcolor: (theme) => (theme.palette.mode === "dark" ? "#262c37" : "#e2e8f0") },
+                          borderColor: (theme) => (theme.palette.mode === "dark" ? "#27272a" : "#e4e4e7"),
+                          "&:hover": { color: "text.primary", borderColor: (theme) => (theme.palette.mode === "dark" ? "#3f3f46" : "#d4d4d8") },
                         }}
                       >
                         <GitHubIcon sx={{ fontSize: 14 }} />

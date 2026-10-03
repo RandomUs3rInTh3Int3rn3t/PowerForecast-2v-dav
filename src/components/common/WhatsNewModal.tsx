@@ -46,7 +46,6 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
     parsedRelease,
     isLoading,
     dismiss,
-    openForVersion,
   } = useWhatsNew();
 
   const { t } = useLanguage();
@@ -91,27 +90,24 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
         slotProps={{
           backdrop: {
             sx: {
-              backdropFilter: "blur(14px)",
-              backgroundColor: "rgba(0, 0, 0, 0.78)",
+              backdropFilter: "blur(16px)",
+              backgroundColor: "rgba(0, 0, 0, 0.75)",
             },
           },
           paper: {
             sx: {
-              borderRadius: { xs: 3, sm: 4 },
+              borderRadius: { xs: 3, sm: 3.5 },
               bgcolor: (theme: Theme) =>
-                theme.palette.mode === "dark"
-                  ? "rgba(11, 13, 27, 0.97)"
-                  : "rgba(255, 255, 255, 0.98)",
+                theme.palette.mode === "dark" ? "#09090b" : "#ffffff",
+              color: (theme: Theme) =>
+                theme.palette.mode === "dark" ? "#fafafa" : "#09090b",
               backdropFilter: "blur(28px)",
               border: "1px solid",
               borderColor: (theme: Theme) =>
                 theme.palette.mode === "dark"
-                  ? "rgba(0, 229, 201, 0.35)"
-                  : "rgba(0, 229, 201, 0.4)",
-              boxShadow: (theme: Theme) =>
-                theme.palette.mode === "dark"
-                  ? "0 28px 72px rgba(0, 0, 0, 0.85), 0 0 36px rgba(0, 229, 201, 0.18)"
-                  : "0 28px 72px rgba(0, 0, 0, 0.16)",
+                  ? "rgba(255, 255, 255, 0.1)"
+                  : "rgba(0, 0, 0, 0.1)",
+              boxShadow: "0 25px 60px rgba(0, 0, 0, 0.5)",
               overflow: "hidden",
               p: { xs: 2.5, sm: 3.5 },
             },
@@ -129,26 +125,29 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
             }}
           >
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              {/* Glowing Icon Badge */}
+              {/* Neutral Icon Badge */}
               <Box
                 sx={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: "16px",
+                  width: 48,
+                  height: 48,
+                  borderRadius: "14px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background:
-                    "linear-gradient(135deg, rgba(0, 229, 201, 0.28) 0%, rgba(99, 102, 241, 0.35) 100%)",
-                  border: "1px solid rgba(0, 229, 201, 0.55)",
-                  boxShadow: (theme) =>
+                  bgcolor: (theme: Theme) =>
                     theme.palette.mode === "dark"
-                      ? "0 0 24px rgba(0, 229, 201, 0.35)"
-                      : "none",
+                      ? "rgba(255, 255, 255, 0.06)"
+                      : "rgba(0, 0, 0, 0.04)",
+                  border: "1px solid",
+                  borderColor: (theme: Theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.12)"
+                      : "rgba(0, 0, 0, 0.1)",
+                  color: "text.primary",
                   flexShrink: 0,
                 }}
               >
-                <RocketIcon sx={{ fontSize: 26, color: "primary.main" }} />
+                <RocketIcon sx={{ fontSize: 24, color: "text.primary" }} />
               </Box>
 
               <Box>
@@ -165,13 +164,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                     sx={{
                       fontWeight: 800,
                       letterSpacing: "-0.02em",
-                      background:
-                        "linear-gradient(90deg, #ffffff 0%, #00e5c9 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: (theme: Theme) =>
-                        theme.palette.mode === "dark"
-                          ? "transparent"
-                          : theme.palette.text.primary,
+                      color: "text.primary",
                     }}
                   >
                     {t("whatsNew.title", "What's New in PowerForecast")}
@@ -181,18 +174,18 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                     size="small"
                     sx={{
                       fontFamily: "monospace",
-                      fontWeight: 800,
+                      fontWeight: 700,
                       fontSize: "0.75rem",
-                      bgcolor: (theme) =>
+                      bgcolor: (theme: Theme) =>
                         theme.palette.mode === "dark"
-                          ? "rgba(0, 229, 201, 0.15)"
-                          : "rgba(13, 148, 136, 0.12)",
-                      color: "primary.main",
+                          ? "rgba(255, 255, 255, 0.08)"
+                          : "rgba(0, 0, 0, 0.06)",
+                      color: "text.primary",
                       border: "1px solid",
-                      borderColor: (theme) =>
+                      borderColor: (theme: Theme) =>
                         theme.palette.mode === "dark"
-                          ? "rgba(0, 229, 201, 0.4)"
-                          : "rgba(13, 148, 136, 0.35)",
+                          ? "rgba(255, 255, 255, 0.15)"
+                          : "rgba(0, 0, 0, 0.12)",
                     }}
                   />
                 </Box>
@@ -225,7 +218,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
 
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <VerifiedIcon
-                      sx={{ fontSize: 13, color: "primary.main" }}
+                      sx={{ fontSize: 13, color: "success.main" }}
                     />
                     <Typography
                       variant="caption"
@@ -256,7 +249,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
           </Box>
         </DialogTitle>
 
-        <Divider sx={{ borderColor: "divider", mb: 2 }} />
+        <Divider sx={{ borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)", mb: 2 }} />
 
         {/* Changes & Highlights Content */}
         <DialogContent sx={{ p: 0, py: 1 }}>
@@ -271,7 +264,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                 gap: 1.5,
               }}
             >
-              <CircularProgress size={28} sx={{ color: "primary.main" }} />
+              <CircularProgress size={28} sx={{ color: "text.primary" }} />
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 {t("whatsNew.loading", "Loading release highlights...")}
               </Typography>
@@ -281,11 +274,11 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
               elevation={0}
               sx={{
                 p: { xs: 2, sm: 2.5 },
-                borderRadius: 3,
+                borderRadius: 2.5,
                 bgcolor: (theme: Theme) =>
                   theme.palette.mode === "dark"
-                    ? "rgba(17, 20, 39, 0.75)"
-                    : "rgba(241, 245, 249, 0.8)",
+                    ? "rgba(255, 255, 255, 0.03)"
+                    : "rgba(0, 0, 0, 0.02)",
                 border: "1px solid",
                 borderColor: (theme: Theme) =>
                   theme.palette.mode === "dark"
@@ -303,7 +296,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                   mb: 1.75,
                 }}
               >
-                <SparklesIcon sx={{ fontSize: 18, color: "primary.main" }} />
+                <SparklesIcon sx={{ fontSize: 16, color: "text.primary" }} />
                 <Typography
                   variant="subtitle2"
                   sx={{ fontWeight: 700, color: "text.primary" }}
@@ -330,7 +323,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                       <CheckIcon
                         sx={{
                           fontSize: 16,
-                          color: "primary.main",
+                          color: "success.main",
                           mt: 0.3,
                           flexShrink: 0,
                         }}
@@ -358,7 +351,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                     <CheckIcon
                       sx={{
                         fontSize: 16,
-                        color: "primary.main",
+                        color: "success.main",
                         mt: 0.3,
                         flexShrink: 0,
                       }}
@@ -382,7 +375,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
               {changelogEntry?.description &&
                 parsedRelease &&
                 parsedRelease.highlights.length > 1 && (
-                  <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px dashed", borderColor: "divider" }}>
+                  <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px dashed", borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)" }}>
                     <Button
                       size="small"
                       onClick={() => setShowFullRaw(!showFullRaw)}
@@ -432,7 +425,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
           )}
         </DialogContent>
 
-        <Divider sx={{ borderColor: "divider", mt: 2.5, mb: 2 }} />
+        <Divider sx={{ borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)", mt: 2.5, mb: 2 }} />
 
         {/* Action Buttons */}
         <DialogActions
@@ -468,23 +461,16 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
               py: 1,
               borderRadius: 2,
               textTransform: "none",
-              fontWeight: 800,
+              fontWeight: 700,
               fontSize: "0.9375rem",
-              bgcolor: "primary.main",
-              color: "primary.contrastText",
-              boxShadow: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "0 0 20px rgba(0, 229, 201, 0.4)"
-                  : "0 4px 14px rgba(13, 148, 136, 0.3)",
+              bgcolor: (theme) => (theme.palette.mode === "dark" ? "#fafafa" : "#18181b"),
+              color: (theme) => (theme.palette.mode === "dark" ? "#09090b" : "#fafafa"),
+              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.12)",
               "&:hover": {
-                bgcolor: "primary.dark",
-                boxShadow: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "0 0 28px rgba(0, 229, 201, 0.6)"
-                    : "0 6px 20px rgba(13, 148, 136, 0.4)",
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "#f4f4f5" : "#27272a"),
                 transform: "translateY(-1px)",
               },
-              transition: "all 0.2s ease-in-out",
+              transition: "all 0.15s ease-in-out",
             }}
           >
             {t("whatsNew.gotItButton", "Awesome, Got It!")}

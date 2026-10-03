@@ -1,25 +1,33 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
 import {
-  MailOutlined as MailIcon,
-  CheckCircleOutlined as CheckCircleIcon,
-  Refresh as RefreshIcon,
-} from "@mui/icons-material";
+  Mail,
+  CheckCircle2,
+  RefreshCw,
+  Sun,
+  Moon,
+  AlertCircle,
+  ArrowLeft,
+} from "lucide-react";
 import { useColorMode } from "../theme/AppTheme";
-import { supabaseClient } from "../lib/supabaseClient";
+import { supabaseClient, APP_VERSION } from "../lib/supabaseClient";
+import { SystemTestingBanner } from "../components/common/SystemTestingBanner";
+import { Button, buttonVariants } from "../components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "../components/ui/card";
+import { cn } from "../lib/utils";
 
 /** Shared channel name for cross-tab verification communication */
 const AUTH_CHANNEL = "powerforecast-auth";
 
 export const VerifyEmailPage: React.FC = () => {
-  const { mode } = useColorMode();
+  const { mode, toggleColorMode } = useColorMode();
   const isDark = mode === "dark";
   const location = useLocation();
 
@@ -28,6 +36,11 @@ export const VerifyEmailPage: React.FC = () => {
   const email = searchParams.get("email") || "your email address";
 
   const [isVerified, setIsVerified] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const handleVerified = useCallback(() => {
     setIsVerified(true);
@@ -38,31 +51,27 @@ export const VerifyEmailPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Retrieve the registration timestamp stamped by authProvider.register().
-    // We use this to ensure email_confirmed_at is genuinely newer than this signup.
-    // The timestamp guard is the sole protection against false-positive verification —
-    // no session exists when email confirmation is enabled so no signOut is needed here.
-    const registeredAt = parseInt(sessionStorage.getItem('powerforecast_registered_at') || '0', 10);
+    const registeredAt = parseInt(
+      sessionStorage.getItem("powerforecast_registered_at") || "0",
+      10
+    );
 
-    const isGenuinelyVerified = (confirmedAtStr: string | null | undefined): boolean => {
+    const isGenuinelyVerified = (
+      confirmedAtStr: string | null | undefined
+    ): boolean => {
       if (!confirmedAtStr) return false;
       const confirmedMs = new Date(confirmedAtStr).getTime();
-      // Must be confirmed AFTER the registration moment (with a 2-second buffer for clock skew)
       return confirmedMs > registeredAt - 2000;
     };
 
-    // ── 1. Supabase onAuthStateChange listener (same-tab redirect fallback) ──
+    // ── 1. Supabase onAuthStateChange listener ──
     const { data: authListener } = supabaseClient.auth.onAuthStateChange(
       (event, session) => {
-        // Only treat this as a genuine verification if:
-        //   a) The Supabase event is SIGNED_IN or USER_UPDATED (not just any state change), AND
-        //   b) email_confirmed_at is present and was set AFTER this registration began.
-        // Removed plain 'SIGNED_IN' as a trigger by itself — that fires for any login.
         if (
           (event === "SIGNED_IN" || event === "USER_UPDATED") &&
           isGenuinelyVerified(session?.user?.email_confirmed_at)
         ) {
-          sessionStorage.removeItem('powerforecast_registered_at');
+          sessionStorage.removeItem("powerforecast_registered_at");
           handleVerified();
         }
       }
@@ -73,7 +82,7 @@ export const VerifyEmailPage: React.FC = () => {
       try {
         const { data } = await supabaseClient.auth.getSession();
         if (isGenuinelyVerified(data?.session?.user?.email_confirmed_at)) {
-          sessionStorage.removeItem('powerforecast_registered_at');
+          sessionStorage.removeItem("powerforecast_registered_at");
           handleVerified();
         }
       } catch {
@@ -87,7 +96,7 @@ export const VerifyEmailPage: React.FC = () => {
       channel = new BroadcastChannel(AUTH_CHANNEL);
       channel.onmessage = (event) => {
         if (event.data?.type === "VERIFICATION_SUCCESS") {
-          sessionStorage.removeItem('powerforecast_registered_at');
+          sessionStorage.removeItem("powerforecast_registered_at");
           handleVerified();
         }
       };
@@ -95,13 +104,13 @@ export const VerifyEmailPage: React.FC = () => {
       // BroadcastChannel not supported
     }
 
-    // ── 4. localStorage event fallback (cross-tab, older browsers) ──
+    // ── 4. localStorage event fallback (cross-tab) ──
     const handleStorageEvent = (event: StorageEvent) => {
       if (event.key === "powerforecast_verification_signal") {
         try {
           const payload = JSON.parse(event.newValue || "{}");
           if (payload.verified) {
-            sessionStorage.removeItem('powerforecast_registered_at');
+            sessionStorage.removeItem("powerforecast_registered_at");
             handleVerified();
           }
         } catch {
@@ -118,9 +127,6 @@ export const VerifyEmailPage: React.FC = () => {
       window.removeEventListener("storage", handleStorageEvent);
     };
   }, [handleVerified]);
-
-  const [isResending, setIsResending] = useState(false);
-  const [resendStatus, setResendStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const handleResend = async () => {
     if (!email || email === "your email address") return;
@@ -140,179 +146,156 @@ export const VerifyEmailPage: React.FC = () => {
       if (error) {
         setResendStatus({ type: "error", message: error.message });
       } else {
-        setResendStatus({ type: "success", message: "Verification email resent successfully! Please check your inbox." });
+        setResendStatus({
+          type: "success",
+          message: "Verification email resent successfully! Please check your inbox.",
+        });
       }
     } catch (err: any) {
-      setResendStatus({ type: "error", message: "Failed to resend email. Please try again later." });
+      setResendStatus({
+        type: "error",
+        message: "Failed to resend email. Please try again later.",
+      });
     } finally {
       setIsResending(false);
     }
   };
 
-  // ── Verified state: shown after cross-tab signal is received ──
-  if (isVerified) {
-    return (
-      <Box
-        sx={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          bgcolor: isDark ? "#17191d" : "#f4f6f8",
-          color: "text.primary",
-          alignItems: "center",
-          justifyContent: "center",
-          p: 2,
-        }}
-      >
-        <Container maxWidth="sm">
-          <Card
-            sx={{
-              p: { xs: 4, sm: 6 },
-              borderRadius: 1.5,
-              textAlign: "center",
-              boxShadow: isDark
-                ? "0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 229, 201, 0.1)"
-                : "0 20px 60px rgba(0, 158, 136, 0.1)",
-              border: "1px solid",
-              borderColor: isDark ? "rgba(0, 229, 201, 0.25)" : "rgba(226, 232, 240, 0.8)",
-              bgcolor: isDark ? "rgba(32, 35, 40, 0.95)" : "rgba(255, 255, 255, 0.96)",
-              backdropFilter: "blur(16px)",
-            }}
-          >
-            <Box
-              sx={{
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                bgcolor: "rgba(0, 229, 201, 0.1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                mx: "auto",
-                mb: 3,
-                animation: "pulse 1.5s ease-in-out",
-                "@keyframes pulse": {
-                  "0%": { transform: "scale(0.8)", opacity: 0 },
-                  "50%": { transform: "scale(1.1)" },
-                  "100%": { transform: "scale(1)", opacity: 1 },
-                },
-              }}
-            >
-              <CheckCircleIcon sx={{ fontSize: 48, color: "primary.main" }} />
-            </Box>
-
-            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
-              Email Verified!
-            </Typography>
-
-            <Typography variant="body1" sx={{ color: "text.secondary", mb: 3 }}>
-              Your PowerForecast account is now active. Redirecting you to sign in...
-            </Typography>
-
-            <CircularProgress size={24} sx={{ color: "primary.main" }} />
-          </Card>
-        </Container>
-      </Box>
-    );
-  }
-
-  // ── Pending state: waiting for verification ──
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        bgcolor: isDark ? "#17191d" : "#f4f6f8",
-        color: "text.primary",
-        alignItems: "center",
-        justifyContent: "center",
-        p: 2,
-      }}
-    >
-      <Container maxWidth="sm">
-        <Card
-          sx={{
-            p: { xs: 4, sm: 6 },
-            borderRadius: 1.5,
-            textAlign: "center",
-            boxShadow: isDark
-              ? "0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 229, 201, 0.1)"
-              : "0 20px 60px rgba(0, 158, 136, 0.1)",
-            border: "1px solid",
-            borderColor: isDark ? "rgba(0, 229, 201, 0.25)" : "rgba(226, 232, 240, 0.8)",
-            bgcolor: isDark ? "rgba(32, 35, 40, 0.95)" : "rgba(255, 255, 255, 0.96)",
-            backdropFilter: "blur(16px)",
-          }}
-        >
-          <Box
-            sx={{
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              bgcolor: isDark ? "rgba(0, 229, 201, 0.12)" : "rgba(0, 158, 136, 0.08)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              mx: "auto",
-              mb: 3,
-            }}
+    <div className="pf-auth flex min-h-screen flex-col justify-between bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+      {/* 1. Header */}
+      <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/80 px-4 backdrop-blur md:px-8">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 text-foreground transition-opacity hover:opacity-90"
           >
-            <MailIcon sx={{ fontSize: 40, color: "primary.main" }} />
-          </Box>
+            <img src="/Assets/LOGO.png" alt="PowerForecast Logo" className="h-7 w-7 object-contain" />
+            <span className="text-base font-bold tracking-tight sm:text-lg">PowerForecast</span>
+          </Link>
 
-          <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
-            Verify Your Email
-          </Typography>
-
-          <Typography variant="body1" sx={{ color: "text.secondary", mb: 3 }}>
-            We've sent a verification link to <Box component="span" sx={{ fontWeight: 700, color: "text.primary" }}>{email}</Box>.
-            Please check your inbox and click the link to activate your account.
-          </Typography>
-
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 4 }}>
-            <CircularProgress size={20} thickness={5} sx={{ color: "text.secondary" }} />
-            <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 500 }}>
-              Waiting for verification...
-            </Typography>
-          </Box>
-
-          {resendStatus && (
-            <Alert severity={resendStatus.type} sx={{ mb: 3, borderRadius: 2, textAlign: "left" }}>
-              {resendStatus.message}
-            </Alert>
-          )}
-
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div className="flex items-center gap-2 sm:gap-3">
             <Button
-              variant="outlined"
-              size="large"
-              fullWidth
-              startIcon={isResending ? <CircularProgress size={20} /> : <RefreshIcon />}
-              onClick={handleResend}
-              disabled={isResending || email === "your email address"}
-              sx={{
-                py: 1.25,
-                borderRadius: 1,
-                fontWeight: 600,
-              }}
+              variant="ghost"
+              size="icon"
+              onClick={toggleColorMode}
+              aria-label={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+              className="text-muted-foreground hover:text-foreground"
             >
-              {isResending ? "Resending..." : "Resend Verification Email"}
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
 
-            <Button
-              component={Link}
+            <Link
               to="/login"
-              variant="text"
-              size="small"
-              sx={{ color: "text.secondary" }}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground hover:text-foreground")}
             >
-              Back to Sign In
-            </Button>
-          </Box>
-        </Card>
-      </Container>
-    </Box>
+              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+              <span>Back to Sign In</span>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* 2. System Testing Banner Strip */}
+      <SystemTestingBanner variant="auth" />
+
+      {/* 3. Main Center Container */}
+      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:py-16">
+        {isVerified ? (
+          <Card className="w-full max-w-[440px] border-border bg-card/95 p-2 shadow-xl backdrop-blur-sm text-center">
+            <CardHeader className="space-y-3 pb-4">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 animate-in zoom-in-75">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+              <CardTitle className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                Email Verified!
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground sm:text-sm">
+                Your PowerForecast account is now active. Redirecting you to sign in...
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center pb-6">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="w-full max-w-[460px] border-border bg-card/95 shadow-xl backdrop-blur-sm text-center">
+            <CardHeader className="space-y-3 pb-4">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted/60 text-foreground shadow-xs">
+                <Mail className="h-7 w-7" />
+              </div>
+              <CardTitle className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                Verify Your Email
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground sm:text-sm leading-relaxed max-w-sm mx-auto">
+                We've sent a verification link to{" "}
+                <strong className="font-semibold text-foreground">{email}</strong>.
+                Please check your inbox and click the link to activate your account.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-center gap-2 rounded-lg border border-border/60 bg-muted/30 py-2.5 px-4 text-xs font-medium text-muted-foreground">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+                <span>Waiting for verification...</span>
+              </div>
+
+              {resendStatus && (
+                <div
+                  className={cn(
+                    "flex items-start gap-2 rounded-lg border p-3 text-xs text-left",
+                    resendStatus.type === "success"
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      : "border-destructive/30 bg-destructive/10 text-destructive"
+                  )}
+                >
+                  {resendStatus.type === "success" ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  )}
+                  <span className="leading-relaxed font-medium">{resendStatus.message}</span>
+                </div>
+              )}
+
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full font-semibold shadow-xs"
+                onClick={handleResend}
+                disabled={isResending || email === "your email address"}
+              >
+                {isResending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Resending...</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Resend Verification Email</span>
+                  </span>
+                )}
+              </Button>
+            </CardContent>
+
+            <CardFooter className="flex justify-center border-t border-border/60 pt-4 pb-4">
+              <Link
+                to="/login"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors hover:underline"
+              >
+                Back to Sign In
+              </Link>
+            </CardFooter>
+          </Card>
+        )}
+      </main>
+
+      {/* 4. Footer */}
+      <footer className="border-t border-border/40 py-4 text-center text-xs text-muted-foreground">
+        © {new Date().getFullYear()} PowerForecast • Version {APP_VERSION}
+      </footer>
+    </div>
   );
 };
 

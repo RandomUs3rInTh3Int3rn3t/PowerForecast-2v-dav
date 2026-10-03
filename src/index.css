@@ -318,7 +318,8 @@ code, kbd, samp, pre {
 }
 
 /* Light tokens (default) */
-.pf-landing {
+.pf-landing,
+.pf-auth {
   --background: hsl(0 0% 100%);
   --foreground: hsl(240 10% 3.9%);
   --card: hsl(0 0% 100%);
@@ -358,7 +359,9 @@ code, kbd, samp, pre {
 
 /* Dark tokens — AppTheme toggles the `dark` class on <html> */
 .dark .pf-landing,
-[data-theme="dark"] .pf-landing {
+[data-theme="dark"] .pf-landing,
+.dark .pf-auth,
+[data-theme="dark"] .pf-auth {
   --background: hsl(240 10% 3.9%);
   --foreground: hsl(0 0% 98%);
   --card: hsl(240 10% 3.9%);
@@ -386,15 +389,19 @@ code, kbd, samp, pre {
 }
 
 @layer base {
-  /* shadcn: `* { @apply border-border }` — scoped to the landing page */
+  /* shadcn: `* { @apply border-border }` — scoped to the landing and auth pages */
   .pf-landing *,
   .pf-landing *::before,
-  .pf-landing *::after {
+  .pf-landing *::after,
+  .pf-auth *,
+  .pf-auth *::before,
+  .pf-auth *::after {
     border-color: var(--border);
   }
 }
 
-.pf-landing ::selection {
+.pf-landing ::selection,
+.pf-auth ::selection {
   background: var(--primary);
   color: var(--primary-foreground);
 }

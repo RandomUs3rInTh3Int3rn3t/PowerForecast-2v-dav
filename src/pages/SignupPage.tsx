@@ -1,28 +1,31 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useRegister } from "@refinedev/core";
-import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import InputAdornment from "@mui/material/InputAdornment";
-import IconButton from "@mui/material/IconButton";
-import Alert from "@mui/material/Alert";
-import Tooltip from "@mui/material/Tooltip";
 import {
-  Person as PersonIcon,
-  Email as EmailIcon,
-  Lock as LockIcon,
-  Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon,
-  LightMode as SunIcon,
-  DarkMode as MoonIcon,
-} from "@mui/icons-material";
+  User,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  Sun,
+  Moon,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
+import { APP_VERSION } from "../lib/supabaseClient";
 import { useColorMode } from "../theme/AppTheme";
 import { useToast } from "../components/common/ToastProvider";
 import { SystemTestingBanner } from "../components/common/SystemTestingBanner";
+import { Button, buttonVariants } from "../components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "../components/ui/card";
+import { cn } from "../lib/utils";
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
@@ -131,313 +134,234 @@ export const SignupPage: React.FC = () => {
   const passwordsMatch = !confirmPassword || password === confirmPassword;
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        bgcolor: isDark ? "#17191d" : "#f4f6f8",
-        color: "text.primary",
-        position: "relative",
-        overflowX: "hidden",
-      }}
-    >
-      {/* Header */}
-      <Box
-        sx={{
-          position: "relative",
-          zIndex: 10,
-          p: 2,
-          px: { xs: 2, sm: 4 },
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid",
-          borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
-          backdropFilter: "blur(12px)",
-          bgcolor: isDark ? "rgba(8, 7, 32, 0.7)" : "rgba(244, 246, 251, 0.7)",
-        }}
-      >
-        <Box component={Link} to="/" sx={{ display: "flex", alignItems: "center", gap: 1.5, textDecoration: "none", color: "inherit" }}>
-          <Box
-            component="img"
-            src="/Assets/LOGO.png"
-            alt="PowerForecast Logo"
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: 1,
-              objectFit: "contain",
-              filter: "drop-shadow(0 2px 8px rgba(0, 229, 201, 0.4))",
-            }}
-          />
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            PowerForecast
-          </Typography>
-        </Box>
+    <div className="pf-auth flex min-h-screen flex-col justify-between bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+      {/* 1. Header */}
+      <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/80 px-4 backdrop-blur md:px-8">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 text-foreground transition-opacity hover:opacity-90"
+          >
+            <img src="/Assets/LOGO.png" alt="PowerForecast Logo" className="h-7 w-7 object-contain" />
+            <span className="text-base font-bold tracking-tight sm:text-lg">PowerForecast</span>
+          </Link>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Tooltip title={`Switch to ${isDark ? "Light" : "Dark"} mode`}>
-            <IconButton onClick={toggleColorMode} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
-              {isDark ? <SunIcon sx={{ color: "#ffd54f", fontSize: 18 }} /> : <MoonIcon sx={{ color: "primary.main", fontSize: 18 }} />}
-            </IconButton>
-          </Tooltip>
-          <Button component={Link} to="/login" size="small" variant="text">
-            Sign In
-          </Button>
-        </Box>
-      </Box>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleColorMode}
+              aria-label={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
 
-      {/* HubSpot-Style System Testing Announcement Banner Strip */}
+            <Link
+              to="/login"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground hover:text-foreground")}
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* 2. System Testing Banner Strip */}
       <SystemTestingBanner variant="auth" />
 
-      {/* Background Hanging Bulb (Left) */}
-      <Box
-        sx={{
-          position: "absolute",
-          top: 0,
-          left: { md: "6%", lg: "12%", xl: "16%" },
-          display: { xs: "none", md: "block" },
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      >
-        {/* Ambient Radial Glow */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: "45%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: { md: 450, lg: 550 },
-            height: { md: 450, lg: 550 },
-            borderRadius: "50%",
-            background: isDark
-              ? "radial-gradient(circle, rgba(0, 229, 201, 0.2) 0%, rgba(23, 25, 29, 0) 70%)"
-              : "radial-gradient(circle, rgba(255, 213, 79, 0.4) 0%, rgba(244, 246, 251, 0) 70%)",
-            filter: "blur(50px)",
-            pointerEvents: "none",
-          }}
-        />
-
-        <Box
-          component="img"
-          src={isDark ? "/Assets/Off.png" : "/Assets/On.png"}
-          alt="PowerForecast Energy Bulb"
-          sx={{
-            height: { md: "calc(100vh - 100px)", lg: "calc(100vh - 110px)" },
-            maxHeight: { md: 640, lg: 750 },
-            width: "auto",
-            objectFit: "contain",
-            display: "block",
-            filter: isDark
-              ? "drop-shadow(0 25px 45px rgba(0, 0, 0, 0.95))"
-              : "drop-shadow(0 25px 60px rgba(255, 213, 79, 0.6))",
-          }}
-        />
-      </Box>
-
-      {/* Main Container: Bento Card positioned on the right */}
-      <Container
-        maxWidth="lg"
-        sx={{
-          flexGrow: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: { xs: "center", md: "flex-end" },
-          py: { xs: 4, sm: 6 },
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <Card
-          sx={{
-            width: "100%",
-            maxWidth: 520,
-            p: { xs: 3, sm: 4.5 },
-            borderRadius: 1.5,
-            boxShadow: isDark
-              ? "0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 229, 201, 0.1)"
-              : "0 20px 60px rgba(0, 158, 136, 0.1)",
-            border: "1px solid",
-            borderColor: isDark ? "rgba(0, 229, 201, 0.25)" : "rgba(226, 232, 240, 0.8)",
-            bgcolor: isDark ? "rgba(32, 35, 40, 0.95)" : "rgba(255, 255, 255, 0.96)",
-            backdropFilter: "blur(16px)",
-          }}
-        >
-          <Box sx={{ textAlign: "center", mb: 3 }}>
-            <Box
-              component="img"
-              src="/Assets/LOGO.png"
-              alt="PowerForecast Logo"
-              sx={{
-                width: 52,
-                height: 52,
-                borderRadius: 1.25,
-                objectFit: "contain",
-                filter: "drop-shadow(0 4px 16px rgba(0, 229, 201, 0.4))",
-                mb: 1.5,
-              }}
-            />
-            <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: "-0.02em" }}>
+      {/* 3. Centered Auth Card */}
+      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:py-16">
+        <Card className="w-full max-w-[460px] border-border bg-card/95 shadow-xl backdrop-blur-sm">
+          <CardHeader className="space-y-2 pb-6 text-center">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted/50 p-2 shadow-xs">
+              <img src="/Assets/LOGO.png" alt="PowerForecast" className="h-8 w-8 object-contain" />
+            </div>
+            <CardTitle className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               Create Account
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground sm:text-sm">
               Start tracking and optimizing your household energy profile
-            </Typography>
-          </Box>
+            </CardDescription>
+          </CardHeader>
 
-          {errorMessage && (
-            <Alert
-              severity="error"
-              sx={{ mb: 3, borderRadius: 1 }}
-              action={
-                errorMessage.toLowerCase().includes("already registered") ||
-                errorMessage.toLowerCase().includes("already exists") ? (
-                  <Button
-                    component={Link}
-                    to="/login"
-                    color="inherit"
-                    size="small"
-                    sx={{ fontWeight: 700, textDecoration: "underline", textTransform: "none" }}
+          <CardContent className="space-y-4">
+            {/* Error Alert Box */}
+            {errorMessage && (
+              <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div className="flex-1 font-medium leading-relaxed">{errorMessage}</div>
+                </div>
+
+                {(errorMessage.toLowerCase().includes("already registered") ||
+                  errorMessage.toLowerCase().includes("already exists")) && (
+                  <div className="pt-1 border-t border-destructive/20">
+                    <Link to="/login" className="font-bold underline hover:opacity-80">
+                      Sign In to your existing account
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Full Name Field */}
+              <div className="space-y-1.5">
+                <label htmlFor="name" className="text-xs font-semibold text-foreground">
+                  Full Name <span className="text-destructive">*</span>
+                </label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Maria Santos"
+                    className="h-10 w-full rounded-md border border-input bg-background/50 pl-9 pr-3 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+              </div>
+
+              {/* Email Address Field */}
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="text-xs font-semibold text-foreground">
+                  Email Address <span className="text-destructive">*</span>
+                </label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                    <Mail className="h-4 w-4" />
+                  </div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="user@powerforecast.ph"
+                    className="h-10 w-full rounded-md border border-input bg-background/50 pl-9 pr-3 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div className="space-y-1.5">
+                <label htmlFor="password" className="text-xs font-semibold text-foreground">
+                  Password <span className="text-destructive">*</span>
+                </label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    className="h-10 w-full rounded-md border border-input bg-background/50 pl-9 pr-10 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer"
                   >
-                    Sign In
-                  </Button>
-                ) : undefined
-              }
-            >
-              {errorMessage}
-            </Alert>
-          )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <TextField
-              label="Full Name"
-              required
-              fullWidth
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Maria Santos"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <PersonIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
+              {/* Confirm Password Field */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="confirmPassword" className="text-xs font-semibold text-foreground">
+                    Confirm Password <span className="text-destructive">*</span>
+                  </label>
+                  {!passwordsMatch && (
+                    <span className="text-[11px] font-medium text-destructive">
+                      Passwords do not match
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repeat your password"
+                    className={cn(
+                      "h-10 w-full rounded-md border bg-background/50 pl-9 pr-10 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1",
+                      passwordsMatch
+                        ? "border-input focus-visible:ring-ring"
+                        : "border-destructive focus-visible:ring-destructive"
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
 
-            <TextField
-              label="Email Address"
-              type="email"
-              required
-              fullWidth
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@powerforecast.ph"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <EmailIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-
-            <TextField
-              label="Password"
-              type={showPassword ? "text" : "password"}
-              required
-              fullWidth
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-
-            <TextField
-              label="Confirm Password"
-              type={showConfirmPassword ? "text" : "password"}
-              required
-              fullWidth
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              error={!passwordsMatch}
-              helperText={!passwordsMatch ? "Passwords do not match" : ""}
-              placeholder="••••••••"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        edge="end"
-                      >
-                        {showConfirmPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              size="large"
-              disabled={isLoading || !passwordsMatch}
-              sx={{ py: 1.25, borderRadius: 1, mt: 1, fontWeight: 700 }}
-            >
-              {isLoading ? "Creating account..." : "Complete Registration"}
-            </Button>
-          </Box>
-
-          <Box sx={{ mt: 3, textAlign: "center" }}>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Already registered?{" "}
-              <Typography
-                component={Link}
-                to="/login"
-                variant="body2"
-                sx={{ color: "primary.main", fontWeight: 700, textDecoration: "none" }}
+              {/* Submit CTA */}
+              <Button
+                type="submit"
+                disabled={isLoading || !passwordsMatch}
+                className="w-full font-semibold shadow-xs"
+                size="lg"
               >
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    <span>Creating account...</span>
+                  </span>
+                ) : (
+                  <span>Complete Registration</span>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+
+          <CardFooter className="flex flex-col gap-2 border-t border-border/60 pt-4 text-center text-xs text-muted-foreground">
+            <div>
+              Already registered?{" "}
+              <Link to="/login" className="font-semibold text-foreground hover:underline">
                 Sign in here
-              </Typography>
-            </Typography>
-          </Box>
+              </Link>
+            </div>
+          </CardFooter>
         </Card>
-      </Container>
-    </Box>
+      </main>
+
+      {/* 4. Minimal Footer */}
+      <footer className="border-t border-border/40 py-4 text-center text-xs text-muted-foreground">
+        © {new Date().getFullYear()} PowerForecast • Version {APP_VERSION}
+      </footer>
+    </div>
   );
 };
 

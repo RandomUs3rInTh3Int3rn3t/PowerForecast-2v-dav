@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.5.0gv",
+    version: "3.5.0gv",
+    git_commit_tag: "3.5.0gv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0gv - Restore and merge all redesigned authentication views (LoginPage, SignupPage, ForgotPasswordPage, VerifyEmailPage, EmailVerifiedPage) and modal dialogs (WhatsNewModal, SystemChangelogModal, VersionBadge) with Stack Template neutral zinc design system and scoped .pf-auth theme tokens",
+  },
+  {
     id: "3.5.0fv",
     version: "3.5.0fv",
     git_commit_tag: "3.5.0fv",
