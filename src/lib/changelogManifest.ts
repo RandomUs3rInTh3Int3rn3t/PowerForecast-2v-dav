@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.5.0hv",
+    version: "3.5.0hv",
+    git_commit_tag: "3.5.0hv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0hv - Clean up Hero section on LandingPage by removing the 3 CTA action buttons and 4 trust metric badge cards, delivering a focused, distraction-free headline and subtitle presentation",
+  },
+  {
     id: "3.5.0gv",
     version: "3.5.0gv",
     git_commit_tag: "3.5.0gv",

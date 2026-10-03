@@ -25,12 +25,10 @@ import {
   WandSparkles,
   ScanText,
   BookOpen,
-  Gauge,
   Monitor,
   ShowerHead,
   Flame,
   Fan,
-  Check,
 } from "lucide-react";
 import { useColorMode } from "../theme/AppTheme";
 import { APP_VERSION } from "../lib/supabaseClient";
@@ -283,48 +281,6 @@ export const LandingPage: React.FC = () => {
               <strong className="font-semibold text-foreground">ERC unbundled tariff formulas</strong>, and{" "}
               <strong className="font-semibold text-foreground">DOE PELP energy efficiency star ratings</strong>.
             </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-wrap justify-center gap-3 pt-2">
-              <Link to="/signup" className={cn(buttonVariants({ variant: "default", size: "lg" }))}>
-                <span>Get Started Free</span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link to="/calculator" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
-                <Calculator className="h-4 w-4" />
-                <span>Unbundled Calculator</span>
-              </Link>
-              <Button
-                variant="ghost"
-                size="lg"
-                onClick={() => scrollToSection("features")}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Gauge className="h-4 w-4" />
-                <span>Core Modules</span>
-              </Button>
-            </div>
-
-            {/* Quick trust metrics row */}
-            <div className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                { label: "100+ DOE PELP Catalog Models", icon: Layers },
-                { label: "ERC Unbundled Centavo Precision", icon: Check },
-                { label: "24-Hour Visual Activity Timeline", icon: Activity },
-                { label: "Smart Overnight Split Engine", icon: Clock },
-              ].map((metric, i) => {
-                const IconComp = metric.icon;
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card/60 px-3 py-2 text-xs font-medium text-foreground shadow-xs backdrop-blur-sm"
-                  >
-                    <IconComp className="h-3.5 w-3.5 text-foreground" />
-                    <span>{metric.label}</span>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </section>
 
