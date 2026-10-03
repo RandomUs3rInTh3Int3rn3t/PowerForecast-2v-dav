@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.6.0bv",
+    version: "3.6.0bv",
+    git_commit_tag: "3.6.0bv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.6.0bv - Merge upstream/main: integrate Google Gemini AI Energy Auditor with token quota preservation & intelligent fallback engine, real-time stopwatch telemetry & Live Load Circuits drawer, and Household Multi-User Access with role-based member permissions",
+  },
+  {
     id: "3.5.0ev",
     version: "3.5.0ev",
     git_commit_tag: "3.5.0ev",
