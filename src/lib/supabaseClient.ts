@@ -7,7 +7,7 @@ export const SUPABASE_ANON_KEY =
   import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_gfiWW-NqpccAsARI5pO4Kg_qzOTY6Az';
 
 // Application Version - bump on every deployment according to user versioning rule
-export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '3.5.0cv';
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '3.5.0dv';
 
 export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {

@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.5.0dv",
+    version: "3.5.0dv",
+    git_commit_tag: "3.5.0dv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0dv - Decommission 24-Hour Daily Load Curve Simulation from Analytics view, sync onboarding tour steps, and introduce on-demand Google Gemini AI Energy Auditor with token quota preservation, session caching, and intelligent fallback engine",
+  },
+  {
     id: "3.5.0cv",
     version: "3.5.0cv",
     git_commit_tag: "3.5.0cv",
