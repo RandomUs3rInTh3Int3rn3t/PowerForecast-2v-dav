@@ -32,6 +32,8 @@ import {
   Refresh as RefreshIcon,
   ChevronRight as ChevronRightIcon,
   HistoryEdu as ChangelogIcon,
+  Group as FamilyIcon,
+  AdminPanelSettings as HouseholdAdminIcon,
 } from "@mui/icons-material";
 import { useList, useGetIdentity, useLogout } from "@refinedev/core";
 import { UserAppliance } from "../../types";
@@ -39,6 +41,7 @@ import { APP_VERSION, checkSupabaseConnection } from "../../lib/supabaseClient";
 import { useLanguage } from "../../context/LanguageContext";
 import { SystemChangelogModal } from "../changelog/SystemChangelogModal";
 import { getMeralcoTariff, MeralcoTariffData, DEFAULT_MERALCO_TARIFF } from "../../lib/meralcoRateService";
+import { useHousehold } from "../../context/HouseholdContext";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -57,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t } = useLanguage();
   const { data: identity } = useGetIdentity<any>();
   const { mutate: logout } = useLogout();
+  const { isOwner, isFamilyMember, ownerInfo, openHouseholdModal } = useHousehold();
 
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
@@ -536,22 +540,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               {identity?.email || "Authenticated Account"}
             </Typography>
-            <Chip
-              icon={<ShieldIcon sx={{ fontSize: "11px !important", color: "#ffd54f !important" }} />}
-              label={t("header.ownerBadge", "Household Owner")}
-              size="small"
-              sx={{
-                height: 18,
-                fontSize: "0.625rem",
-                fontWeight: 800,
-                bgcolor: "rgba(255, 213, 79, 0.12)",
-                color: "#ffd54f",
-                border: "1px solid rgba(255, 213, 79, 0.3)",
-                mt: 0.5,
-              }}
-            />
+            {isFamilyMember ? (
+              <Chip
+                icon={<FamilyIcon sx={{ fontSize: "11px !important", color: "#60a5fa !important" }} />}
+                label={ownerInfo ? `Member · ${ownerInfo.owner_name}` : "Family Member"}
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: "0.625rem",
+                  fontWeight: 800,
+                  maxWidth: 160,
+                  bgcolor: "rgba(96, 165, 250, 0.12)",
+                  color: "#60a5fa",
+                  border: "1px solid rgba(96, 165, 250, 0.3)",
+                  mt: 0.5,
+                  '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                }}
+              />
+            ) : (
+              <Chip
+                icon={<ShieldIcon sx={{ fontSize: "11px !important", color: "#ffd54f !important" }} />}
+                label={t("header.ownerBadge", "Household Owner")}
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: "0.625rem",
+                  fontWeight: 800,
+                  bgcolor: "rgba(255, 213, 79, 0.12)",
+                  color: "#ffd54f",
+                  border: "1px solid rgba(255, 213, 79, 0.3)",
+                  mt: 0.5,
+                }}
+              />
+            )}
           </Box>
         </Box>
+
+        {/* Household Access Button */}
+        <Button
+          fullWidth
+          variant="outlined"
+          size="small"
+          startIcon={<HouseholdAdminIcon sx={{ fontSize: 16 }} />}
+          onClick={() => { openHouseholdModal(isOwner ? 0 : 1); if (onClose) onClose(); }}
+          sx={{
+            mb: 1,
+            borderRadius: 1.5,
+            fontWeight: 700,
+            fontSize: "0.75rem",
+            py: 0.75,
+            textTransform: "none",
+            borderColor: isFamilyMember ? "rgba(96, 165, 250, 0.4)" : "rgba(0, 229, 201, 0.35)",
+            bgcolor: isFamilyMember ? "rgba(96, 165, 250, 0.08)" : "rgba(0, 229, 201, 0.08)",
+            color: isFamilyMember ? "#60a5fa" : "primary.main",
+            "&:hover": {
+              bgcolor: isFamilyMember ? "rgba(96, 165, 250, 0.16)" : "rgba(0, 229, 201, 0.16)",
+              borderColor: isFamilyMember ? "#60a5fa" : "primary.main",
+            },
+          }}
+        >
+          {isFamilyMember ? "Household Access" : "Household Access"}
+        </Button>
 
         <Button
           fullWidth
@@ -594,8 +643,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Navigation & Tools
         </Typography>
         <List disablePadding sx={{ mt: 0.75, display: "flex", flexDirection: "column", gap: 0.75 }}>
-          {/* Settings */}
-          <ListItem disablePadding>
+          {/* Settings — Household Owner only */}
+          {isOwner && <ListItem disablePadding>
             <ListItemButton
               component={Link}
               to="/settings"
@@ -630,7 +679,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               />
               <ChevronRightIcon sx={{ fontSize: 16, color: "text.disabled" }} />
             </ListItemButton>
-          </ListItem>
+          </ListItem>}
 
           {/* Forecasting */}
           <ListItem disablePadding>

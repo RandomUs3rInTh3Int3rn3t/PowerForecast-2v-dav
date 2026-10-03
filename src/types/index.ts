@@ -34,8 +34,44 @@ export interface UserAppliance {
   is_inverter?: boolean;
   cruising_watts?: number;
   ai_metadata?: Record<string, any>;
+  approval_status?: 'approved' | 'pending' | 'rejected';
+  requested_by?: string;
+  requested_by_email?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export type HouseholdRole = 'owner' | 'member';
+
+export interface HouseholdMember {
+  id: string;
+  name: string;
+  email: string;
+  role: HouseholdRole;
+  status: 'active' | 'pending';
+  joinedAt: string;
+  inviteCode?: string;
+}
+
+export interface PendingApplianceRequest {
+  id: string;
+  household_id: string;
+  requested_by_id: string;
+  requested_by_name: string;
+  requested_by_email: string;
+  requested_at: string;
+  status: 'pending' | 'approved' | 'rejected';
+  appliance_data: Partial<UserAppliance>;
+}
+
+export interface HouseholdProfile {
+  household_id: string;
+  owner_id: string;
+  owner_name: string;
+  owner_email: string;
+  invite_code: string;
+  created_at: string;
+  members: HouseholdMember[];
 }
 
 export const STREAMLINED_CATEGORIES = [

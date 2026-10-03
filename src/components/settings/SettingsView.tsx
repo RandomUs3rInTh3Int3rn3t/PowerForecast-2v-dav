@@ -113,17 +113,8 @@ import {
   getNotificationPreferences,
   saveNotificationPreferences,
 } from "../../lib/notificationService";
-
-interface HouseholdMember {
-  id: string;
-  name: string;
-  email: string;
-  role: "owner" | "member";
-  status: "active" | "pending";
-  inviteCode?: string;
-  joinedAt: string;
-}
-
+import { useHousehold } from "../../context/HouseholdContext";
+import { HouseholdMember } from "../../types";
 
 export const SettingsView: React.FC = () => {
   const navigate = useNavigate();
@@ -239,33 +230,22 @@ export const SettingsView: React.FC = () => {
     );
   };
 
-  // ── 4. Household Members State ───────────────────────────
-  const householdStorageKey = `powerforecast_household_${identity?.id || "default"}`;
+  // ── 4. Household Members State from HouseholdContext ───────
+  const {
+    members,
+    role: householdRole,
+    isOwner,
+    isFamilyMember,
+    ownerInfo,
+    inviteCode: hhInviteCode,
+    openHouseholdModal,
+    removeMember,
+  } = useHousehold();
 
-  const [members, setMembers] = useState<HouseholdMember[]>(() => {
-    const saved = localStorage.getItem(householdStorageKey);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (err) {
-        console.error("Error parsing household members:", err);
-      }
-    }
-    return [
-      {
-        id: "owner-1",
-        name: identity?.name || "Demo User (You)",
-        email: identity?.email || "test09@gmail.com",
-        role: "owner",
-        status: "active",
-        joinedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      },
-    ];
-  });
-
-  useEffect(() => {
-    localStorage.setItem(householdStorageKey, JSON.stringify(members));
-  }, [members, householdStorageKey]);
+  const handleRemoveMember = (id: string, name: string) => {
+    removeMember(id);
+    showSuccess(`Removed ${name} from household.`);
+  };
 
   // Invite Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);

@@ -173,11 +173,24 @@ export const resilientDataProvider: DataProvider = {
       return localDataProvider.create<TData, TVariables>(params);
     }
     try {
-      // Auto-inject authenticated user_id if missing and available
+      // Auto-inject authenticated user_id (or Household Owner user_id if Family Member)
       const sessionUser = (await supabaseClient.auth.getSession()).data.session?.user;
+      let effectiveUserId = sessionUser?.id;
+      if (effectiveUserId) {
+        try {
+          const linkedRaw = localStorage.getItem(`powerforecast_household_linked_owner_${effectiveUserId}`);
+          if (linkedRaw) {
+            const linked = JSON.parse(linkedRaw);
+            if (linked?.owner_id) {
+              effectiveUserId = linked.owner_id;
+            }
+          }
+        } catch {}
+      }
+
       let enrichedVariables = { ...(params.variables as any) };
-      if (sessionUser?.id && !enrichedVariables.user_id) {
-        enrichedVariables.user_id = sessionUser.id;
+      if (effectiveUserId && !enrichedVariables.user_id) {
+        enrichedVariables.user_id = effectiveUserId;
       }
 
       let res: any;
