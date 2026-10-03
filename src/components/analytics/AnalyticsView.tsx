@@ -52,15 +52,25 @@ import {
   ReferenceArea,
 } from "recharts";
 import { UserAppliance, ApplianceList, DailyApplianceUsage, SimulatedApplianceUsage } from "../../types";
-import { useList } from "@refinedev/core";
+import { useList, useGetIdentity } from "@refinedev/core";
 import { calculateMeralcoBill } from "../../lib/meralcoCalculator";
 import { MetricCard } from "../common/MetricCard";
-import { generateAiEnergyTips, AiEnergyTip, getCachedAiTips } from "../../lib/energyAiService";
+import {
+  generateAiEnergyTips,
+  AiEnergyTip,
+  getPersistedAiTips,
+  getDailyAiQuota,
+  computeInventoryFingerprint,
+  MAX_DAILY_AI_GENERATIONS,
+} from "../../lib/energyAiService";
 import { devLog } from "../../lib/devLogger";
 
 export const AnalyticsView: React.FC = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const { data: identity } = useGetIdentity<any>();
+  const userId = identity?.id;
+
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
   const [breakdownView, setBreakdownView] = useState<"category" | "appliances">("category");
   const [dataSourceMode, setDataSourceMode] = useState<"actual" | "simulated">("actual");
@@ -71,6 +81,8 @@ export const AnalyticsView: React.FC = () => {
   const [aiTipsGeneratedAt, setAiTipsGeneratedAt] = useState<string | null>(null);
   const [aiTipsIsFallback, setAiTipsIsFallback] = useState<boolean>(false);
   const [hasGeneratedAiTips, setHasGeneratedAiTips] = useState<boolean>(false);
+  const [savedInventoryHash, setSavedInventoryHash] = useState<string>("");
+  const [dailyQuota, setDailyQuota] = useState(() => getDailyAiQuota(userId));
 
   const appliancesRes = useList<UserAppliance>({
     resource: "user_appliances",
@@ -362,25 +374,73 @@ export const AnalyticsView: React.FC = () => {
     };
   }, [targetAppliances, effectiveRate]);
 
-  // Load cached AI tips on mount or space switch to avoid token waste
+  // Fingerprint of current inventory for change detection
+  const currentInventoryFingerprint = useMemo(
+    () => computeInventoryFingerprint(targetAppliances, totalMonthlyKwh),
+    [targetAppliances, totalMonthlyKwh]
+  );
+
+  // Detect if appliances or consumption data changed since last AI audit
+  const hasInventoryChanged = useMemo(() => {
+    if (!hasGeneratedAiTips || !savedInventoryHash) return false;
+    return savedInventoryHash !== currentInventoryFingerprint;
+  }, [hasGeneratedAiTips, savedInventoryHash, currentInventoryFingerprint]);
+
+  // Comprehensive Live Actual Tracker Telemetry
+  const liveTrackerMetrics = useMemo(() => {
+    const runningApps = targetAppliances.filter((a) => a.is_currently_on);
+    const liveWatts = runningApps.reduce(
+      (acc, a) => acc + (Number(a.watts) || 0) * (Number(a.quantity) || 1),
+      0
+    );
+    const runningNames = runningApps.map((a) => a.name);
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayRecords = dailyUsageRecords.filter((r) => r.usage_date === todayStr);
+    const todayKwh = todayRecords.reduce((acc, r) => acc + (Number(r.kwh_consumed) || 0), 0);
+    const todayCost = todayRecords.reduce((acc, r) => acc + (Number(r.estimated_cost) || 0), 0);
+
+    return {
+      runningCount: runningApps.length,
+      liveWattsNow: Math.round(liveWatts),
+      runningApplianceNames: runningNames,
+      todayMeasuredKwh: Number(todayKwh.toFixed(2)),
+      todayMeasuredCost: Number(todayCost.toFixed(2)),
+      hasActualHistory: actualAggregates.hasRecords,
+      totalMeasuredKwh: actualAggregates.totalKwh,
+      totalMeasuredCost: actualAggregates.totalCost,
+    };
+  }, [targetAppliances, dailyUsageRecords, actualAggregates]);
+
+  // Load persisted AI tips (retained across logout, refresh, and system exit)
   useEffect(() => {
-    const cached = getCachedAiTips(selectedSpaceId);
-    if (cached && cached.tips.length > 0) {
-      setAiTips(cached.tips);
-      setAiTipsGeneratedAt(cached.generatedAt);
-      setAiTipsIsFallback(cached.isFallback);
+    const persisted = getPersistedAiTips(userId, selectedSpaceId);
+    if (persisted && persisted.tips && persisted.tips.length > 0) {
+      setAiTips(persisted.tips);
+      setAiTipsGeneratedAt(persisted.generatedAt);
+      setAiTipsIsFallback(persisted.isFallback);
+      setSavedInventoryHash(persisted.inventoryHash || "");
       setHasGeneratedAiTips(true);
     } else {
       setAiTips([]);
       setAiTipsGeneratedAt(null);
       setAiTipsIsFallback(false);
+      setSavedInventoryHash("");
       setHasGeneratedAiTips(false);
     }
-  }, [selectedSpaceId]);
+    setDailyQuota(getDailyAiQuota(userId));
+  }, [selectedSpaceId, userId]);
 
-  // Trigger on-demand Gemini AI energy audit
+  // Trigger on-demand data-driven Gemini AI energy audit
   const handleGenerateAiTips = async (force = false) => {
     if (isGeneratingAiTips) return;
+    const currentQuota = getDailyAiQuota(userId);
+    if (currentQuota.remaining <= 0) {
+      setDailyQuota(currentQuota);
+      return;
+    }
+
     setIsGeneratingAiTips(true);
     try {
       const res = await generateAiEnergyTips(
@@ -390,15 +450,21 @@ export const AnalyticsView: React.FC = () => {
           totalCost,
           effectiveRate,
           tariffType,
+          distributionTier: distributionTierInfo,
+          efficiencyMetrics,
           vampireMetrics: vampireLoadMetrics,
+          liveTrackerMetrics,
           spaceId: selectedSpaceId,
+          userId,
         },
         force
       );
       setAiTips(res.tips);
       setAiTipsGeneratedAt(res.generatedAt);
       setAiTipsIsFallback(res.isFallback);
+      setSavedInventoryHash(res.inventoryHash || currentInventoryFingerprint);
       setHasGeneratedAiTips(true);
+      setDailyQuota(getDailyAiQuota(userId));
     } catch (err: any) {
       devLog.error("Analytics", "Failed to generate AI energy tips", { error: err });
     } finally {
@@ -1257,26 +1323,69 @@ export const AnalyticsView: React.FC = () => {
             </Box>
           </Box>
 
-          {hasGeneratedAiTips && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, alignSelf: { xs: "flex-end", sm: "auto" } }}>
-              {aiTipsGeneratedAt && (
-                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
-                  Updated {aiTipsGeneratedAt}
-                </Typography>
-              )}
-              <Button
+          {/* Header Controls & Quota Indicator */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", alignSelf: { xs: "flex-start", sm: "auto" } }}>
+            <TooltipMui title={`Each user receives ${MAX_DAILY_AI_GENERATIONS} AI energy audits per day to preserve API tokens. Quota resets at 12:00 AM.`}>
+              <Chip
+                label={`${dailyQuota.remaining}/${dailyQuota.max} Audits Left Today`}
                 size="small"
-                variant="outlined"
-                startIcon={isGeneratingAiTips ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon sx={{ fontSize: 16 }} />}
-                onClick={() => handleGenerateAiTips(true)}
-                disabled={isGeneratingAiTips}
-                sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem" }}
-              >
-                {isGeneratingAiTips ? "Auditing..." : "Regenerate Tips"}
-              </Button>
-            </Box>
-          )}
+                color={dailyQuota.remaining > 0 ? "info" : "error"}
+                variant={dailyQuota.remaining > 0 ? "outlined" : "filled"}
+                sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700 }}
+              />
+            </TooltipMui>
+
+            {hasGeneratedAiTips && (
+              <>
+                {aiTipsGeneratedAt && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
+                    Updated {aiTipsGeneratedAt}
+                  </Typography>
+                )}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={isGeneratingAiTips ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => handleGenerateAiTips(true)}
+                  disabled={isGeneratingAiTips || dailyQuota.remaining <= 0}
+                  sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem" }}
+                >
+                  {isGeneratingAiTips ? "Auditing..." : dailyQuota.remaining <= 0 ? "Limit Reached" : "Regenerate Tips"}
+                </Button>
+              </>
+            )}
+          </Box>
         </Box>
+
+        {/* Change Alert: Notification banner when user adds/modifies appliances */}
+        {hasInventoryChanged && hasGeneratedAiTips && (
+          <Alert
+            severity="warning"
+            icon={<BoltIcon sx={{ color: "#f59e0b" }} />}
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => handleGenerateAiTips(true)}
+                disabled={isGeneratingAiTips || dailyQuota.remaining <= 0}
+                sx={{ fontWeight: 800, textTransform: "none", fontSize: "0.75rem" }}
+              >
+                Update Audit Now
+              </Button>
+            }
+            sx={{
+              mb: 2.5,
+              borderRadius: 1.5,
+              bgcolor: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(254, 243, 199, 0.9)",
+              border: "1px solid",
+              borderColor: isDark ? "rgba(245, 158, 11, 0.3)" : "rgba(245, 158, 11, 0.4)",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+            }}
+          >
+            🔔 Telemetry Changed: Your appliance inventory or consumption data has been updated since your last AI audit. Regenerate tips to incorporate the latest telemetry!
+          </Alert>
+        )}
 
         {/* 1. Empty / Un-triggered State: Call To Action to preserve tokens */}
         {!hasGeneratedAiTips && !isGeneratingAiTips && (
@@ -1323,7 +1432,7 @@ export const AnalyticsView: React.FC = () => {
               size="medium"
               startIcon={<SparklesIcon />}
               onClick={() => handleGenerateAiTips(false)}
-              disabled={targetAppliances.length === 0}
+              disabled={targetAppliances.length === 0 || dailyQuota.remaining <= 0}
               sx={{
                 bgcolor: "#00e5c9",
                 color: "#0a0e14",
@@ -1344,11 +1453,11 @@ export const AnalyticsView: React.FC = () => {
                 },
               }}
             >
-              Generate Tips from AI
+              {dailyQuota.remaining <= 0 ? "Daily Quota Reached (0/5)" : "Generate Tips from AI"}
             </Button>
 
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", opacity: 0.85 }}>
-              🔒 Quota-Protected: Generated strictly on-demand. Cached in-session to save API tokens.
+              🔒 Quota-Protected: {dailyQuota.remaining} of {dailyQuota.max} AI audits available today. Persisted permanently until you regenerate.
             </Typography>
           </Box>
         )}

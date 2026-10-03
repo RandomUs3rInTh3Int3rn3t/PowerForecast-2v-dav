@@ -103,8 +103,8 @@ class handler(BaseHTTPRequestHandler):
 
         prompt = None
         if isinstance(raw_prompt, str) and raw_prompt.strip():
-            # Cap prompt length to 2000 chars to avoid buffer/token abuse
-            prompt = raw_prompt.strip()[:2000]
+            # Cap prompt length to 8000 chars to support comprehensive energy audit telemetry
+            prompt = raw_prompt.strip()[:8000]
 
         api_keys = get_gemini_api_keys()
 
