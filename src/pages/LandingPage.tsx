@@ -50,6 +50,7 @@ import {
   Timeline as TimelineIcon,
   ElectricBolt as ElectricBoltIcon,
   AutoFixHigh as AutoFixHighIcon,
+  Science as ScienceIcon,
   DocumentScanner as DocumentScannerIcon,
   MenuBook as DocsIcon,
   Speed as SpeedIcon,
@@ -452,7 +453,7 @@ export const LandingPage: React.FC = () => {
               }}
             >
               High-precision appliance telemetry with <strong>24-hour visual activity tracking</strong>, 
-              <strong> smart auto-midnight session splitting</strong>, <strong>routine defaults batch autofill</strong>, 
+              <strong> smart auto-midnight session splitting</strong>, <strong>isolated Simulate Appliance engine</strong>, 
               official <strong>ERC unbundled tariff formulas</strong>, and <strong>DOE PELP energy efficiency star ratings</strong>.
             </Typography>
 
@@ -830,7 +831,7 @@ export const LandingPage: React.FC = () => {
             >
               <Tab icon={<TimelineIcon />} iconPosition="start" label="24-Hour Activity & Cost Ticker" />
               <Tab icon={<ClockIcon />} iconPosition="start" label="Smart Calendar & Midnight Splitting" />
-              <Tab icon={<AutoFixHighIcon />} iconPosition="start" label="Routine Defaults Batch Autofill" />
+              <Tab icon={<ScienceIcon />} iconPosition="start" label="Simulate Appliance & What-If Planner" />
               <Tab icon={<CalculateIcon />} iconPosition="start" label="Unbundled ERC Calculator" />
               <Tab icon={<LayersIcon />} iconPosition="start" label="DOE PELP Energy Catalog" />
               <Tab icon={<DocumentScannerIcon />} iconPosition="start" label="AI Vision OCR Scanner" />
@@ -976,22 +977,22 @@ export const LandingPage: React.FC = () => {
                 </Grid>
               )}
 
-              {/* Tab 2: Routine Defaults Batch Autofill */}
+              {/* Tab 2: Simulate Appliance & What-If Planner */}
               {activeTab === 2 && (
                 <Grid container spacing={4} sx={{ alignItems: "center" }}>
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <Chip label="1-Click Batch Automation" color="primary" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
+                    <Chip label="Isolated What-If Modeling" color="primary" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
                     <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
-                      Multi-Range Routine Defaults Autofill Engine
+                      Simulate Appliance & Dual-Tab Calendar Engine
                     </Typography>
                     <Typography variant="body1" sx={{ color: "text.secondary", lineHeight: 1.7, mb: 3 }}>
-                      Don't waste time logging the same appliances every single day. Configure routine default hours per appliance and populate your entire month in 1 single click with full custom range flexibility.
+                      Experiment freely without contaminating your verified actual records. Model appliance schedules, measure tasks with a live test-run stopwatch, and plan future billing cycles in a dedicated simulation layer.
                     </Typography>
                     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
                       {[
-                        "1st to Today: Instant catch-up for the current month",
-                        "Full Month: Project and log an entire 30-day billing cycle in advance",
-                        "Custom Range: Flexible date picker for specific billing windows",
+                        "Dual-Tab Calendar: Strict isolation between measured Actuals and What-If Simulations",
+                        "Test-Run Stopwatch: Time appliance cycles in real-time and apply duration directly to your plan",
+                        "Blended Forecasting: Combines actuals-to-date with remaining simulation days for exact predictions",
                       ].map((item, idx) => (
                         <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <CheckCircleIcon sx={{ color: "primary.main", fontSize: 18 }} />
@@ -1008,32 +1009,32 @@ export const LandingPage: React.FC = () => {
                       endIcon={<ArrowForwardIcon />}
                       sx={{ fontWeight: 800 }}
                     >
-                      Try Routine Autofill
+                      Explore Simulation Plan
                     </Button>
                   </Grid>
 
                   <Grid size={{ xs: 12, md: 6 }}>
                     <Card sx={{ p: 3, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                        3 Selectable Autofill Range Modes
+                        3 Pillars of PowerForecast Simulation
                       </Typography>
                       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                        <Paper sx={{ p: 2, border: "1px solid", borderColor: "primary.main", bgcolor: "rgba(99,102,241,0.08)", borderRadius: 1.25 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Mode 1: 1st of Month to Today</Typography>
+                        <Paper sx={{ p: 2, border: "1px solid", borderColor: "primary.main", bgcolor: "rgba(0, 229, 201, 0.08)", borderRadius: 1.25 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main" }}>Pillar 1: 100% Data Isolation</Typography>
                           <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            Fills Days 1 to Current Date based on your refrigerator (24h), AC (8h), and lights (5h).
+                            Simulated plans commit exclusively to isolated tables so verified stopwatch sessions are never overwritten.
                           </Typography>
                         </Paper>
                         <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1.25 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Mode 2: Full Month (1st to Month-End)</Typography>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Pillar 2: Test-Run Stopwatch</Typography>
                           <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            Populates all 30/31 days to immediately compute full month projected electricity cost.
+                            Time chore durations or inverter cool-down periods with a built-in stopwatch to craft realistic routine targets.
                           </Typography>
                         </Paper>
                         <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1.25 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Mode 3: Custom Date Range</Typography>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Pillar 3: Plan Quota Alerts</Typography>
                           <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            Match exact Meralco billing cutoff dates (e.g. 15th to 14th of next month).
+                            Receive automated audio, push, and haptic notifications if live stopwatch runtime exceeds your simulated quota.
                           </Typography>
                         </Paper>
                       </Box>
@@ -1284,9 +1285,9 @@ export const LandingPage: React.FC = () => {
                 desc: "Overnight appliance runs are automatically split at 23:59:59 into two accurate day logs, keeping calendar metrics 100% truthful.",
               },
               {
-                icon: <AutoFixHighIcon sx={{ fontSize: 28, color: "primary.light" }} />,
-                title: "Multi-Range Routine Autofill",
-                desc: "Batch populate usage records from 1st to Today, Full Month, or Custom Date Range in 1 click using your appliances' default routine hours.",
+                icon: <ScienceIcon sx={{ fontSize: 28, color: "primary.light" }} />,
+                title: "Simulate Appliance & What-If Planner",
+                desc: "Experiment with what-if schedules and test-run stopwatches in an isolated simulation layer without altering your verified measured telemetry.",
               },
               {
                 icon: <CalculateIcon sx={{ fontSize: 28, color: "warning.main" }} />,
@@ -1520,8 +1521,8 @@ export const LandingPage: React.FC = () => {
                 a: "When you log an overnight session (e.g. 10:00 PM to 2:00 AM), PowerForecast automatically detects the 23:59:59 crossing and splits the session into 2 distinct records: 2 hours attributed to Day 1, and 2 hours attributed to Day 2. This guarantees 100% calendar accuracy.",
               },
               {
-                q: "What is the multi-range Routine Defaults autofill feature?",
-                a: "Routine Defaults allows you to set standard daily hours for each appliance (e.g., Refrigerator 24h, AC 8h, Fan 10h). You can then batch autofill records for '1st to Today', 'Full Month', or any 'Custom Range' in a single click with full edit and delete support.",
+                q: "How does the Simulate Appliance and Dual-Tab Calendar work?",
+                a: "PowerForecast isolates real telemetry from budget planning. The Actual Tracker tab records verified stopwatch sessions and measured kWh, while the Simulation Plan tab lets you experiment with what-if runtimes, test-run stopwatches, and quota targets without distorting your actual records. Forecasting then blends both to deliver the most accurate month-end bill projection.",
               },
               {
                 q: "How accurate is the ERC unbundled Meralco calculation formula?",

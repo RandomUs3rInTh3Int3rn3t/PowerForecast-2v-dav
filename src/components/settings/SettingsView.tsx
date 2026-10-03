@@ -80,6 +80,7 @@ import {
   AutoGraph as AutoGraphIcon,
   Dashboard as DashboardIcon,
   AccessTime as ClockIcon,
+  Timer as TimerIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useTour } from "../../hooks/useTour";
@@ -297,6 +298,9 @@ export const SettingsView: React.FC = () => {
   const [stopwatchThresholdHours, setStopwatchThresholdHours] = useState<number>(() => {
     return getNotificationPreferences().runtimeThresholdHours ?? 2;
   });
+  const [planQuotaAlertEnabled, setPlanQuotaAlertEnabled] = useState(() => {
+    return getNotificationPreferences().planQuotaAlert ?? true;
+  });
 
   useEffect(() => {
     checkEmailDeliveryHealth().then((status) => setEmailHealth(status));
@@ -486,6 +490,18 @@ export const SettingsView: React.FC = () => {
       language === "tl"
         ? `Na-set ang stopwatch alert threshold sa ${hours} oras.`
         : `Stopwatch alert threshold updated to ${hours} hours.`
+    );
+  };
+
+  const handleTogglePlanQuotaAlert = (checked: boolean) => {
+    setPlanQuotaAlertEnabled(checked);
+    saveNotificationPreferences({
+      planQuotaAlert: checked,
+    });
+    showSuccess(
+      checked
+        ? (language === "tl" ? "Aktibo na ang simulated plan quota overrun alerts!" : "Simulated plan quota overrun alerts enabled!")
+        : (language === "tl" ? "Nai-off ang quota overrun alerts." : "Plan quota overrun alerts disabled.")
     );
   };
 
@@ -1431,6 +1447,47 @@ export const SettingsView: React.FC = () => {
               </TextField>
             </Box>
           )}
+
+          {/* Plan Quota Overrun Alert Toggle */}
+          <Box
+            sx={{
+              mt: 2,
+              pt: 1.5,
+              borderTop: "1px dashed",
+              borderColor: "divider",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", sm: "center" },
+              gap: 2,
+              flexWrap: "wrap",
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1 }}>
+                <TimerIcon sx={{ color: "warning.main", fontSize: 18 }} />
+                {language === "tl" ? "Bala sa Paglagpas sa Simulated Quota" : "Plan Quota Overrun Warning"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+                {language === "tl"
+                  ? "Nagpapadala ng kritikal na alerto kapag lumagpas ang runtime ng stopwatch sa nakalaang simulated target hours ngayong araw."
+                  : "Fires a critical alert when live stopwatch runtime exceeds today's planned hours in your Simulation Plan."}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Switch
+                checked={planQuotaAlertEnabled}
+                onChange={(e) => handleTogglePlanQuotaAlert(e.target.checked)}
+                color="warning"
+                size="small"
+              />
+              <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                {planQuotaAlertEnabled
+                  ? (language === "tl" ? "Naka-on" : "Active")
+                  : (language === "tl" ? "Naka-off" : "Disabled")}
+              </Typography>
+            </Box>
+          </Box>
         </Paper>
 
         {/* Web Push Setup & Error Prevention Accordion */}

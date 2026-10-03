@@ -14,6 +14,8 @@ import {
   triggerNotificationVibration,
 } from "../lib/notificationService";
 import { sendSurgeAlertEmail, sendEnergyBudgetAlertEmail } from "../lib/emailService";
+import { formatDateToKey } from "../lib/dailyUsageService";
+import { fetchSimulatedUsageRange } from "../lib/simulationService";
 import { devLog } from "../lib/devLogger";
 
 interface UseNotificationsProps {
@@ -136,6 +138,55 @@ export function useNotifications({
     const interval = setInterval(checkActiveCircuits, 30000);
     return () => clearInterval(interval);
   }, [appliances, prefs.enabled, prefs.runtimeAlert, prefs.stopwatchAlert, prefs.runtimeThresholdHours, prefs.stopwatchThresholdHours, prefs.notificationLevel]);
+
+  // 1.1 Simulated Plan Quota Overrun Monitor (Every 30s)
+  useEffect(() => {
+    const isPlanQuotaActive = prefs.enabled && (prefs.planQuotaAlert ?? true);
+    if (!isPlanQuotaActive) return;
+
+    let isMounted = true;
+    const checkQuotaOverrun = async () => {
+      const running = appliances.filter((a) => a.is_currently_on && a.last_turned_on_at);
+      if (running.length === 0) return;
+
+      const todayKey = formatDateToKey(new Date());
+      const simRecords = await fetchSimulatedUsageRange(todayKey, todayKey);
+      if (!isMounted) return;
+
+      const simMap = new Map<string, number>();
+      simRecords.forEach((r) => simMap.set(r.appliance_id, r.hours_used));
+
+      const now = Date.now();
+      running.forEach((app) => {
+        const startTime = new Date(app.last_turned_on_at!).getTime();
+        const elapsedHours = (now - startTime) / (3600 * 1000);
+
+        // Target quota: custom simulated plan if present, else baseline routine
+        const plannedHours = simMap.has(app.id) ? simMap.get(app.id)! : (Number(app.hours_per_day) || 0);
+
+        if (plannedHours > 0 && elapsedHours > plannedHours) {
+          const quotaKey = `quota-exceeded-${app.id}-${todayKey}-${Math.floor(elapsedHours)}`;
+          if (!sentAlertsRef.current.has(quotaKey)) {
+            sentAlertsRef.current.add(quotaKey);
+
+            sendNotification({
+              title: `🚨 Quota Exceeded: ${app.name}`,
+              body: `Active for ${elapsedHours.toFixed(1)}h, exceeding your simulated plan of ${plannedHours}h! Turn off to prevent Meralco bill overruns.`,
+              tag: `quota-exceeded-${app.id}`,
+              urgency: "critical",
+            });
+          }
+        }
+      });
+    };
+
+    checkQuotaOverrun();
+    const interval = setInterval(checkQuotaOverrun, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [appliances, prefs.enabled, prefs.planQuotaAlert]);
 
   // 2. Real-Time High Wattage Surge Spike Monitor (Every 15s)
   useEffect(() => {

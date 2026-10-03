@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.5.0bv",
+    version: "3.5.0bv",
+    git_commit_tag: "3.5.0bv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0bv - Complete implementation plan: Simulated Plan Quota Overrun Alert monitor, overnight push alerts on midnight rollover, plan quota settings toggle, Analytics verified actuals vs simulated history toggle, and Landing Page copy alignment",
+  },
+  {
     id: "3.5.0v",
     version: "3.5.0v",
     git_commit_tag: "3.5.0v",

@@ -14,6 +14,8 @@ export interface NotificationPreferences {
   stopwatchAlert?: boolean;
   /** @deprecated Backward-compatible alias for runtimeThresholdHours */
   stopwatchThresholdHours?: number;
+  /** Alert when running stopwatch runtime exceeds today's simulated plan quota */
+  planQuotaAlert?: boolean;
   budgetAlert: boolean;
   budgetThresholdPercent: number; // 90 (relaxed), 80 (standard), 70 (proactive), 50 (strict)
   scheduleAlert: boolean;
@@ -35,6 +37,7 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     runtimeThresholdHours: 6,
     stopwatchAlert: true,
     stopwatchThresholdHours: 6,
+    planQuotaAlert: false,
     budgetAlert: true,
     budgetThresholdPercent: 90,
     scheduleAlert: false,
@@ -51,6 +54,7 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     runtimeThresholdHours: 4,
     stopwatchAlert: true,
     stopwatchThresholdHours: 4,
+    planQuotaAlert: true,
     budgetAlert: true,
     budgetThresholdPercent: 80,
     scheduleAlert: true,
@@ -67,6 +71,7 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     runtimeThresholdHours: 2,
     stopwatchAlert: true,
     stopwatchThresholdHours: 2,
+    planQuotaAlert: true,
     budgetAlert: true,
     budgetThresholdPercent: 70,
     scheduleAlert: true,
@@ -83,6 +88,7 @@ export const NOTIFICATION_LEVEL_PRESETS: Record<NotificationLevel, Partial<Notif
     runtimeThresholdHours: 1,
     stopwatchAlert: true,
     stopwatchThresholdHours: 1,
+    planQuotaAlert: true,
     budgetAlert: true,
     budgetThresholdPercent: 50,
     scheduleAlert: true,
@@ -102,6 +108,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   runtimeThresholdHours: 4,
   stopwatchAlert: true,
   stopwatchThresholdHours: 4,
+  planQuotaAlert: true,
   budgetAlert: true,
   budgetThresholdPercent: 80,
   scheduleAlert: true,

@@ -3,6 +3,7 @@ import { useList } from "@refinedev/core";
 import { UserAppliance } from "../types";
 import { reconcileOvernightRunningStopwatches } from "../lib/dailyUsageService";
 import { useToast } from "../components/common/ToastProvider";
+import { sendNotification } from "../lib/notificationService";
 import { devLog } from "../lib/devLogger";
 
 /**
@@ -36,6 +37,17 @@ export function useStopwatchMidnightRollover() {
           `⏱️ Midnight Rollover: Yesterday's active circuit session was automatically saved to daily records. Today's live tracking continues seamlessly.`,
           "Active Session Midnight Rollover"
         );
+
+        // Fire overnight push & audio/vibration notification for still-running appliances
+        const stillRunning = appliances.filter((a) => a.is_currently_on);
+        stillRunning.forEach((app) => {
+          sendNotification({
+            title: `🌙 Running Overnight: ${app.name}`,
+            body: `Yesterday's session was auto-saved at midnight. The stopwatch is still active today. Did you leave it running?`,
+            tag: `midnight-rollover-${app.id}-${new Date().toDateString()}`,
+            urgency: "high",
+          });
+        });
 
         if (refetchAppliances) {
           refetchAppliances();

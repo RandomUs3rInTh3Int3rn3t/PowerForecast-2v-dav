@@ -33,6 +33,7 @@ import {
   AccessTime as ClockIcon,
   CheckCircle as CheckIcon,
   InfoOutlined as InfoIcon,
+  Science as ScienceIcon,
 } from "@mui/icons-material";
 import {
   AreaChart,
@@ -47,7 +48,7 @@ import {
   ResponsiveContainer,
   ReferenceArea,
 } from "recharts";
-import { UserAppliance, ApplianceList, UserCalendarEvent, DailyApplianceUsage } from "../../types";
+import { UserAppliance, ApplianceList, UserCalendarEvent, DailyApplianceUsage, SimulatedApplianceUsage } from "../../types";
 import { useList } from "@refinedev/core";
 import { computeHourlyLoadCurve } from "../../lib/loadCurveService";
 import { calculateMeralcoBill } from "../../lib/meralcoCalculator";
@@ -60,6 +61,7 @@ export const AnalyticsView: React.FC = () => {
   const [zoomPreset, setZoomPreset] = useState<"24h" | "morning" | "day" | "evening">("24h");
   const [breakdownView, setBreakdownView] = useState<"category" | "appliances">("category");
   const [resolutionMinutes] = useState<1 | 5 | 15 | 30>(5);
+  const [dataSourceMode, setDataSourceMode] = useState<"actual" | "simulated">("actual");
 
   const appliancesRes = useList<UserAppliance>({
     resource: "user_appliances",
@@ -81,10 +83,16 @@ export const AnalyticsView: React.FC = () => {
     pagination: { mode: "off" },
   }) as any;
 
+  const simulatedUsageRes = useList<SimulatedApplianceUsage>({
+    resource: "simulated_appliance_usage",
+    pagination: { mode: "off" },
+  }) as any;
+
   const appliances: UserAppliance[] = appliancesRes?.data?.data || appliancesRes?.result?.data || [];
   const spaces: ApplianceList[] = spacesRes?.data?.data || spacesRes?.result?.data || [];
   const events: UserCalendarEvent[] = eventsRes?.data?.data || eventsRes?.result?.data || [];
   const dailyUsageRecords: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
+  const simulatedUsageRecords: SimulatedApplianceUsage[] = simulatedUsageRes?.data?.data || simulatedUsageRes?.result?.data || [];
 
   // Filter target appliances based on active space selection (excluding blacklisted appliances)
   const targetAppliances = useMemo(() => {
@@ -388,9 +396,10 @@ export const AnalyticsView: React.FC = () => {
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-    // 1. Group daily_appliance_usage records by YYYY-MM
+    // 1. Group records by YYYY-MM based on selected data source
     const usageByMonthKey: Record<string, { kwh: number; cost: number; daysCount: number }> = {};
-    dailyUsageRecords.forEach((r) => {
+    const sourceRecords = dataSourceMode === "actual" ? dailyUsageRecords : (simulatedUsageRecords as any);
+    sourceRecords.forEach((r: any) => {
       if (!r.usage_date) return;
       const monthKey = r.usage_date.substring(0, 7);
       if (!usageByMonthKey[monthKey]) {
@@ -415,9 +424,11 @@ export const AnalyticsView: React.FC = () => {
           month: monthStr,
           kwh: Math.round(recorded.kwh),
           cost: Math.round(recorded.cost),
-          status: "Recorded Actuals",
-          type: "recorded",
-          fillColor: isDark ? "#009e88" : "#0d9488",
+          status: dataSourceMode === "actual" ? "Recorded Actuals" : "Simulated Plan History",
+          type: dataSourceMode === "actual" ? "recorded" : "simulated",
+          fillColor: dataSourceMode === "actual"
+            ? (isDark ? "#009e88" : "#0d9488")
+            : (isDark ? "#00e5c9" : "#0d9488"),
         });
       }
     }
@@ -433,10 +444,10 @@ export const AnalyticsView: React.FC = () => {
     const totalActiveCost = totalActiveKwh * effectiveRate;
 
     points.push({
-      month: `${monthNames[currentMonthIdx]} (Active)`,
+      month: `${monthNames[currentMonthIdx]} (${dataSourceMode === "actual" ? "Active" : "Simulated"})`,
       kwh: Math.round(totalActiveKwh),
       cost: Math.round(totalActiveCost),
-      status: `Active Cycle • Day ${currentDay} of ${daysInCurrentMonth} (MTD + Projected)`,
+      status: `${dataSourceMode === "actual" ? "Active Cycle" : "Simulated Cycle"} • Day ${currentDay} of ${daysInCurrentMonth} (MTD + Projected)`,
       type: "active",
       fillColor: isDark ? "#00e5c9" : "#14b8a6",
     });
@@ -458,7 +469,7 @@ export const AnalyticsView: React.FC = () => {
     }
 
     return points;
-  }, [dailyUsageRecords, totalMonthlyKwh, totalCost, effectiveRate, isDark]);
+  }, [dailyUsageRecords, simulatedUsageRecords, dataSourceMode, totalMonthlyKwh, totalCost, effectiveRate, isDark]);
 
   // AI Energy Insights & Actionable Recommendations
   const actionableInsights = useMemo(() => {
@@ -1110,25 +1121,55 @@ export const AnalyticsView: React.FC = () => {
             <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
               Multi-Month Consumption Trend & Predictive Forecast
             </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
               Active billing cycle telemetry alongside forward-looking baseline predictions based on your registered appliance routines
             </Typography>
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            {MONTHLY_TREND_DATA.some((d) => d.type === "recorded") && (
+            <ButtonGroup size="small" variant="outlined" sx={{ my: { xs: 0.5, sm: 0 } }}>
+              <Button
+                variant={dataSourceMode === "actual" ? "contained" : "outlined"}
+                onClick={() => setDataSourceMode("actual")}
+                startIcon={<AnalyticsIcon sx={{ fontSize: 16 }} />}
+                sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem" }}
+              >
+                Verified Actuals
+              </Button>
+              <Button
+                variant={dataSourceMode === "simulated" ? "contained" : "outlined"}
+                onClick={() => setDataSourceMode("simulated")}
+                startIcon={<ScienceIcon sx={{ fontSize: 16 }} />}
+                sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem" }}
+              >
+                View Simulated History
+              </Button>
+            </ButtonGroup>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+              {MONTHLY_TREND_DATA.some((d) => d.type === "recorded" || d.type === "simulated") && (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      bgcolor: dataSourceMode === "actual" ? (isDark ? "#009e88" : "#0d9488") : "#00e5c9",
+                    }}
+                  />
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+                    {dataSourceMode === "actual" ? "Recorded Actuals" : "Simulated Plan History"}
+                  </Typography>
+                </Box>
+              )}
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: isDark ? "#009e88" : "#0d9488" }} />
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>Recorded History</Typography>
+                <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: isDark ? "#00e5c9" : "#14b8a6" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>Active Billing Cycle</Typography>
               </Box>
-            )}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: isDark ? "#00e5c9" : "#14b8a6" }} />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>Active Billing Cycle</Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: isDark ? "#2a2f38" : "#cbd5e1" }} />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>Predicted (Appliance Baseline)</Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: isDark ? "#2a2f38" : "#cbd5e1" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>Predicted Baseline</Typography>
+              </Box>
             </Box>
           </Box>
         </Box>
