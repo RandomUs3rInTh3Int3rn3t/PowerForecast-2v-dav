@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
@@ -12,6 +12,9 @@ import TooltipMui from "@mui/material/Tooltip";
 import ButtonGroup from "@mui/material/ButtonGroup";
 import Paper from "@mui/material/Paper";
 import Divider from "@mui/material/Divider";
+import Skeleton from "@mui/material/Skeleton";
+import CircularProgress from "@mui/material/CircularProgress";
+import Alert from "@mui/material/Alert";
 import { useTheme } from "@mui/material/styles";
 import {
   BarChart as AnalyticsIcon,
@@ -34,10 +37,10 @@ import {
   CheckCircle as CheckIcon,
   InfoOutlined as InfoIcon,
   Science as ScienceIcon,
+  Refresh as RefreshIcon,
+  SmartToy as RobotIcon,
 } from "@mui/icons-material";
 import {
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   Cell,
@@ -48,20 +51,38 @@ import {
   ResponsiveContainer,
   ReferenceArea,
 } from "recharts";
-import { UserAppliance, ApplianceList, UserCalendarEvent, DailyApplianceUsage, SimulatedApplianceUsage } from "../../types";
-import { useList } from "@refinedev/core";
-import { computeHourlyLoadCurve } from "../../lib/loadCurveService";
+import { UserAppliance, ApplianceList, DailyApplianceUsage, SimulatedApplianceUsage } from "../../types";
+import { useList, useGetIdentity } from "@refinedev/core";
 import { calculateMeralcoBill } from "../../lib/meralcoCalculator";
 import { MetricCard } from "../common/MetricCard";
+import {
+  generateAiEnergyTips,
+  AiEnergyTip,
+  getPersistedAiTips,
+  getDailyAiQuota,
+  computeInventoryFingerprint,
+  MAX_DAILY_AI_GENERATIONS,
+} from "../../lib/energyAiService";
+import { devLog } from "../../lib/devLogger";
 
 export const AnalyticsView: React.FC = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const { data: identity } = useGetIdentity<any>();
+  const userId = identity?.id;
+
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
-  const [zoomPreset, setZoomPreset] = useState<"24h" | "morning" | "day" | "evening">("24h");
   const [breakdownView, setBreakdownView] = useState<"category" | "appliances">("category");
-  const [resolutionMinutes] = useState<1 | 5 | 15 | 30>(5);
   const [dataSourceMode, setDataSourceMode] = useState<"actual" | "simulated">("actual");
+
+  // On-demand Gemini AI Energy Tips states
+  const [aiTips, setAiTips] = useState<AiEnergyTip[]>([]);
+  const [isGeneratingAiTips, setIsGeneratingAiTips] = useState<boolean>(false);
+  const [aiTipsGeneratedAt, setAiTipsGeneratedAt] = useState<string | null>(null);
+  const [aiTipsIsFallback, setAiTipsIsFallback] = useState<boolean>(false);
+  const [hasGeneratedAiTips, setHasGeneratedAiTips] = useState<boolean>(false);
+  const [savedInventoryHash, setSavedInventoryHash] = useState<string>("");
+  const [dailyQuota, setDailyQuota] = useState(() => getDailyAiQuota(userId));
 
   const appliancesRes = useList<UserAppliance>({
     resource: "user_appliances",
@@ -70,11 +91,6 @@ export const AnalyticsView: React.FC = () => {
 
   const spacesRes = useList<ApplianceList>({
     resource: "appliance_lists",
-    pagination: { mode: "off" },
-  }) as any;
-
-  const eventsRes = useList<UserCalendarEvent>({
-    resource: "user_calendar_events",
     pagination: { mode: "off" },
   }) as any;
 
@@ -90,9 +106,23 @@ export const AnalyticsView: React.FC = () => {
 
   const appliances: UserAppliance[] = appliancesRes?.data?.data || appliancesRes?.result?.data || [];
   const spaces: ApplianceList[] = spacesRes?.data?.data || spacesRes?.result?.data || [];
-  const events: UserCalendarEvent[] = eventsRes?.data?.data || eventsRes?.result?.data || [];
   const dailyUsageRecords: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
   const simulatedUsageRecords: SimulatedApplianceUsage[] = simulatedUsageRes?.data?.data || simulatedUsageRes?.result?.data || [];
+
+  // Synchronize circuit toggles and simulation updates across views
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
+      if (simulatedUsageRes?.refetch) simulatedUsageRes.refetch();
+      if (appliancesRes?.refetch) appliancesRes.refetch();
+    };
+    window.addEventListener("powerforecast_circuit_toggled", handleUpdate);
+    window.addEventListener("powerforecast_simulation_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("powerforecast_circuit_toggled", handleUpdate);
+      window.removeEventListener("powerforecast_simulation_updated", handleUpdate);
+    };
+  }, [dailyUsageRes, simulatedUsageRes, appliancesRes]);
 
   // Filter target appliances based on active space selection (excluding blacklisted appliances)
   const targetAppliances = useMemo(() => {
@@ -104,6 +134,66 @@ export const AnalyticsView: React.FC = () => {
           );
     return list.filter((a) => a.is_active !== false);
   }, [appliances, spaces, selectedSpaceId]);
+
+  // Aggregated Actual Measured Data for target appliances
+  const actualAggregates = useMemo(() => {
+    const targetIds = new Set(targetAppliances.map((a) => a.id));
+    let totalKwh = 0;
+    let totalCost = 0;
+    const catMap: Record<string, number> = {};
+    const appMap: Record<string, number> = {};
+
+    dailyUsageRecords.forEach((r) => {
+      if (targetIds.has(r.appliance_id)) {
+        const kwh = Number(r.kwh_consumed) || 0;
+        const cost = Number(r.estimated_cost) || 0;
+        totalKwh += kwh;
+        totalCost += cost;
+        const app = targetAppliances.find((a) => a.id === r.appliance_id);
+        const cat = app?.category || "General";
+        catMap[cat] = (catMap[cat] || 0) + kwh;
+        appMap[r.appliance_id] = (appMap[r.appliance_id] || 0) + kwh;
+      }
+    });
+
+    return {
+      totalKwh: Number(totalKwh.toFixed(2)),
+      totalCost: Number(totalCost.toFixed(2)),
+      catMap,
+      appMap,
+      hasRecords: totalKwh > 0,
+    };
+  }, [dailyUsageRecords, targetAppliances]);
+
+  // Aggregated Simulated Plan Data for target appliances
+  const simulatedAggregates = useMemo(() => {
+    const targetIds = new Set(targetAppliances.map((a) => a.id));
+    let totalKwh = 0;
+    let totalCost = 0;
+    const catMap: Record<string, number> = {};
+    const appMap: Record<string, number> = {};
+
+    simulatedUsageRecords.forEach((r) => {
+      if (targetIds.has(r.appliance_id)) {
+        const kwh = Number(r.kwh_consumed) || 0;
+        const cost = Number(r.estimated_cost) || 0;
+        totalKwh += kwh;
+        totalCost += cost;
+        const app = targetAppliances.find((a) => a.id === r.appliance_id);
+        const cat = app?.category || "General";
+        catMap[cat] = (catMap[cat] || 0) + kwh;
+        appMap[r.appliance_id] = (appMap[r.appliance_id] || 0) + kwh;
+      }
+    });
+
+    return {
+      totalKwh: Number(totalKwh.toFixed(2)),
+      totalCost: Number(totalCost.toFixed(2)),
+      catMap,
+      appMap,
+      hasRecords: totalKwh > 0,
+    };
+  }, [simulatedUsageRecords, targetAppliances]);
 
   const activeSpace = spaces.find((s) => s.id === selectedSpaceId);
   const isCommercialSelected = selectedSpaceId !== "all" && activeSpace?.tariff_type === "commercial";
@@ -284,16 +374,133 @@ export const AnalyticsView: React.FC = () => {
     };
   }, [targetAppliances, effectiveRate]);
 
+  // Fingerprint of current inventory for change detection
+  const currentInventoryFingerprint = useMemo(
+    () => computeInventoryFingerprint(targetAppliances, totalMonthlyKwh),
+    [targetAppliances, totalMonthlyKwh]
+  );
+
+  // Detect if appliances or consumption data changed since last AI audit
+  const hasInventoryChanged = useMemo(() => {
+    if (!hasGeneratedAiTips || !savedInventoryHash) return false;
+    return savedInventoryHash !== currentInventoryFingerprint;
+  }, [hasGeneratedAiTips, savedInventoryHash, currentInventoryFingerprint]);
+
+  // Comprehensive Live Actual Tracker Telemetry
+  const liveTrackerMetrics = useMemo(() => {
+    const runningApps = targetAppliances.filter((a) => a.is_currently_on);
+    const liveWatts = runningApps.reduce(
+      (acc, a) => acc + (Number(a.watts) || 0) * (Number(a.quantity) || 1),
+      0
+    );
+    const runningNames = runningApps.map((a) => a.name);
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayRecords = dailyUsageRecords.filter((r) => r.usage_date === todayStr);
+    const todayKwh = todayRecords.reduce((acc, r) => acc + (Number(r.kwh_consumed) || 0), 0);
+    const todayCost = todayRecords.reduce((acc, r) => acc + (Number(r.estimated_cost) || 0), 0);
+
+    return {
+      runningCount: runningApps.length,
+      liveWattsNow: Math.round(liveWatts),
+      runningApplianceNames: runningNames,
+      todayMeasuredKwh: Number(todayKwh.toFixed(2)),
+      todayMeasuredCost: Number(todayCost.toFixed(2)),
+      hasActualHistory: actualAggregates.hasRecords,
+      totalMeasuredKwh: actualAggregates.totalKwh,
+      totalMeasuredCost: actualAggregates.totalCost,
+    };
+  }, [targetAppliances, dailyUsageRecords, actualAggregates]);
+
+  // Load persisted AI tips (retained across logout, refresh, and system exit)
+  useEffect(() => {
+    const persisted = getPersistedAiTips(userId, selectedSpaceId);
+    if (persisted && persisted.tips && persisted.tips.length > 0) {
+      setAiTips(persisted.tips);
+      setAiTipsGeneratedAt(persisted.generatedAt);
+      setAiTipsIsFallback(persisted.isFallback);
+      setSavedInventoryHash(persisted.inventoryHash || "");
+      setHasGeneratedAiTips(true);
+    } else {
+      setAiTips([]);
+      setAiTipsGeneratedAt(null);
+      setAiTipsIsFallback(false);
+      setSavedInventoryHash("");
+      setHasGeneratedAiTips(false);
+    }
+    setDailyQuota(getDailyAiQuota(userId));
+  }, [selectedSpaceId, userId]);
+
+  // Trigger on-demand data-driven Gemini AI energy audit
+  const handleGenerateAiTips = async (force = false) => {
+    if (isGeneratingAiTips) return;
+    const currentQuota = getDailyAiQuota(userId);
+    if (currentQuota.remaining <= 0) {
+      setDailyQuota(currentQuota);
+      return;
+    }
+
+    setIsGeneratingAiTips(true);
+    try {
+      const res = await generateAiEnergyTips(
+        {
+          appliances: targetAppliances,
+          totalMonthlyKwh,
+          totalCost,
+          effectiveRate,
+          tariffType,
+          distributionTier: distributionTierInfo,
+          efficiencyMetrics,
+          vampireMetrics: vampireLoadMetrics,
+          liveTrackerMetrics,
+          spaceId: selectedSpaceId,
+          userId,
+        },
+        force
+      );
+      setAiTips(res.tips);
+      setAiTipsGeneratedAt(res.generatedAt);
+      setAiTipsIsFallback(res.isFallback);
+      setSavedInventoryHash(res.inventoryHash || currentInventoryFingerprint);
+      setHasGeneratedAiTips(true);
+      setDailyQuota(getDailyAiQuota(userId));
+    } catch (err: any) {
+      devLog.error("Analytics", "Failed to generate AI energy tips", { error: err });
+    } finally {
+      setIsGeneratingAiTips(false);
+    }
+  };
+
   // Category Breakdown
   const categoryBreakdown = useMemo(() => {
     const catMap: Record<string, { kwh: number; count: number }> = {};
-    targetAppliances.forEach((a) => {
-      const cat = a.category || "General";
-      const kwh = getApplianceMonthlyKwh(a);
-      if (!catMap[cat]) catMap[cat] = { kwh: 0, count: 0 };
-      catMap[cat].kwh += kwh;
-      catMap[cat].count += a.quantity || 1;
-    });
+
+    if (dataSourceMode === "actual" && actualAggregates.hasRecords) {
+      targetAppliances.forEach((a) => {
+        const cat = a.category || "General";
+        const kwh = actualAggregates.catMap[cat] || 0;
+        if (!catMap[cat]) catMap[cat] = { kwh: 0, count: 0 };
+        catMap[cat].kwh = kwh;
+        catMap[cat].count += a.quantity || 1;
+      });
+    } else if (dataSourceMode === "simulated" && simulatedAggregates.hasRecords) {
+      targetAppliances.forEach((a) => {
+        const cat = a.category || "General";
+        const kwh = simulatedAggregates.catMap[cat] || 0;
+        if (!catMap[cat]) catMap[cat] = { kwh: 0, count: 0 };
+        catMap[cat].kwh = kwh;
+        catMap[cat].count += a.quantity || 1;
+      });
+    } else {
+      targetAppliances.forEach((a) => {
+        const cat = a.category || "General";
+        const kwh = getApplianceMonthlyKwh(a);
+        if (!catMap[cat]) catMap[cat] = { kwh: 0, count: 0 };
+        catMap[cat].kwh += kwh;
+        catMap[cat].count += a.quantity || 1;
+      });
+    }
 
     const totalKwh = Object.values(catMap).reduce((acc, curr) => acc + curr.kwh, 0) || 1;
     return Object.entries(catMap)
@@ -305,14 +512,26 @@ export const AnalyticsView: React.FC = () => {
         count: data.count,
       }))
       .sort((a, b) => b.kwh - a.kwh);
-  }, [targetAppliances, effectiveRate]);
+  }, [targetAppliances, effectiveRate, dataSourceMode, actualAggregates, simulatedAggregates]);
 
   // Individual Top Appliances Breakdown (Pareto)
   const topAppliancesBreakdown = useMemo(() => {
-    const totalKwh = totalMonthlyKwh || 1;
+    const effectiveTotalKwh =
+      dataSourceMode === "actual" && actualAggregates.hasRecords
+        ? actualAggregates.totalKwh
+        : dataSourceMode === "simulated" && simulatedAggregates.hasRecords
+        ? simulatedAggregates.totalKwh
+        : totalMonthlyKwh || 1;
+
     return [...targetAppliances]
       .map((a) => {
-        const kwh = getApplianceMonthlyKwh(a);
+        const kwh =
+          dataSourceMode === "actual" && actualAggregates.hasRecords
+            ? actualAggregates.appMap[a.id] || 0
+            : dataSourceMode === "simulated" && simulatedAggregates.hasRecords
+            ? simulatedAggregates.appMap[a.id] || 0
+            : getApplianceMonthlyKwh(a);
+
         return {
           id: a.id,
           name: a.name,
@@ -322,12 +541,12 @@ export const AnalyticsView: React.FC = () => {
           hours: a.hours_per_day,
           kwh: kwh,
           cost: kwh * effectiveRate,
-          percentage: Math.round((kwh / totalKwh) * 100),
+          percentage: Math.round((kwh / effectiveTotalKwh) * 100),
           isCurrentlyOn: a.is_currently_on,
         };
       })
       .sort((a, b) => b.kwh - a.kwh);
-  }, [targetAppliances, totalMonthlyKwh, effectiveRate]);
+  }, [targetAppliances, totalMonthlyKwh, effectiveRate, dataSourceMode, actualAggregates, simulatedAggregates]);
 
   // Unbundled Rate Components breakdown
   const rateComponents = useMemo(() => {
@@ -341,49 +560,7 @@ export const AnalyticsView: React.FC = () => {
     ];
   }, [bill]);
 
-  // Load curve zoom parameters
-  let startHour = 0;
-  let endHour = 24;
-  if (zoomPreset === "morning") {
-    startHour = 0;
-    endHour = 8;
-  } else if (zoomPreset === "day") {
-    startHour = 8;
-    endHour = 16;
-  } else if (zoomPreset === "evening") {
-    startHour = 16;
-    endHour = 24;
-  }
 
-  const HOURLY_LOAD_DATA = useMemo(() => {
-    const simulatedCurve = computeHourlyLoadCurve({
-      appliances: targetAppliances,
-      events,
-      resolutionMinutes,
-      startHour,
-      endHour,
-      effectiveRate,
-    });
-
-    const baselineCurve = computeHourlyLoadCurve({
-      appliances: targetAppliances,
-      events: [],
-      resolutionMinutes,
-      startHour,
-      endHour,
-      effectiveRate,
-    });
-
-    return simulatedCurve.map((pt, idx) => {
-      const basePt = baselineCurve[idx];
-      const baselineWatts = basePt ? basePt.watts : pt.watts;
-      return {
-        ...pt,
-        baselineWatts,
-        simulatedWatts: pt.watts,
-      };
-    });
-  }, [targetAppliances, events, resolutionMinutes, startHour, endHour, effectiveRate]);
 
   // Pure Appliance Baseline Multi-Month Trend & Predictions (No fake past months, No weather multipliers)
   const MONTHLY_TREND_DATA = useMemo(() => {
@@ -471,75 +648,7 @@ export const AnalyticsView: React.FC = () => {
     return points;
   }, [dailyUsageRecords, simulatedUsageRecords, dataSourceMode, totalMonthlyKwh, totalCost, effectiveRate, isDark]);
 
-  // AI Energy Insights & Actionable Recommendations
-  const actionableInsights = useMemo(() => {
-    const list = [];
 
-    // 1. Air Conditioning Check
-    const acApps = targetAppliances.filter(
-      (a) => (a.category || "").toLowerCase().includes("air") || (a.name || "").toLowerCase().includes("ac")
-    );
-    const acKwh = acApps.reduce((acc, a) => acc + getApplianceMonthlyKwh(a), 0);
-    if (acApps.length > 0 && totalMonthlyKwh > 0) {
-      const acPct = Math.round((acKwh / totalMonthlyKwh) * 100);
-      const acCost = acKwh * effectiveRate;
-      const thermostatSaving = acCost * 0.15; // 15% savings setting thermostat to 25°C
-      list.push({
-        id: "cooling",
-        title: `Cooling accounts for ${acPct}% of your electricity`,
-        description: `Air conditioning consumes ~${acKwh.toFixed(0)} kWh (₱${acCost.toFixed(2)}/mo). Setting your thermostat to 25°C and cleaning filters monthly can save up to ₱${thermostatSaving.toFixed(2)}/mo.`,
-        saving: `Save ~₱${thermostatSaving.toFixed(0)}/mo`,
-        badgeColor: "warning",
-      });
-    }
-
-    // 2. Peak Hours Shifting (Meralco 11 AM - 4 PM & 6 PM - 9 PM)
-    const heavyLoads = targetAppliances.filter((a) => {
-      const cat = (a.category || "").toLowerCase();
-      const watts = a.watts * (a.quantity || 1);
-      return cat.includes("wash") || cat.includes("laundry") || cat.includes("iron") || cat.includes("heater") || watts >= 1000;
-    });
-    if (heavyLoads.length > 0) {
-      list.push({
-        id: "peak_shift",
-        title: "Shift heavy loads to Off-Peak hours",
-        description: `High-wattage devices (${heavyLoads.map((h) => h.name).slice(0, 2).join(", ")}) should be operated during off-peak windows (before 11:00 AM or after 9:00 PM) to avoid grid strain and maximize system efficiency.`,
-        saving: "Peak Load Optimization",
-        badgeColor: "info",
-      });
-    }
-
-    // 3. Standby / Vampire Load
-    if (vampireLoadMetrics.standbyMonthlyCost > 40) {
-      list.push({
-        id: "vampire",
-        title: `Standby vampire loads cost ~₱${vampireLoadMetrics.standbyMonthlyCost.toFixed(2)}/month`,
-        description: `${vampireLoadMetrics.vampireDevicesCount} idle electronics draw continuous standby power. Using master switch power strips can eliminate this cost completely.`,
-        saving: `Save ~₱${vampireLoadMetrics.standbyMonthlyCost.toFixed(0)}/mo`,
-        badgeColor: "success",
-      });
-    }
-
-    // 4. Inverter Upgrade Advice
-    const nonInverters = targetAppliances.filter((a) => {
-      const name = (a.name || "").toLowerCase();
-      const cat = (a.category || "").toLowerCase();
-      return (cat.includes("air") || cat.includes("ref")) && !name.includes("inverter");
-    });
-    if (nonInverters.length > 0) {
-      const nonInverterKwh = nonInverters.reduce((acc, a) => acc + getApplianceMonthlyKwh(a), 0);
-      const upgradeSavings = nonInverterKwh * 0.35 * effectiveRate;
-      list.push({
-        id: "inverter",
-        title: "Inverter upgrade potential for legacy cooling",
-        description: `You have ${nonInverters.length} non-inverter appliance(s) (${nonInverters.map((n) => n.name).slice(0, 2).join(", ")}). Upgrading to DOE PELP certified inverter units can reduce their power draw by up to 35%.`,
-        saving: `Save ~₱${upgradeSavings.toFixed(0)}/mo`,
-        badgeColor: "primary",
-      });
-    }
-
-    return list;
-  }, [targetAppliances, totalMonthlyKwh, effectiveRate, vampireLoadMetrics]);
 
   // Export CSV handler
   const handleExportCsv = () => {
@@ -620,6 +729,42 @@ export const AnalyticsView: React.FC = () => {
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+          {/* Top Level Mode Switcher: Actuals vs Simulated */}
+          <ButtonGroup size="small" variant="outlined" sx={{ borderRadius: 2 }}>
+            <Button
+              variant={dataSourceMode === "actual" ? "contained" : "outlined"}
+              onClick={() => setDataSourceMode("actual")}
+              startIcon={<AnalyticsIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                borderRadius: "8px 0 0 8px",
+                ...(dataSourceMode === "actual"
+                  ? { bgcolor: "primary.main", color: "#0c1b18" }
+                  : {}),
+              }}
+            >
+              Verified Actuals
+            </Button>
+            <Button
+              variant={dataSourceMode === "simulated" ? "contained" : "outlined"}
+              onClick={() => setDataSourceMode("simulated")}
+              startIcon={<ScienceIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                borderRadius: "0 8px 8px 0",
+                ...(dataSourceMode === "simulated"
+                  ? { bgcolor: "secondary.main", color: "#0c1b18" }
+                  : {}),
+              }}
+            >
+              Simulated Plan
+            </Button>
+          </ButtonGroup>
+
           <Button
             variant="outlined"
             size="small"
@@ -717,12 +862,29 @@ export const AnalyticsView: React.FC = () => {
         {/* Monthly Volume */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <MetricCard
-            title="Monthly Energy Volume"
-            value={`${totalMonthlyKwh.toFixed(1)} kWh`}
-            subtitle={`${targetAppliances.length} appliances • ${runningAppliances.length} live ON`}
+            title={dataSourceMode === "actual" ? "Actual Energy Volume (MTD)" : "Monthly Energy Volume"}
+            value={
+              dataSourceMode === "actual" && actualAggregates.hasRecords
+                ? `${actualAggregates.totalKwh} kWh`
+                : dataSourceMode === "simulated" && simulatedAggregates.hasRecords
+                ? `${simulatedAggregates.totalKwh} kWh`
+                : `${totalMonthlyKwh.toFixed(1)} kWh`
+            }
+            subtitle={
+              dataSourceMode === "actual"
+                ? actualAggregates.hasRecords
+                  ? `${targetAppliances.length} devices • Verified Measured Truth`
+                  : "No sessions recorded yet this cycle"
+                : `${targetAppliances.length} appliances • ${runningAppliances.length} live ON`
+            }
             icon={<BoltIcon sx={{ color: "#ffd54f" }} />}
             trend={{
-              value: distributionTierInfo.tier,
+              value:
+                dataSourceMode === "actual"
+                  ? "Recorded Actuals"
+                  : dataSourceMode === "simulated"
+                  ? "Simulation Plan"
+                  : distributionTierInfo.tier,
               direction: distributionTierInfo.tier.includes("Lifeline") ? "up" : "neutral",
               label: distributionTierInfo.label,
             }}
@@ -732,12 +894,23 @@ export const AnalyticsView: React.FC = () => {
         {/* Forecasted Bill */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <MetricCard
-            title="Forecasted Monthly Bill"
-            value={`₱${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            title={dataSourceMode === "actual" ? "Actual Measured Spend (MTD)" : "Forecasted Monthly Bill"}
+            value={
+              dataSourceMode === "actual" && actualAggregates.hasRecords
+                ? `₱${actualAggregates.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : dataSourceMode === "simulated" && simulatedAggregates.hasRecords
+                ? `₱${simulatedAggregates.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : `₱${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            }
             subtitle={`Effective: ₱${effectiveRate.toFixed(2)}/kWh`}
             icon={<TrendingUpIcon sx={{ color: "primary.light" }} />}
             trend={{
-              value: `₱${(totalCost / 30).toFixed(0)}/day`,
+              value:
+                dataSourceMode === "actual"
+                  ? "Verified Audit"
+                  : dataSourceMode === "simulated"
+                  ? "Target Budget"
+                  : `₱${(totalCost / 30).toFixed(0)}/day`,
               direction: "neutral",
               label: isCommercialSelected ? "Commercial GP" : "Meralco Unbundled",
             }}
@@ -960,161 +1133,7 @@ export const AnalyticsView: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* 5. 24-Hour Load Curve Simulation */}
-      <Card data-tour="analytics-load-curve" sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 1.5 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5, mb: 2.5 }}>
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-              24-Hour Daily Load Curve Simulation
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Appliance hourly draw and peak pricing stress test
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mr: 1 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <Box sx={{ width: 12, height: 2, bgcolor: "#818cf8", borderTop: "2px dashed #818cf8" }} />
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                  Baseline Quota
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <Box sx={{ width: 12, height: 3, bgcolor: "#00e5c9", borderRadius: 1 }} />
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                  Simulated Plan
-                </Typography>
-              </Box>
-            </Box>
-
-            <ButtonGroup size="small" variant="outlined">
-              {[
-                { label: "All 24h", val: "24h" },
-                { label: "Morning", val: "morning" },
-                { label: "Daytime", val: "day" },
-                { label: "Night", val: "evening" },
-              ].map((b) => (
-                <Button
-                  key={b.val}
-                  variant={zoomPreset === b.val ? "contained" : "outlined"}
-                  onClick={() => setZoomPreset(b.val as any)}
-                  sx={{ fontWeight: 700 }}
-                >
-                  {b.label}
-                </Button>
-              ))}
-            </ButtonGroup>
-          </Box>
-        </Box>
-
-        <Box sx={{ height: 280, width: "100%" }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={HOURLY_LOAD_DATA} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorBaselineLoad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#818cf8" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#818cf8" stopOpacity={0.0} />
-                </linearGradient>
-                <linearGradient id="colorLoadCurve" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00e5c9" stopOpacity={0.45} />
-                  <stop offset="95%" stopColor="#00e5c9" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.12} />
-              <XAxis dataKey="time" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} unit=" W" />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const d = payload[0].payload;
-                    const diff = (d.baselineWatts || 0) - (d.simulatedWatts || 0);
-                    return (
-                      <Box
-                        sx={{
-                          p: 1.5,
-                          borderRadius: 1.25,
-                          bgcolor: (theme) => (theme.palette.mode === "dark" ? "#17191d" : "background.paper"),
-                          border: "1px solid",
-                          borderColor: (theme) =>
-                            theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.35)" : "rgba(13, 148, 136, 0.35)",
-                          color: "text.primary",
-                          boxShadow: (theme) =>
-                            theme.palette.mode === "dark" ? "0 8px 32px rgba(0,0,0,0.6)" : "0 8px 24px rgba(0,0,0,0.12)",
-                          maxWidth: 280,
-                        }}
-                      >
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5, gap: 1 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 800 }}>
-                            {d.timeLabel}
-                          </Typography>
-                          {d.isPeak && (
-                            <Chip label="PEAK HOUR" size="small" color="error" sx={{ height: 16, fontSize: "0.6rem", fontWeight: 800 }} />
-                          )}
-                        </Box>
-                        
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", my: 0.5 }}>
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                            Baseline: {d.baselineWatts ?? d.watts} W
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "primary.main", fontWeight: 900, fontFamily: "monospace", fontSize: "0.95rem" }}
-                          >
-                            {d.simulatedWatts ?? d.watts} W
-                          </Typography>
-                        </Box>
-
-                        {diff !== 0 && (
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              display: "block",
-                              fontWeight: 800,
-                              color: diff > 0 ? "success.main" : "warning.main",
-                              fontSize: "0.75rem",
-                              mb: 0.5,
-                            }}
-                          >
-                            {diff > 0 ? `Peak Shaved: -${diff}W (Off-Peak)` : `+${Math.abs(diff)}W Load Shift`}
-                          </Typography>
-                        )}
-
-                        <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 0.25 }}>
-                          Running Cost: ₱{d.costPerHour.toFixed(2)}/hr
-                        </Typography>
-
-                        {d.activeDevices && d.activeDevices.length > 0 && (
-                          <Box sx={{ mt: 1, pt: 1, borderTop: "1px solid", borderTopColor: "divider" }}>
-                            <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: "primary.main", mb: 0.5 }}>
-                              Active Devices ({d.activeDevices.length}):
-                            </Typography>
-                            {d.activeDevices.slice(0, 4).map((dev: any, idx: number) => (
-                              <Typography key={idx} variant="caption" sx={{ display: "block", fontSize: "0.7rem", color: "text.primary" }}>
-                                • {dev.name} ({dev.watts}W)
-                              </Typography>
-                            ))}
-                            {d.activeDevices.length > 4 && (
-                              <Typography variant="caption" sx={{ display: "block", fontSize: "0.68rem", color: "text.secondary" }}>
-                                +{d.activeDevices.length - 4} more
-                              </Typography>
-                            )}
-                          </Box>
-                        )}
-                      </Box>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Area type="monotone" dataKey="baselineWatts" stroke="#818cf8" strokeDasharray="3 3" strokeWidth={2} fillOpacity={1} fill="url(#colorBaselineLoad)" />
-              <Area type="monotone" dataKey="simulatedWatts" stroke="#00e5c9" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLoadCurve)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Box>
-      </Card>
-
-      {/* 6. Multi-Month Trend & Predictive Baseline Forecast */}
+      {/* 5. Multi-Month Trend & Predictive Baseline Forecast */}
       <Card data-tour="analytics-historical-trend" sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 1.5 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5, mb: 2.5 }}>
           <Box>
@@ -1257,69 +1276,285 @@ export const AnalyticsView: React.FC = () => {
         </Box>
       </Card>
 
-      {/* 7. Actionable AI Energy Recommendations */}
+      {/* 6. AI Smart Energy Audit & Actionable Insights */}
       <Card data-tour="analytics-insights" sx={{ p: { xs: 2.5, sm: 3 }, borderRadius: 1.5 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
-          <SparklesIcon sx={{ color: (theme) => (theme.palette.mode === "dark" ? "#ffd54f" : "#d97706") }} />
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-              AI Smart Energy Audit & Actionable Insights
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Practical recommendations based on your appliance load profile and Meralco tariff structure
-            </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" },
+            flexDirection: { xs: "column", sm: "row" },
+            gap: 1.5,
+            mb: 2.5,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: "50%",
+                bgcolor: isDark ? "rgba(255, 213, 79, 0.12)" : "rgba(217, 119, 6, 0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <SparklesIcon sx={{ color: isDark ? "#ffd54f" : "#d97706", fontSize: 22 }} />
+            </Box>
+            <Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                  AI Smart Energy Audit & Actionable Insights
+                </Typography>
+                {hasGeneratedAiTips && (
+                  <Chip
+                    icon={<SparklesIcon sx={{ fontSize: "14px !important" }} />}
+                    label={aiTipsIsFallback ? "Rule Engine Baseline" : "Google Gemini AI"}
+                    size="small"
+                    color={aiTipsIsFallback ? "default" : "secondary"}
+                    sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700 }}
+                  />
+                )}
+              </Box>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Practical recommendations based on your appliance load profile and Meralco tariff structure
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Header Controls & Quota Indicator */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", alignSelf: { xs: "flex-start", sm: "auto" } }}>
+            <TooltipMui title={`Each user receives ${MAX_DAILY_AI_GENERATIONS} AI energy audits per day to preserve API tokens. Quota resets at 12:00 AM.`}>
+              <Chip
+                label={`${dailyQuota.remaining}/${dailyQuota.max} Audits Left Today`}
+                size="small"
+                color={dailyQuota.remaining > 0 ? "info" : "error"}
+                variant={dailyQuota.remaining > 0 ? "outlined" : "filled"}
+                sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700 }}
+              />
+            </TooltipMui>
+
+            {hasGeneratedAiTips && (
+              <>
+                {aiTipsGeneratedAt && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>
+                    Updated {aiTipsGeneratedAt}
+                  </Typography>
+                )}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={isGeneratingAiTips ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => handleGenerateAiTips(true)}
+                  disabled={isGeneratingAiTips || dailyQuota.remaining <= 0}
+                  sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem" }}
+                >
+                  {isGeneratingAiTips ? "Auditing..." : dailyQuota.remaining <= 0 ? "Limit Reached" : "Regenerate Tips"}
+                </Button>
+              </>
+            )}
           </Box>
         </Box>
 
-        <Grid container spacing={2}>
-          {actionableInsights.length === 0 ? (
-            <Grid size={{ xs: 12 }}>
-              <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 2 }}>
-                Register appliances to generate customized energy-saving recommendations.
+        {/* Change Alert: Notification banner when user adds/modifies appliances */}
+        {hasInventoryChanged && hasGeneratedAiTips && (
+          <Alert
+            severity="warning"
+            icon={<BoltIcon sx={{ color: "#f59e0b" }} />}
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => handleGenerateAiTips(true)}
+                disabled={isGeneratingAiTips || dailyQuota.remaining <= 0}
+                sx={{ fontWeight: 800, textTransform: "none", fontSize: "0.75rem" }}
+              >
+                Update Audit Now
+              </Button>
+            }
+            sx={{
+              mb: 2.5,
+              borderRadius: 1.5,
+              bgcolor: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(254, 243, 199, 0.9)",
+              border: "1px solid",
+              borderColor: isDark ? "rgba(245, 158, 11, 0.3)" : "rgba(245, 158, 11, 0.4)",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+            }}
+          >
+            🔔 Telemetry Changed: Your appliance inventory or consumption data has been updated since your last AI audit. Regenerate tips to incorporate the latest telemetry!
+          </Alert>
+        )}
+
+        {/* 1. Empty / Un-triggered State: Call To Action to preserve tokens */}
+        {!hasGeneratedAiTips && !isGeneratingAiTips && (
+          <Box
+            sx={{
+              p: { xs: 3, sm: 4 },
+              borderRadius: 1.5,
+              bgcolor: isDark ? "rgba(18, 22, 28, 0.7)" : "rgba(248, 250, 252, 0.8)",
+              border: "1px dashed",
+              borderColor: isDark ? "rgba(0, 229, 201, 0.3)" : "rgba(13, 148, 136, 0.3)",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            <Box
+              sx={{
+                width: 52,
+                height: 52,
+                borderRadius: "50%",
+                bgcolor: isDark ? "rgba(0, 229, 201, 0.12)" : "rgba(13, 148, 136, 0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <SparklesIcon sx={{ color: "#00e5c9", fontSize: 30 }} />
+            </Box>
+
+            <Box sx={{ maxWidth: 520 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                Personalized Energy Optimization with Gemini AI
               </Typography>
-            </Grid>
-          ) : (
-            actionableInsights.map((rec) => (
-              <Grid key={rec.id} size={{ xs: 12, md: 6 }}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 1.25,
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.65)" : "#ffffff",
-                    border: "1px solid",
-                    borderColor: (theme) =>
-                      theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
-                    boxShadow: (theme) =>
-                      theme.palette.mode === "dark" ? "none" : "0 2px 10px rgba(15, 23, 42, 0.04)",
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    gap: 1.5,
-                  }}
-                >
-                  <Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.75 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: "text.primary" }}>
-                        {rec.title}
-                      </Typography>
-                      <Chip
-                        label={rec.saving}
-                        size="small"
-                        color={rec.badgeColor as any}
-                        sx={{ height: 22, fontWeight: 800, fontSize: "0.72rem", flexShrink: 0 }}
-                      />
+              <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.6 }}>
+                Generate actionable strategies tailored to your {targetAppliances.length} active appliance(s),
+                identifying peak hour load shifts, inverter retrofits, and standby vampire power mitigation.
+              </Typography>
+            </Box>
+
+            <Button
+              variant="contained"
+              size="medium"
+              startIcon={<SparklesIcon />}
+              onClick={() => handleGenerateAiTips(false)}
+              disabled={targetAppliances.length === 0 || dailyQuota.remaining <= 0}
+              sx={{
+                bgcolor: "#00e5c9",
+                color: "#0a0e14",
+                fontWeight: 800,
+                textTransform: "none",
+                px: 3.5,
+                py: 1.1,
+                borderRadius: 1.5,
+                fontSize: "0.88rem",
+                boxShadow: "0 0 16px rgba(0, 229, 201, 0.35)",
+                "&:hover": {
+                  bgcolor: "#00c4ac",
+                  boxShadow: "0 0 24px rgba(0, 229, 201, 0.55)",
+                },
+                "&.Mui-disabled": {
+                  bgcolor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+                  color: "text.disabled",
+                },
+              }}
+            >
+              {dailyQuota.remaining <= 0 ? "Daily Quota Reached (0/5)" : "Generate Tips from AI"}
+            </Button>
+
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", opacity: 0.85 }}>
+              🔒 Quota-Protected: {dailyQuota.remaining} of {dailyQuota.max} AI audits available today. Persisted permanently until you regenerate.
+            </Typography>
+          </Box>
+        )}
+
+        {/* 2. Loading State: Shimmering Skeletons */}
+        {isGeneratingAiTips && (
+          <Box sx={{ py: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 2.5 }}>
+              <CircularProgress size={20} sx={{ color: "#00e5c9" }} />
+              <Typography variant="body2" sx={{ fontWeight: 700, color: "primary.main" }}>
+                Auditing appliance loads & Meralco tariff tiers with Gemini AI...
+              </Typography>
+            </Box>
+
+            <Grid container spacing={2}>
+              {[1, 2].map((k) => (
+                <Grid key={k} size={{ xs: 12, md: 6 }}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 1.25,
+                      bgcolor: isDark ? "rgba(24, 27, 32, 0.65)" : "#ffffff",
+                      border: "1px solid",
+                      borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1.5 }}>
+                      <Skeleton variant="text" width="60%" height={24} />
+                      <Skeleton variant="rounded" width={80} height={22} />
                     </Box>
-                    <Typography variant="caption" sx={{ color: "text.secondary", lineHeight: 1.5, display: "block" }}>
-                      {rec.description}
-                    </Typography>
+                    <Skeleton variant="text" width="100%" height={18} />
+                    <Skeleton variant="text" width="90%" height={18} />
+                    <Skeleton variant="text" width="40%" height={18} />
                   </Box>
-                </Box>
-              </Grid>
-            ))
-          )}
-        </Grid>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+
+        {/* 3. Generated State: Dynamic AI Recommendations */}
+        {hasGeneratedAiTips && !isGeneratingAiTips && (
+          <>
+            {aiTipsIsFallback && (
+              <Alert severity="info" sx={{ mb: 2, borderRadius: 1.25, fontSize: "0.78rem" }}>
+                Notice: Gemini API is in local offline mode. Showing verified rule-based energy audit recommendations.
+              </Alert>
+            )}
+
+            <Grid container spacing={2}>
+              {aiTips.length === 0 ? (
+                <Grid size={{ xs: 12 }}>
+                  <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 2 }}>
+                    Register appliances to generate customized energy-saving recommendations.
+                  </Typography>
+                </Grid>
+              ) : (
+                aiTips.map((rec) => (
+                  <Grid key={rec.id} size={{ xs: 12, md: 6 }}>
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 1.25,
+                        bgcolor: isDark ? "rgba(24, 27, 32, 0.65)" : "#ffffff",
+                        border: "1px solid",
+                        borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                        boxShadow: isDark ? "none" : "0 2px 10px rgba(15, 23, 42, 0.04)",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        gap: 1.5,
+                      }}
+                    >
+                      <Box>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.75 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: "text.primary" }}>
+                            {rec.title}
+                          </Typography>
+                          <Chip
+                            label={rec.saving}
+                            size="small"
+                            color={rec.badgeColor as any}
+                            sx={{ height: 22, fontWeight: 800, fontSize: "0.72rem", flexShrink: 0 }}
+                          />
+                        </Box>
+                        <Typography variant="caption" sx={{ color: "text.secondary", lineHeight: 1.5, display: "block" }}>
+                          {rec.description}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                ))
+              )}
+            </Grid>
+          </>
+        )}
       </Card>
     </Box>
   );

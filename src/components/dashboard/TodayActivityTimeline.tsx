@@ -103,9 +103,11 @@ export const TodayActivityTimeline: React.FC<TodayActivityTimelineProps> = ({ ap
     };
     window.addEventListener("powerforecast_session_sync", handleRollover);
     window.addEventListener("powerforecast_stopwatch_rollover", handleRollover);
+    window.addEventListener("powerforecast_circuit_toggled", handleRollover);
     return () => {
       window.removeEventListener("powerforecast_session_sync", handleRollover);
       window.removeEventListener("powerforecast_stopwatch_rollover", handleRollover);
+      window.removeEventListener("powerforecast_circuit_toggled", handleRollover);
     };
   }, [logsRes, dailyUsageRes]);
 

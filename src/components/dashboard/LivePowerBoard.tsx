@@ -30,7 +30,7 @@ import { devLog } from "../../lib/devLogger";
 import { calculateSimultaneousDemand } from "../../lib/meralcoCalculator";
 import { supabaseClient } from "../../lib/supabaseClient";
 import { calculateKwh, calculateApplianceKwh, calculateCost } from "../../lib/dailyUsageService";
-import { switchOnCircuit, switchOffCircuit } from "../../lib/sessionService";
+import { switchOnCircuit, switchOffCircuit, getEffectiveApplianceRate } from "../../lib/sessionService";
 
 interface LivePowerBoardProps {
   onOpenAddModal: () => void;
@@ -56,6 +56,15 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Synchronize circuit toggles across views
+  useEffect(() => {
+    const handleCircuitToggled = () => {
+      if (appliancesRes?.refetch) appliancesRes.refetch();
+    };
+    window.addEventListener("powerforecast_circuit_toggled", handleCircuitToggled);
+    return () => window.removeEventListener("powerforecast_circuit_toggled", handleCircuitToggled);
+  }, [appliancesRes]);
 
   // Memoize demand calculation to avoid running on every second tick
   const demand = useMemo(() => calculateSimultaneousDemand(appliances, 9.2), [appliances]);
@@ -98,8 +107,8 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
     } else {
       await switchOnCircuit(app);
     }
+    if (appliancesRes?.refetch) appliancesRes.refetch();
   };
-
 
   const getRunningDuration = (turnedOnAt?: string | null) => {
     if (!turnedOnAt) return "00:00:00";
@@ -117,7 +126,7 @@ export const LivePowerBoard: React.FC<LivePowerBoardProps> = ({ onOpenAddModal }
     const diffSeconds = Math.max(0, (now - start) / 1000);
     const totalWatts = app.watts * (app.quantity || 1);
     const accumulatedKwh = (totalWatts / 1000) * (diffSeconds / 3600);
-    const effectiveRate = app.tariff_type === "commercial" ? 15.2 : 14.8261;
+    const effectiveRate = getEffectiveApplianceRate(app);
     return accumulatedKwh * effectiveRate;
   };
 

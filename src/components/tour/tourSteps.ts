@@ -579,23 +579,7 @@ const analyticsTour: PageTour = {
         },
       },
     },
-    {
-      id: 'analytics-load-curve',
-      placement: 'top',
-      page: 'analytics',
-      copy: {
-        en: {
-          title: '24-Hour Load Curve Simulation',
-          description:
-            'Simulate hourly power demand across a full 24-hour cycle. Identify peak consumption spikes and opportunities to shift heavy appliances to off-peak hours.',
-        },
-        tl: {
-          title: 'Simulasyon ng 24-Oras na Load Curve',
-          description:
-            'Visual na hugis ng konsumo sa buong 24 oras. Alamin kung kailan ang peak hours at ilipat ang mabibigat na gamit sa mga oras na mas mababa ang demand.',
-        },
-      },
-    },
+
     {
       id: 'analytics-historical-trend',
       placement: 'top',

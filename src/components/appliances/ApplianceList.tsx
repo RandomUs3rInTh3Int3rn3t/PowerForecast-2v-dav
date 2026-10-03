@@ -42,7 +42,7 @@ import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmProvider";
 import { devLog } from "../../lib/devLogger";
 import { calculateMeralcoBill } from "../../lib/meralcoCalculator";
-import { switchOffCircuit } from "../../lib/sessionService";
+import { switchOnCircuit, switchOffCircuit, getEffectiveApplianceRate } from "../../lib/sessionService";
 import {
   calculateKwh,
   calculateApplianceKwh,
@@ -104,6 +104,69 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
   }, [spaces, activeSpaceId]);
 
   const activeSpace = spaces.find((s) => s.id === activeSpaceId) || spaces[0];
+
+  // Live 1-second ticker for running stopwatches
+  const [now, setNow] = useState<number>(Date.now());
+  useEffect(() => {
+    const hasRunning = appliances.some((a) => a.is_currently_on);
+    if (!hasRunning) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [appliances]);
+
+  // Synchronize circuit toggles triggered from Sidebar, Dashboard, or Smart Calendar
+  useEffect(() => {
+    const handleCircuitToggled = () => {
+      if (appliancesRes?.refetch) appliancesRes.refetch();
+    };
+    window.addEventListener("powerforecast_circuit_toggled", handleCircuitToggled);
+    return () => window.removeEventListener("powerforecast_circuit_toggled", handleCircuitToggled);
+  }, [appliancesRes]);
+
+  const togglePower = async (app: UserAppliance) => {
+    if (app.is_active === false) {
+      showError("Appliance is blacklisted. Restore it first to enable the stopwatch.");
+      return;
+    }
+
+    if (app.is_currently_on) {
+      const res = await switchOffCircuit(app);
+      if (res.success) {
+        showSuccess(`Stopwatch stopped: Logged ${res.durationMinutes}m (~₱${res.cost.toFixed(2)}) for ${app.name}`);
+        if (appliancesRes?.refetch) appliancesRes.refetch();
+      } else {
+        showError(`Failed to stop stopwatch for ${app.name}`);
+      }
+    } else {
+      const res = await switchOnCircuit(app);
+      if (res.success) {
+        showSuccess(`Stopwatch started for ${app.name}! Real-time energy tracking active.`);
+        if (appliancesRes?.refetch) appliancesRes.refetch();
+      } else {
+        showError(`Failed to start stopwatch for ${app.name}`);
+      }
+    }
+  };
+
+  const getRunningDuration = (turnedOnAt?: string | null) => {
+    if (!turnedOnAt) return "00:00:00";
+    const start = new Date(turnedOnAt).getTime();
+    const diffSeconds = Math.max(0, Math.floor((now - start) / 1000));
+    const hrs = String(Math.floor(diffSeconds / 3600)).padStart(2, "0");
+    const mins = String(Math.floor((diffSeconds % 3600) / 60)).padStart(2, "0");
+    const secs = String(diffSeconds % 60).padStart(2, "0");
+    return `${hrs}:${mins}:${secs}`;
+  };
+
+  const getLiveSpent = (app: UserAppliance) => {
+    if (!app.is_currently_on || !app.last_turned_on_at) return 0;
+    const start = new Date(app.last_turned_on_at).getTime();
+    const diffSeconds = Math.max(0, (now - start) / 1000);
+    const totalWatts = app.watts * (app.quantity || 1);
+    const accumulatedKwh = (totalWatts / 1000) * (diffSeconds / 3600);
+    const rate = getEffectiveApplianceRate(app);
+    return accumulatedKwh * rate;
+  };
 
   // First-time space submission handler
   const handleCreateInitialSpace = (e: React.FormEvent) => {
@@ -804,6 +867,9 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                 : (isInverter ? cruisingWatts : w);
             const hourlyRate = (effectiveWatts / 1000) * (appBill.effectiveRatePerKwh || 14.82);
 
+            const isOn = Boolean(app.is_currently_on);
+            const liveSpent = getLiveSpent(app);
+
             return (
               <Grid size={{ xs: 12, sm: 6, md: 4 }} key={app.id}>
                 <Card
@@ -817,17 +883,31 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                         ? theme.palette.mode === "dark"
                           ? "rgba(245, 158, 11, 0.45)"
                           : "rgba(217, 119, 6, 0.4)"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255, 255, 255, 0.06)"
-                          : "#e2e8f0",
+                        : isOn
+                          ? theme.palette.mode === "dark"
+                            ? "#00e5c9"
+                            : "#0d9488"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255, 255, 255, 0.06)"
+                            : "#e2e8f0",
                     bgcolor: (theme) =>
                       isBlacklisted
                         ? theme.palette.mode === "dark"
                           ? "rgba(22, 24, 28, 0.88)"
                           : "rgba(254, 243, 199, 0.12)"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(20, 24, 28, 0.75)"
-                          : "background.paper",
+                        : isOn
+                          ? theme.palette.mode === "dark"
+                            ? "rgba(0, 229, 201, 0.05)"
+                            : "rgba(13, 148, 136, 0.04)"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(20, 24, 28, 0.75)"
+                            : "background.paper",
+                    boxShadow: (theme) =>
+                      isOn
+                        ? theme.palette.mode === "dark"
+                          ? "0 0 16px rgba(0, 229, 201, 0.25)"
+                          : "0 0 16px rgba(13, 148, 136, 0.2)"
+                        : "none",
                     opacity: isBlacklisted ? 0.82 : 1,
                     display: "flex",
                     flexDirection: "column",
@@ -840,20 +920,24 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                           ? theme.palette.mode === "dark"
                             ? "rgba(245, 158, 11, 0.7)"
                             : "rgba(217, 119, 6, 0.6)"
-                          : theme.palette.mode === "dark"
-                            ? "rgba(0, 229, 201, 0.45)"
-                            : "rgba(13, 148, 136, 0.4)",
+                          : isOn
+                            ? theme.palette.mode === "dark"
+                              ? "#00e5c9"
+                              : "#0d9488"
+                            : theme.palette.mode === "dark"
+                              ? "rgba(0, 229, 201, 0.45)"
+                              : "rgba(13, 148, 136, 0.4)",
                       transform: "translateY(-3px)",
                       boxShadow: (theme) =>
                         theme.palette.mode === "dark"
-                          ? "0 8px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 229, 201, 0.08)"
-                          : "0 8px 24px rgba(13, 148, 136, 0.1)",
+                          ? "0 8px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 229, 201, 0.12)"
+                          : "0 8px 24px rgba(13, 148, 136, 0.12)",
                     },
                   }}
                 >
                   <Box>
-                    {/* Top Row: Category, Blacklist badge & Room Tag */}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.5, gap: 1 }}>
+                    {/* Top Row: Category, Blacklist badge, Room Tag & Start Stopwatch Button */}
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, gap: 1 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
                         <Chip
                           label={app.category}
@@ -886,20 +970,74 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
                             />
                           </Tooltip>
                         )}
+                        {app.room_location && (
+                          <Chip
+                            label={app.room_location}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: "0.6875rem",
+                              borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "#cbd5e1"),
+                              color: "text.secondary",
+                            }}
+                          />
+                        )}
                       </Box>
-                      {app.room_location && (
-                        <Chip
-                          label={app.room_location}
-                          size="small"
-                          variant="outlined"
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: "0.6875rem",
-                            borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.12)" : "#cbd5e1"),
-                            color: "text.secondary",
-                          }}
-                        />
-                      )}
+
+                      {/* Start / Stop Live Stopwatch Button */}
+                      <Tooltip
+                        title={
+                          isBlacklisted
+                            ? "Appliance is blacklisted — click restore below to enable stopwatch"
+                            : isOn
+                            ? "Stop Live Stopwatch (Auto-logs duration and energy into today's session records)"
+                            : "Start Live Stopwatch (Track real-time energy & cost)"
+                        }
+                      >
+                        <span>
+                          <Button
+                            size="small"
+                            variant={isOn ? "contained" : "outlined"}
+                            color={isOn ? "error" : "primary"}
+                            disabled={isBlacklisted}
+                            onClick={() => togglePower(app)}
+                            startIcon={
+                              isOn ? (
+                                <ClockIcon sx={{ fontSize: "14px !important" }} />
+                              ) : (
+                                <BoltIcon sx={{ fontSize: "14px !important" }} />
+                              )
+                            }
+                            sx={{
+                              py: 0.3,
+                              px: 1.2,
+                              minHeight: 28,
+                              fontSize: "0.7rem",
+                              fontWeight: 800,
+                              borderRadius: 1.5,
+                              textTransform: "none",
+                              ...(isOn
+                                ? {
+                                    bgcolor: "#ef4444",
+                                    color: "#ffffff",
+                                    boxShadow: "0 0 10px rgba(239, 68, 68, 0.45)",
+                                    "&:hover": { bgcolor: "#dc2626" },
+                                  }
+                                : {
+                                    borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.4)" : "#0d9488"),
+                                    color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
+                                    bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.08)" : "rgba(13, 148, 136, 0.06)"),
+                                    "&:hover": {
+                                      bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.2)" : "rgba(13, 148, 136, 0.12)"),
+                                    },
+                                  }),
+                            }}
+                          >
+                            {isOn ? "Stop" : "Start"}
+                          </Button>
+                        </span>
+                      </Tooltip>
                     </Box>
 
                     {/* Appliance Name & Details */}
@@ -984,9 +1122,27 @@ export const ApplianceList: React.FC<ApplianceListProps> = () => {
 
                   {/* Card Footer with Rate & Actions */}
                   <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid", borderColor: "divider", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                      ₱{hourlyRate.toFixed(2)}/hr rate
-                    </Typography>
+                    {isOn ? (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "success.main" }}>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            bgcolor: "success.main",
+                            boxShadow: "0 0 8px #00e5c9",
+                            animation: "pulse 1.5s infinite",
+                          }}
+                        />
+                        <Typography variant="caption" sx={{ fontWeight: 800, fontFamily: "monospace", fontSize: "0.75rem" }}>
+                          {getRunningDuration(app.last_turned_on_at)} <span style={{ opacity: 0.8 }}>• ₱{liveSpent.toFixed(4)}</span>
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                        ₱{hourlyRate.toFixed(2)}/hr rate
+                      </Typography>
+                    )}
 
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       {/* Blacklist / Exclude Toggle Action */}

@@ -3,6 +3,46 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.6.0bv",
+    version: "3.6.0bv",
+    git_commit_tag: "3.6.0bv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.6.0bv - Merge upstream/main: integrate Google Gemini AI Energy Auditor with token quota preservation & intelligent fallback engine, real-time stopwatch telemetry & Live Load Circuits drawer, and Household Multi-User Access with role-based member permissions",
+  },
+  {
+    id: "3.5.0ev",
+    version: "3.5.0ev",
+    git_commit_tag: "3.5.0ev",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0ev - Upgrade Gemini AI Energy Auditor with long-term localStorage persistence across logout/refresh/system exit, 5 daily generation quota limit per user, appliance change detection banner, live stopwatch tracker telemetry, and expanded serverless prompt buffer",
+  },
+  {
+    id: "3.5.0dv",
+    version: "3.5.0dv",
+    git_commit_tag: "3.5.0dv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0dv - Decommission 24-Hour Daily Load Curve Simulation from Analytics view, sync onboarding tour steps, and introduce on-demand Google Gemini AI Energy Auditor with token quota preservation, session caching, and intelligent fallback engine",
+  },
+  {
+    id: "3.5.0cv",
+    version: "3.5.0cv",
+    git_commit_tag: "3.5.0cv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0cv - Full 3-part synchronization across Dashboard, Appliance Hub, Sidebar, Analytics, and Forecasting: restored direct Start stopwatch button on appliance cards with live timer/spend telemetry, interactive Live Load side panel drawer with per-circuit stop controls, Today's Measured Spend KPI card on Dashboard with real-time dynamic rates, seamless Actual vs Simulated plan switching in Analytics, and interactive What-If scenario application in Forecasting",
+  },
+  {
     id: "3.5.0bv",
     version: "3.5.0bv",
     git_commit_tag: "3.5.0bv",
