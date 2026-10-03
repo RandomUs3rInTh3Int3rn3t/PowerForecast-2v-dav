@@ -293,15 +293,10 @@ export const authProvider: AuthProvider = {
 
       const { data, error } = await supabaseClient.auth.getSession();
       if (error || !data?.session?.user) {
-        // If offline during check, preserve session if cached user exists
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
-          devLog.warn("Auth", "Device is offline during session check; preserving cached session");
-          try {
-            const cached = localStorage.getItem("powerforecast_active_user");
-            if (cached) {
-              return { authenticated: true };
-            }
-          } catch {}
+        // If cached user exists and rememberMe is not explicitly false, preserve session during refresh
+        const cached = localStorage.getItem("powerforecast_active_user");
+        if (cached && rememberMe !== "false") {
+          return { authenticated: true };
         }
         try {
           localStorage.removeItem("powerforecast_active_user");
@@ -324,6 +319,11 @@ export const authProvider: AuthProvider = {
         authenticated: true,
       };
     } catch {
+      const cached = localStorage.getItem("powerforecast_active_user");
+      const rememberMe = localStorage.getItem("powerforecast_remember_me");
+      if (cached && rememberMe !== "false") {
+        return { authenticated: true };
+      }
       try {
         localStorage.removeItem("powerforecast_active_user");
         localStorage.removeItem("powerforecast_remember_me");
@@ -338,35 +338,46 @@ export const authProvider: AuthProvider = {
   },
 
   getIdentity: async () => {
+    // Instant synchronous cache hydration to eliminate refresh race condition
+    let cachedActiveUser: any = null;
+    try {
+      const raw = localStorage.getItem("powerforecast_active_user");
+      if (raw) cachedActiveUser = JSON.parse(raw);
+    } catch {}
+
     try {
       const { data: authData, error: authError } = await supabaseClient.auth.getUser();
       if (authError || !authData?.user) {
-        return null;
+        return cachedActiveUser || null;
       }
 
       const user = authData.user;
 
       // Query accounts table for customized profile metadata
-      const { data: profile } = await supabaseClient
-        .from("accounts")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
+      let accountProfile: any = null;
+      try {
+        const { data: profile } = await supabaseClient
+          .from("accounts")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+        accountProfile = profile;
+      } catch {}
 
       const activeUser = {
         id: user.id,
-        name: profile?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User",
-        email: profile?.email || user.email || "",
-        avatar: profile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`,
-        householdType: user.user_metadata?.householdType || profile?.household_type || "Residential",
-        provider: profile?.provider || "email",
+        name: accountProfile?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || cachedActiveUser?.name || "User",
+        email: accountProfile?.email || user.email || cachedActiveUser?.email || "",
+        avatar: accountProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`,
+        householdType: user.user_metadata?.householdType || accountProfile?.household_type || "Residential",
+        provider: accountProfile?.provider || "email",
       };
 
       localStorage.setItem("powerforecast_active_user", JSON.stringify(activeUser));
       return activeUser;
     } catch (e) {
       devLog.warn("Auth", "Error fetching user identity", e);
-      return null;
+      return cachedActiveUser || null;
     }
   },
 

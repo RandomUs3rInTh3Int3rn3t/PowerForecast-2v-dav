@@ -42,6 +42,19 @@ import {
   HistoryEdu as ChangelogIcon,
   Settings as SettingsIcon,
 } from "@mui/icons-material";
+import { HouseholdProvider, useHousehold } from "./context/HouseholdContext";
+import { HouseholdAccessModal } from "./components/household/HouseholdAccessModal";
+
+const HouseholdAccessModalConsumer: React.FC = () => {
+  const { isHouseholdModalOpen, closeHouseholdModal, householdModalTab } = useHousehold();
+  return (
+    <HouseholdAccessModal
+      isOpen={isHouseholdModalOpen}
+      onClose={closeHouseholdModal}
+      initialTab={householdModalTab}
+    />
+  );
+};
 
 /**
  * Intelligent Root Gate: Detects existing active session and 'Remember Me' state.
@@ -207,43 +220,46 @@ export const App: React.FC = () => {
               warnWhenUnsavedChanges: true,
             }}
           >
-            <Routes>
-              {/* Public Landing / Marketing Page (With Intelligent Auth Redirect) */}
-              <Route path="/" element={<RootGate />} />
-              <Route path="/landing" element={<LandingPage />} />
+            <HouseholdProvider>
+              <Routes>
+                {/* Public Landing / Marketing Page (With Intelligent Auth Redirect) */}
+                <Route path="/" element={<RootGate />} />
+                <Route path="/landing" element={<LandingPage />} />
 
-              {/* Authentication Pages */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
-              <Route path="/verified" element={<EmailVerifiedPage />} />
+                {/* Authentication Pages */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/signup" element={<SignupPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+                <Route path="/verified" element={<EmailVerifiedPage />} />
 
-              {/* App Workspace Pages (Protected under Authenticated guard and Layout) */}
-              <Route
-                element={
-                  <Authenticated key="authenticated-workspace" fallback={<Navigate to="/login" replace />}>
-                    <Layout />
-                  </Authenticated>
-                }
-              >
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/calculator" element={<CalculatorPage />} />
-                <Route path="/appliances" element={<AppliancesPage />} />
-                <Route path="/calendar" element={<CalendarPage />} />
-                <Route path="/analytics" element={<AnalyticsPage />} />
-                <Route path="/forecasting" element={<ForecastingPage />} />
-                <Route path="/docs" element={<ApiDocsPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-              </Route>
+                {/* App Workspace Pages (Protected under Authenticated guard and Layout) */}
+                <Route
+                  element={
+                    <Authenticated key="authenticated-workspace" fallback={<Navigate to="/login" replace />}>
+                      <Layout />
+                    </Authenticated>
+                  }
+                >
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/calculator" element={<CalculatorPage />} />
+                  <Route path="/appliances" element={<AppliancesPage />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/forecasting" element={<ForecastingPage />} />
+                  <Route path="/docs" element={<ApiDocsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Route>
 
-              {/* Catch-all fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-            <UnsavedChangesNotifier />
-            <VersionBadge />
-            <PwaUpdateModal />
-            <WhatsNewModal />
+                {/* Catch-all fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+              <HouseholdAccessModalConsumer />
+              <UnsavedChangesNotifier />
+              <VersionBadge />
+              <PwaUpdateModal />
+              <WhatsNewModal />
+            </HouseholdProvider>
           </Refine>
           </HashRouter>
           </ConfirmProvider>

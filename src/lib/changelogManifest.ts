@@ -3,6 +3,26 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.6.0cv",
+    version: "3.6.0cv",
+    git_commit_tag: "3.6.0cv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.6.0cv - Synchronize upstream household multi-user access (invite codes, roles, and appliance approval workflow) and Gemini AI Energy Auditor with the local Stack Template design system, neutral zinc auth cards, Inter typography, and distraction-free Hero layout",
+  },
+  {
+    id: "3.6.0bv",
+    version: "3.6.0bv",
+    git_commit_tag: "3.6.0bv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.6.0bv - Merge upstream/main: integrate Google Gemini AI Energy Auditor with token quota preservation & intelligent fallback engine, real-time stopwatch telemetry & Live Load Circuits drawer, and Household Multi-User Access with role-based member permissions",
+  },
+  {
     id: "3.5.0hv",
     version: "3.5.0hv",
     git_commit_tag: "3.5.0hv",
