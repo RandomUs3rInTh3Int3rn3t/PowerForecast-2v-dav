@@ -32,13 +32,19 @@ import {
   Refresh as RefreshIcon,
   ChevronRight as ChevronRightIcon,
   HistoryEdu as ChangelogIcon,
+  AccessTime as ClockIcon,
+  PowerSettingsNew as PowerIcon,
+  ArrowForward as ArrowForwardIcon,
 } from "@mui/icons-material";
+import Tooltip from "@mui/material/Tooltip";
 import { useList, useGetIdentity, useLogout } from "@refinedev/core";
 import { UserAppliance } from "../../types";
 import { APP_VERSION, checkSupabaseConnection } from "../../lib/supabaseClient";
 import { useLanguage } from "../../context/LanguageContext";
 import { SystemChangelogModal } from "../changelog/SystemChangelogModal";
 import { getMeralcoTariff, MeralcoTariffData, DEFAULT_MERALCO_TARIFF } from "../../lib/meralcoRateService";
+import { switchOffCircuit } from "../../lib/sessionService";
+import { DEFAULT_EFFECTIVE_RATE } from "../../lib/dailyUsageService";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -60,8 +66,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
+  const [isLiveDrawerOpen, setIsLiveDrawerOpen] = useState(false);
 
-  // Meralco Tariff Telemetry for Mobile Drawer
+  // Meralco Tariff Telemetry for Mobile Drawer & Sidebar
   const [tariff, setTariff] = useState<MeralcoTariffData>(DEFAULT_MERALCO_TARIFF);
   const [isTariffRefreshing, setIsTariffRefreshing] = useState(false);
 
@@ -81,6 +88,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Synchronize circuit toggles across views
+  useEffect(() => {
+    const handleCircuitToggled = () => {
+      if (appliancesRes?.refetch) appliancesRes.refetch();
+    };
+    window.addEventListener("powerforecast_circuit_toggled", handleCircuitToggled);
+    return () => window.removeEventListener("powerforecast_circuit_toggled", handleCircuitToggled);
+  }, [appliancesRes]);
 
   // Fetch Meralco Tariff & DB Status for mobile telemetry
   useEffect(() => {
@@ -110,6 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const runningAppliances = appliances.filter((a) => a.is_currently_on);
   const activeWattage = runningAppliances.reduce((acc, curr) => acc + curr.watts * (curr.quantity || 1), 0);
   const runningCount = runningAppliances.length;
+  const effectiveRate = tariff.totalEffectiveRate || DEFAULT_EFFECTIVE_RATE;
 
   const getAccumulatedPesos = (app: UserAppliance) => {
     if (!app.is_currently_on || !app.last_turned_on_at) return 0;
@@ -117,7 +134,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const diffSeconds = Math.max(0, (now - start) / 1000);
     const totalWatts = app.watts * (app.quantity || 1);
     const accumulatedKwh = (totalWatts / 1000) * (diffSeconds / 3600);
-    return accumulatedKwh * 14.8261;
+    const rate = app.tariff_type === "commercial" ? 15.2 : effectiveRate;
+    return accumulatedKwh * rate;
+  };
+
+  const getRunningDuration = (turnedOnAt?: string | null) => {
+    if (!turnedOnAt) return "00:00:00";
+    const start = new Date(turnedOnAt).getTime();
+    const diffSeconds = Math.max(0, Math.floor((now - start) / 1000));
+    const hrs = String(Math.floor(diffSeconds / 3600)).padStart(2, "0");
+    const mins = String(Math.floor((diffSeconds % 3600) / 60)).padStart(2, "0");
+    const secs = String(diffSeconds % 60).padStart(2, "0");
+    return `${hrs}:${mins}:${secs}`;
+  };
+
+  const handleStopCircuit = async (app: UserAppliance) => {
+    await switchOffCircuit(app, effectiveRate);
+    if (appliancesRes?.refetch) appliancesRes.refetch();
+  };
+
+  const handleStopAllCircuits = async () => {
+    for (const app of runningAppliances) {
+      await switchOffCircuit(app, effectiveRate);
+    }
+    if (appliancesRes?.refetch) appliancesRes.refetch();
   };
 
   const totalSessionCost = runningAppliances.reduce((acc, curr) => acc + getAccumulatedPesos(curr), 0);
@@ -267,97 +307,116 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Live Grid Load Card & Footer */}
       <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
-        <Paper
-          elevation={0}
-          sx={{
-            p: 1.75,
-            borderRadius: 1.25,
-            bgcolor: (theme) =>
-              theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.88)" : "#f8fafc",
-            border: "1px solid",
-            borderColor: (theme) =>
-              theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
-            mb: 1.5,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Box
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  bgcolor: runningCount > 0 ? "success.main" : "text.disabled",
-                  boxShadow: (theme) =>
-                    runningCount > 0
-                      ? theme.palette.mode === "dark"
-                        ? "0 0 8px #00e5c9"
-                        : "0 0 8px rgba(5, 150, 105, 0.5)"
-                      : "none",
-                  transition: "all 0.3s ease",
-                }}
-              />
-              <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary" }}>
-                {t("nav.liveLoad", "Live Load")}
-              </Typography>
-            </Box>
-            <Chip
-              label={`${runningCount} Active`}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: "0.6875rem",
-                fontWeight: 700,
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.12)" : "rgba(13, 148, 136, 0.1)",
-                color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
-                border: "1px solid",
-                borderColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.3)" : "rgba(13, 148, 136, 0.25)",
-              }}
-            />
-          </Box>
-
-          <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 800,
-                fontFamily: "monospace",
-                color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
-              }}
-            >
-              {activeWattage} <Typography component="span" variant="caption" sx={{ color: "text.secondary" }}>W</Typography>
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
-                fontFamily: "monospace",
-                fontWeight: 700,
-              }}
-            >
-              ₱{((activeWattage / 1000) * 14.8261).toFixed(2)}/hr
-            </Typography>
-          </Box>
-
-          {runningCount > 0 && (
-            <>
-              <Divider sx={{ my: 1, borderColor: "divider" }} />
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <CoinsIcon sx={{ fontSize: 13, color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488") }} />
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                    Session:
-                  </Typography>
-                </Box>
-                <Typography variant="caption" sx={{ color: "success.main", fontFamily: "monospace", fontWeight: 700 }}>
-                  ₱{totalSessionCost.toFixed(4)}
+        <Tooltip title="Click to view & control active live circuits" arrow placement="top">
+          <Paper
+            elevation={0}
+            onClick={() => setIsLiveDrawerOpen(true)}
+            sx={{
+              p: 1.75,
+              borderRadius: 1.25,
+              bgcolor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(24, 27, 32, 0.88)" : "#f8fafc",
+              border: "1px solid",
+              borderColor: (theme) =>
+                runningCount > 0
+                  ? theme.palette.mode === "dark"
+                    ? "rgba(0, 229, 201, 0.4)"
+                    : "rgba(13, 148, 136, 0.4)"
+                  : theme.palette.mode === "dark"
+                    ? "divider"
+                    : "#e2e8f0",
+              mb: 1.5,
+              cursor: "pointer",
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              "&:hover": {
+                borderColor: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
+                transform: "translateY(-1px)",
+                boxShadow: (theme) =>
+                  theme.palette.mode === "dark"
+                    ? "0 4px 16px rgba(0, 229, 201, 0.15)"
+                    : "0 4px 16px rgba(13, 148, 136, 0.12)",
+              },
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    bgcolor: runningCount > 0 ? "success.main" : "text.disabled",
+                    boxShadow: (theme) =>
+                      runningCount > 0
+                        ? theme.palette.mode === "dark"
+                          ? "0 0 8px #00e5c9"
+                          : "0 0 8px rgba(5, 150, 105, 0.5)"
+                        : "none",
+                    transition: "all 0.3s ease",
+                  }}
+                />
+                <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                  {t("nav.liveLoad", "Live Load")}
                 </Typography>
               </Box>
-            </>
-          )}
-        </Paper>
+              <Chip
+                label={`${runningCount} Active`}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: "0.6875rem",
+                  fontWeight: 700,
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.12)" : "rgba(13, 148, 136, 0.1)",
+                  color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
+                  border: "1px solid",
+                  borderColor: (theme) =>
+                    theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.3)" : "rgba(13, 148, 136, 0.25)",
+                }}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 800,
+                  fontFamily: "monospace",
+                  color: (theme) => (theme.palette.mode === "dark" ? "#ffffff" : "#0f172a"),
+                }}
+              >
+                {activeWattage} <Typography component="span" variant="caption" sx={{ color: "text.secondary" }}>W</Typography>
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
+                  fontFamily: "monospace",
+                  fontWeight: 700,
+                }}
+              >
+                ₱{((activeWattage / 1000) * effectiveRate).toFixed(2)}/hr
+              </Typography>
+            </Box>
+
+            {runningCount > 0 && (
+              <>
+                <Divider sx={{ my: 1, borderColor: "divider" }} />
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <CoinsIcon sx={{ fontSize: 13, color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488") }} />
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
+                      Session:
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{ color: "success.main", fontFamily: "monospace", fontWeight: 700 }}>
+                    ₱{totalSessionCost.toFixed(4)}
+                  </Typography>
+                </Box>
+              </>
+            )}
+          </Paper>
+        </Tooltip>
 
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -675,6 +734,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* 4. Live Grid Load Card */}
       <Paper
         elevation={0}
+        onClick={() => setIsLiveDrawerOpen(true)}
         sx={{
           p: 1.75,
           borderRadius: 2,
@@ -682,7 +742,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             theme.palette.mode === "dark" ? "rgba(24, 27, 34, 0.88)" : "#f8fafc",
           border: "1px solid",
           borderColor: (theme) =>
-            theme.palette.mode === "dark" ? "divider" : "#e2e8f0",
+            runningCount > 0
+              ? theme.palette.mode === "dark"
+                ? "rgba(0, 229, 201, 0.4)"
+                : "rgba(13, 148, 136, 0.4)"
+              : theme.palette.mode === "dark"
+                ? "divider"
+                : "#e2e8f0",
+          cursor: "pointer",
+          transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+          "&:hover": {
+            borderColor: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 4px 16px rgba(0, 229, 201, 0.15)"
+                : "0 4px 16px rgba(13, 148, 136, 0.12)",
+          },
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
@@ -741,7 +816,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               fontWeight: 700,
             }}
           >
-            ₱{((activeWattage / 1000) * 14.8261).toFixed(2)}/hr
+            ₱{((activeWattage / 1000) * effectiveRate).toFixed(2)}/hr
           </Typography>
         </Box>
 
@@ -1005,6 +1080,227 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isOpen={isChangelogModalOpen}
         onClose={() => setIsChangelogModalOpen(false)}
       />
+
+      {/* Live Circuits & Active Stopwatch Inspection Dialog */}
+      <Dialog
+        open={isLiveDrawerOpen}
+        onClose={() => setIsLiveDrawerOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.3)" : "rgba(13, 148, 136, 0.3)",
+              bgcolor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(20, 24, 28, 0.98)" : "#ffffff",
+              backdropFilter: "blur(20px)",
+              p: 1,
+            },
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between", pb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 1,
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.15)" : "rgba(13, 148, 136, 0.1)"),
+                color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488"),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <BoltIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                Live Load Circuits
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Real-time active stopwatch power monitoring
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton size="small" onClick={() => setIsLiveDrawerOpen(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 1 }}>
+          {/* Summary Banner */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 2.5,
+              borderRadius: 1.5,
+              bgcolor: (theme) =>
+                theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.03)" : "#f1f5f9",
+              border: "1px solid",
+              borderColor: "divider",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1.5,
+            }}
+          >
+            <Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                Total Active Load
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "primary.main" }}>
+                {activeWattage} <span style={{ fontSize: "0.875rem", fontWeight: 600 }}>Watts</span>
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: "right" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                Current Running Burn
+              </Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, fontFamily: "monospace", color: (theme) => (theme.palette.mode === "dark" ? "#00e5c9" : "#0d9488") }}>
+                ₱{((activeWattage / 1000) * effectiveRate).toFixed(2)}/hr
+              </Typography>
+            </Box>
+          </Paper>
+
+          {/* Running Circuits List */}
+          {runningAppliances.length === 0 ? (
+            <Box sx={{ py: 4, textAlign: "center" }}>
+              <PowerIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1, opacity: 0.5 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "text.secondary" }}>
+                No circuits are currently active
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5, maxWidth: 360, mx: "auto" }}>
+                Use the Start button in Appliance Hub or the Live Power Board on Dashboard to turn on appliances and track real-time power.
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {runningAppliances.map((app) => (
+                <Paper
+                  key={app.id}
+                  elevation={0}
+                  sx={{
+                    p: 1.75,
+                    borderRadius: 1.5,
+                    border: "1px solid",
+                    borderColor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.25)" : "rgba(13, 148, 136, 0.2)",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.04)" : "rgba(13, 148, 136, 0.03)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 1.5,
+                  }}
+                >
+                  <Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: "success.main",
+                          boxShadow: "0 0 8px #00e5c9",
+                          animation: "pulse 1.5s infinite",
+                        }}
+                      />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                        {app.name}
+                      </Typography>
+                      <Chip
+                        label={`${app.watts * (app.quantity || 1)}W`}
+                        size="small"
+                        sx={{ height: 20, fontSize: "0.6875rem", fontWeight: 700 }}
+                      />
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: "success.main", fontFamily: "monospace", fontWeight: 700 }}>
+                        ⏱ {getRunningDuration(app.last_turned_on_at)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        • ₱{getAccumulatedPesos(app).toFixed(4)} spent
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    onClick={() => handleStopCircuit(app)}
+                    sx={{
+                      fontSize: "0.75rem",
+                      fontWeight: 800,
+                      borderRadius: 1.25,
+                      textTransform: "none",
+                      px: 1.5,
+                      bgcolor: "#ef4444",
+                      "&:hover": { bgcolor: "#dc2626" },
+                    }}
+                  >
+                    Stop
+                  </Button>
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button
+              component={Link}
+              to="/dashboard"
+              onClick={() => setIsLiveDrawerOpen(false)}
+              size="small"
+              variant="outlined"
+              endIcon={<ArrowForwardIcon fontSize="small" />}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              Dashboard
+            </Button>
+            <Button
+              component={Link}
+              to="/calendar"
+              onClick={() => setIsLiveDrawerOpen(false)}
+              size="small"
+              variant="outlined"
+              endIcon={<ArrowForwardIcon fontSize="small" />}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              Calendar
+            </Button>
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 1 }}>
+            {runningAppliances.length > 1 && (
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                onClick={handleStopAllCircuits}
+                sx={{ textTransform: "none", fontWeight: 800 }}
+              >
+                Stop All ({runningAppliances.length})
+              </Button>
+            )}
+            <Button
+              onClick={() => setIsLiveDrawerOpen(false)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              Close
+            </Button>
+          </Box>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

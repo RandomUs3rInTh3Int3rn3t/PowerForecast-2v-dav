@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.5.0cv",
+    version: "3.5.0cv",
+    git_commit_tag: "3.5.0cv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0cv - Full 3-part synchronization across Dashboard, Appliance Hub, Sidebar, Analytics, and Forecasting: restored direct Start stopwatch button on appliance cards with live timer/spend telemetry, interactive Live Load side panel drawer with per-circuit stop controls, Today's Measured Spend KPI card on Dashboard with real-time dynamic rates, seamless Actual vs Simulated plan switching in Analytics, and interactive What-If scenario application in Forecasting",
+  },
+  {
     id: "3.5.0bv",
     version: "3.5.0bv",
     git_commit_tag: "3.5.0bv",

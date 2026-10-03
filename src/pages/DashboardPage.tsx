@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
@@ -32,11 +32,14 @@ import { PelpCatalogModal } from "../components/appliances/PelpCatalogModal";
 import { SpaceManagementModal } from "../components/appliances/SpaceManagementModal";
 import { AiVisionScannerModal } from "../components/vision/AiVisionScannerModal";
 import { useList } from "@refinedev/core";
-import { UserAppliance, ApplianceList } from "../types";
+import { UserAppliance, ApplianceList, DailyApplianceUsage } from "../types";
 import { calculateMeralcoBill } from "../lib/meralcoCalculator";
 import { useNotifications } from "../hooks/useNotifications";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../components/common/ToastProvider";
+import { formatDateToKey, DEFAULT_EFFECTIVE_RATE } from "../lib/dailyUsageService";
+import { getMeralcoTariff, MeralcoTariffData, DEFAULT_MERALCO_TARIFF } from "../lib/meralcoRateService";
+import { getEffectiveApplianceRate } from "../lib/sessionService";
 
 export const DashboardPage: React.FC = () => {
   const { t } = useLanguage();
@@ -58,8 +61,44 @@ export const DashboardPage: React.FC = () => {
     pagination: { mode: "off" },
   }) as any;
 
+  const todayKey = formatDateToKey(new Date());
+
+  const dailyUsageRes = useList<DailyApplianceUsage>({
+    resource: "daily_appliance_usage",
+    filters: [{ field: "usage_date", operator: "eq", value: todayKey }],
+  }) as any;
+
+  const todayUsageRecords: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
+
+  // Meralco Tariff Telemetry
+  const [tariff, setTariff] = useState<MeralcoTariffData>(DEFAULT_MERALCO_TARIFF);
+  useEffect(() => {
+    getMeralcoTariff(false).then((data) => setTariff(data));
+  }, []);
+
+  const effectiveRate = tariff.totalEffectiveRate || DEFAULT_EFFECTIVE_RATE;
+
   const appliances: UserAppliance[] = listResponse?.data?.data || listResponse?.result?.data || [];
   const spaces: ApplianceList[] = spacesResponse?.data?.data || spacesResponse?.result?.data || [];
+
+  // Live 1-second ticker for active running stopwatches
+  const [now, setNow] = useState<number>(Date.now());
+  useEffect(() => {
+    const hasRunning = appliances.some((a) => a.is_currently_on);
+    if (!hasRunning) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [appliances]);
+
+  // Synchronize circuit toggles across views
+  useEffect(() => {
+    const handleCircuitToggled = () => {
+      if (listResponse?.refetch) listResponse.refetch();
+      if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
+    };
+    window.addEventListener("powerforecast_circuit_toggled", handleCircuitToggled);
+    return () => window.removeEventListener("powerforecast_circuit_toggled", handleCircuitToggled);
+  }, [listResponse, dailyUsageRes]);
 
   const handleOpenAddModal = () => {
     if (spaces.length === 0) {
@@ -77,6 +116,31 @@ export const DashboardPage: React.FC = () => {
     (acc: number, curr: UserAppliance) => acc + curr.watts * (curr.quantity || 1),
     0
   );
+
+  // Today's Measured Spend = saved daily_appliance_usage records today + live running stopwatches
+  const liveSessionCost = runningAppliances.reduce((acc, curr) => {
+    if (!curr.last_turned_on_at) return acc;
+    const start = new Date(curr.last_turned_on_at).getTime();
+    const diffSeconds = Math.max(0, (now - start) / 1000);
+    const totalWatts = curr.watts * (curr.quantity || 1);
+    const accumulatedKwh = (totalWatts / 1000) * (diffSeconds / 3600);
+    const rate = getEffectiveApplianceRate(curr);
+    return acc + accumulatedKwh * rate;
+  }, 0);
+
+  const liveSessionKwh = runningAppliances.reduce((acc, curr) => {
+    if (!curr.last_turned_on_at) return acc;
+    const start = new Date(curr.last_turned_on_at).getTime();
+    const diffSeconds = Math.max(0, (now - start) / 1000);
+    const totalWatts = curr.watts * (curr.quantity || 1);
+    return acc + (totalWatts / 1000) * (diffSeconds / 3600);
+  }, 0);
+
+  const loggedTodayCost = todayUsageRecords.reduce((acc, curr) => acc + (Number(curr.estimated_cost) || 0), 0);
+  const loggedTodayKwh = todayUsageRecords.reduce((acc, curr) => acc + (Number(curr.kwh_consumed) || 0), 0);
+
+  const todayTotalCost = loggedTodayCost + liveSessionCost;
+  const todayTotalKwh = loggedTodayKwh + liveSessionKwh;
 
   const totalMonthlyKwh = activeAppliances.reduce(
     (acc: number, curr: UserAppliance) => acc + (Number(curr.monthly_kwh) || ((curr.watts * curr.hours_per_day * (curr.quantity || 1) * 30) / 1000)),
@@ -240,7 +304,7 @@ export const DashboardPage: React.FC = () => {
             {activeWattage} <Typography component="span" variant="body2" sx={{ color: "text.secondary", fontWeight: 600 }}>Watts</Typography>
           </Typography>
           <Typography variant="caption" sx={{ color: "#00e5c9", fontWeight: 700, fontFamily: "monospace", display: "block" }}>
-            ₱{((activeWattage / 1000) * 14.8261).toFixed(2)}/hr {t("dash.runningRate", "running rate")}
+            ₱{((activeWattage / 1000) * effectiveRate).toFixed(2)}/hr {t("dash.runningRate", "running rate")}
           </Typography>
         </Paper>
       </Card>
@@ -277,11 +341,14 @@ export const DashboardPage: React.FC = () => {
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <MetricCard
-            title={t("dash.dailyAvg", "Daily Avg Energy")}
-            value={`${(totalMonthlyKwh / 30).toFixed(1)} kWh`}
-            subtitle={t("dash.projectedPacing", "Projected daily run")}
-            icon={<ClockIcon sx={{ color: "success.main" }} />}
-            trend={{ value: "30-day baseline", direction: "neutral" }}
+            title={t("dash.todaySpend", "Today's Measured Spend")}
+            value={`₱${todayTotalCost.toFixed(2)}`}
+            subtitle={`${todayTotalKwh.toFixed(2)} kWh recorded today`}
+            icon={<ClockIcon sx={{ color: runningAppliances.length > 0 ? "#00e5c9" : "success.main" }} />}
+            trend={{
+              value: runningAppliances.length > 0 ? `${runningAppliances.length} Live Active` : `${todayUsageRecords.length} Logged`,
+              direction: runningAppliances.length > 0 ? "up" : "neutral",
+            }}
           />
         </Grid>
       </Grid>

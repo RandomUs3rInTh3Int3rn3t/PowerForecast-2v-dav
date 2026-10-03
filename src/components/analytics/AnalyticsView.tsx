@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
@@ -94,6 +94,21 @@ export const AnalyticsView: React.FC = () => {
   const dailyUsageRecords: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
   const simulatedUsageRecords: SimulatedApplianceUsage[] = simulatedUsageRes?.data?.data || simulatedUsageRes?.result?.data || [];
 
+  // Synchronize circuit toggles and simulation updates across views
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
+      if (simulatedUsageRes?.refetch) simulatedUsageRes.refetch();
+      if (appliancesRes?.refetch) appliancesRes.refetch();
+    };
+    window.addEventListener("powerforecast_circuit_toggled", handleUpdate);
+    window.addEventListener("powerforecast_simulation_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("powerforecast_circuit_toggled", handleUpdate);
+      window.removeEventListener("powerforecast_simulation_updated", handleUpdate);
+    };
+  }, [dailyUsageRes, simulatedUsageRes, appliancesRes]);
+
   // Filter target appliances based on active space selection (excluding blacklisted appliances)
   const targetAppliances = useMemo(() => {
     const list =
@@ -104,6 +119,66 @@ export const AnalyticsView: React.FC = () => {
           );
     return list.filter((a) => a.is_active !== false);
   }, [appliances, spaces, selectedSpaceId]);
+
+  // Aggregated Actual Measured Data for target appliances
+  const actualAggregates = useMemo(() => {
+    const targetIds = new Set(targetAppliances.map((a) => a.id));
+    let totalKwh = 0;
+    let totalCost = 0;
+    const catMap: Record<string, number> = {};
+    const appMap: Record<string, number> = {};
+
+    dailyUsageRecords.forEach((r) => {
+      if (targetIds.has(r.appliance_id)) {
+        const kwh = Number(r.kwh_consumed) || 0;
+        const cost = Number(r.estimated_cost) || 0;
+        totalKwh += kwh;
+        totalCost += cost;
+        const app = targetAppliances.find((a) => a.id === r.appliance_id);
+        const cat = app?.category || "General";
+        catMap[cat] = (catMap[cat] || 0) + kwh;
+        appMap[r.appliance_id] = (appMap[r.appliance_id] || 0) + kwh;
+      }
+    });
+
+    return {
+      totalKwh: Number(totalKwh.toFixed(2)),
+      totalCost: Number(totalCost.toFixed(2)),
+      catMap,
+      appMap,
+      hasRecords: totalKwh > 0,
+    };
+  }, [dailyUsageRecords, targetAppliances]);
+
+  // Aggregated Simulated Plan Data for target appliances
+  const simulatedAggregates = useMemo(() => {
+    const targetIds = new Set(targetAppliances.map((a) => a.id));
+    let totalKwh = 0;
+    let totalCost = 0;
+    const catMap: Record<string, number> = {};
+    const appMap: Record<string, number> = {};
+
+    simulatedUsageRecords.forEach((r) => {
+      if (targetIds.has(r.appliance_id)) {
+        const kwh = Number(r.kwh_consumed) || 0;
+        const cost = Number(r.estimated_cost) || 0;
+        totalKwh += kwh;
+        totalCost += cost;
+        const app = targetAppliances.find((a) => a.id === r.appliance_id);
+        const cat = app?.category || "General";
+        catMap[cat] = (catMap[cat] || 0) + kwh;
+        appMap[r.appliance_id] = (appMap[r.appliance_id] || 0) + kwh;
+      }
+    });
+
+    return {
+      totalKwh: Number(totalKwh.toFixed(2)),
+      totalCost: Number(totalCost.toFixed(2)),
+      catMap,
+      appMap,
+      hasRecords: totalKwh > 0,
+    };
+  }, [simulatedUsageRecords, targetAppliances]);
 
   const activeSpace = spaces.find((s) => s.id === selectedSpaceId);
   const isCommercialSelected = selectedSpaceId !== "all" && activeSpace?.tariff_type === "commercial";
@@ -287,13 +362,32 @@ export const AnalyticsView: React.FC = () => {
   // Category Breakdown
   const categoryBreakdown = useMemo(() => {
     const catMap: Record<string, { kwh: number; count: number }> = {};
-    targetAppliances.forEach((a) => {
-      const cat = a.category || "General";
-      const kwh = getApplianceMonthlyKwh(a);
-      if (!catMap[cat]) catMap[cat] = { kwh: 0, count: 0 };
-      catMap[cat].kwh += kwh;
-      catMap[cat].count += a.quantity || 1;
-    });
+
+    if (dataSourceMode === "actual" && actualAggregates.hasRecords) {
+      targetAppliances.forEach((a) => {
+        const cat = a.category || "General";
+        const kwh = actualAggregates.catMap[cat] || 0;
+        if (!catMap[cat]) catMap[cat] = { kwh: 0, count: 0 };
+        catMap[cat].kwh = kwh;
+        catMap[cat].count += a.quantity || 1;
+      });
+    } else if (dataSourceMode === "simulated" && simulatedAggregates.hasRecords) {
+      targetAppliances.forEach((a) => {
+        const cat = a.category || "General";
+        const kwh = simulatedAggregates.catMap[cat] || 0;
+        if (!catMap[cat]) catMap[cat] = { kwh: 0, count: 0 };
+        catMap[cat].kwh = kwh;
+        catMap[cat].count += a.quantity || 1;
+      });
+    } else {
+      targetAppliances.forEach((a) => {
+        const cat = a.category || "General";
+        const kwh = getApplianceMonthlyKwh(a);
+        if (!catMap[cat]) catMap[cat] = { kwh: 0, count: 0 };
+        catMap[cat].kwh += kwh;
+        catMap[cat].count += a.quantity || 1;
+      });
+    }
 
     const totalKwh = Object.values(catMap).reduce((acc, curr) => acc + curr.kwh, 0) || 1;
     return Object.entries(catMap)
@@ -305,14 +399,26 @@ export const AnalyticsView: React.FC = () => {
         count: data.count,
       }))
       .sort((a, b) => b.kwh - a.kwh);
-  }, [targetAppliances, effectiveRate]);
+  }, [targetAppliances, effectiveRate, dataSourceMode, actualAggregates, simulatedAggregates]);
 
   // Individual Top Appliances Breakdown (Pareto)
   const topAppliancesBreakdown = useMemo(() => {
-    const totalKwh = totalMonthlyKwh || 1;
+    const effectiveTotalKwh =
+      dataSourceMode === "actual" && actualAggregates.hasRecords
+        ? actualAggregates.totalKwh
+        : dataSourceMode === "simulated" && simulatedAggregates.hasRecords
+        ? simulatedAggregates.totalKwh
+        : totalMonthlyKwh || 1;
+
     return [...targetAppliances]
       .map((a) => {
-        const kwh = getApplianceMonthlyKwh(a);
+        const kwh =
+          dataSourceMode === "actual" && actualAggregates.hasRecords
+            ? actualAggregates.appMap[a.id] || 0
+            : dataSourceMode === "simulated" && simulatedAggregates.hasRecords
+            ? simulatedAggregates.appMap[a.id] || 0
+            : getApplianceMonthlyKwh(a);
+
         return {
           id: a.id,
           name: a.name,
@@ -322,12 +428,12 @@ export const AnalyticsView: React.FC = () => {
           hours: a.hours_per_day,
           kwh: kwh,
           cost: kwh * effectiveRate,
-          percentage: Math.round((kwh / totalKwh) * 100),
+          percentage: Math.round((kwh / effectiveTotalKwh) * 100),
           isCurrentlyOn: a.is_currently_on,
         };
       })
       .sort((a, b) => b.kwh - a.kwh);
-  }, [targetAppliances, totalMonthlyKwh, effectiveRate]);
+  }, [targetAppliances, totalMonthlyKwh, effectiveRate, dataSourceMode, actualAggregates, simulatedAggregates]);
 
   // Unbundled Rate Components breakdown
   const rateComponents = useMemo(() => {
@@ -620,6 +726,42 @@ export const AnalyticsView: React.FC = () => {
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+          {/* Top Level Mode Switcher: Actuals vs Simulated */}
+          <ButtonGroup size="small" variant="outlined" sx={{ borderRadius: 2 }}>
+            <Button
+              variant={dataSourceMode === "actual" ? "contained" : "outlined"}
+              onClick={() => setDataSourceMode("actual")}
+              startIcon={<AnalyticsIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                borderRadius: "8px 0 0 8px",
+                ...(dataSourceMode === "actual"
+                  ? { bgcolor: "primary.main", color: "#0c1b18" }
+                  : {}),
+              }}
+            >
+              Verified Actuals
+            </Button>
+            <Button
+              variant={dataSourceMode === "simulated" ? "contained" : "outlined"}
+              onClick={() => setDataSourceMode("simulated")}
+              startIcon={<ScienceIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                borderRadius: "0 8px 8px 0",
+                ...(dataSourceMode === "simulated"
+                  ? { bgcolor: "secondary.main", color: "#0c1b18" }
+                  : {}),
+              }}
+            >
+              Simulated Plan
+            </Button>
+          </ButtonGroup>
+
           <Button
             variant="outlined"
             size="small"
@@ -717,12 +859,29 @@ export const AnalyticsView: React.FC = () => {
         {/* Monthly Volume */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <MetricCard
-            title="Monthly Energy Volume"
-            value={`${totalMonthlyKwh.toFixed(1)} kWh`}
-            subtitle={`${targetAppliances.length} appliances • ${runningAppliances.length} live ON`}
+            title={dataSourceMode === "actual" ? "Actual Energy Volume (MTD)" : "Monthly Energy Volume"}
+            value={
+              dataSourceMode === "actual" && actualAggregates.hasRecords
+                ? `${actualAggregates.totalKwh} kWh`
+                : dataSourceMode === "simulated" && simulatedAggregates.hasRecords
+                ? `${simulatedAggregates.totalKwh} kWh`
+                : `${totalMonthlyKwh.toFixed(1)} kWh`
+            }
+            subtitle={
+              dataSourceMode === "actual"
+                ? actualAggregates.hasRecords
+                  ? `${targetAppliances.length} devices • Verified Measured Truth`
+                  : "No sessions recorded yet this cycle"
+                : `${targetAppliances.length} appliances • ${runningAppliances.length} live ON`
+            }
             icon={<BoltIcon sx={{ color: "#ffd54f" }} />}
             trend={{
-              value: distributionTierInfo.tier,
+              value:
+                dataSourceMode === "actual"
+                  ? "Recorded Actuals"
+                  : dataSourceMode === "simulated"
+                  ? "Simulation Plan"
+                  : distributionTierInfo.tier,
               direction: distributionTierInfo.tier.includes("Lifeline") ? "up" : "neutral",
               label: distributionTierInfo.label,
             }}
@@ -732,12 +891,23 @@ export const AnalyticsView: React.FC = () => {
         {/* Forecasted Bill */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <MetricCard
-            title="Forecasted Monthly Bill"
-            value={`₱${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            title={dataSourceMode === "actual" ? "Actual Measured Spend (MTD)" : "Forecasted Monthly Bill"}
+            value={
+              dataSourceMode === "actual" && actualAggregates.hasRecords
+                ? `₱${actualAggregates.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : dataSourceMode === "simulated" && simulatedAggregates.hasRecords
+                ? `₱${simulatedAggregates.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : `₱${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            }
             subtitle={`Effective: ₱${effectiveRate.toFixed(2)}/kWh`}
             icon={<TrendingUpIcon sx={{ color: "primary.light" }} />}
             trend={{
-              value: `₱${(totalCost / 30).toFixed(0)}/day`,
+              value:
+                dataSourceMode === "actual"
+                  ? "Verified Audit"
+                  : dataSourceMode === "simulated"
+                  ? "Target Budget"
+                  : `₱${(totalCost / 30).toFixed(0)}/day`,
               direction: "neutral",
               label: isCommercialSelected ? "Commercial GP" : "Meralco Unbundled",
             }}

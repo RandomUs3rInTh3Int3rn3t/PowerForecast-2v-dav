@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
@@ -50,12 +50,16 @@ import { useList } from "@refinedev/core";
 import { calculateMeralcoBill } from "../../lib/meralcoCalculator";
 import { calculateKwh, calculateApplianceKwh, calculateCost, DEFAULT_EFFECTIVE_RATE } from "../../lib/dailyUsageService";
 import { useLanguage } from "../../context/LanguageContext";
+import { useToast } from "../common/ToastProvider";
+import { saveSimulatedAppliance } from "../../lib/simulationService";
 
 export const ForecastingView: React.FC = () => {
   const { t, language } = useLanguage();
+  const { showSuccess, showError } = useToast();
   const [genRateDelta, setGenRateDelta] = useState<number>(0);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
   const [whatIfHours, setWhatIfHours] = useState<Record<string, number>>({});
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
 
   // 1. Fetch Real User Inventory, Spaces, Daily Usage Records, Simulated Schedules, and Telemetry
   const appliancesRes = useList<UserAppliance>({
@@ -83,11 +87,35 @@ export const ForecastingView: React.FC = () => {
     pagination: { mode: "off" },
   }) as any;
 
+  // Synchronize circuit toggles and simulation updates across views
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (dailyUsageRes?.refetch) dailyUsageRes.refetch();
+      if (simulatedUsageRes?.refetch) simulatedUsageRes.refetch();
+      if (appliancesRes?.refetch) appliancesRes.refetch();
+    };
+    window.addEventListener("powerforecast_circuit_toggled", handleUpdate);
+    window.addEventListener("powerforecast_simulation_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("powerforecast_circuit_toggled", handleUpdate);
+      window.removeEventListener("powerforecast_simulation_updated", handleUpdate);
+    };
+  }, [dailyUsageRes, simulatedUsageRes, appliancesRes]);
+
   const appliances: UserAppliance[] = appliancesRes?.data?.data || appliancesRes?.result?.data || [];
   const spaces: ApplianceList[] = spacesRes?.data?.data || spacesRes?.result?.data || [];
   const dailyRecords: DailyApplianceUsage[] = dailyUsageRes?.data?.data || dailyUsageRes?.result?.data || [];
   const sessionLogs: ApplianceUsageLog[] = usageLogsRes?.data?.data || usageLogsRes?.result?.data || [];
   const simulatedRecords: SimulatedApplianceUsage[] = simulatedUsageRes?.data?.data || simulatedUsageRes?.result?.data || [];
+
+  // Live 1-second ticker for running stopwatches
+  const [liveNow, setLiveNow] = useState<number>(Date.now());
+  useEffect(() => {
+    const hasRunning = appliances.some((a) => a.is_currently_on);
+    if (!hasRunning) return;
+    const interval = setInterval(() => setLiveNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [appliances]);
 
   // Filter target appliances based on space selection (excluding blacklisted / inactive appliances)
   const allSpaceAppliances = useMemo(() => {
@@ -143,6 +171,31 @@ export const ForecastingView: React.FC = () => {
       }
     });
 
+    // Factor in live currently running stopwatch sessions for Today
+    const runningTargetApps = targetAppliances.filter((a) => a.is_currently_on);
+    let liveSessionKwh = 0;
+    let liveSessionCost = 0;
+
+    runningTargetApps.forEach((curr) => {
+      if (curr.last_turned_on_at) {
+        const start = new Date(curr.last_turned_on_at).getTime();
+        const diffSeconds = Math.max(0, (liveNow - start) / 1000);
+        const totalWatts = curr.watts * (curr.quantity || 1);
+        const kwh = (totalWatts / 1000) * (diffSeconds / 3600);
+        const rate = curr.tariff_type === "commercial" ? 15.2 : 14.8261;
+        liveSessionKwh += kwh;
+        liveSessionCost += kwh * rate;
+      }
+    });
+
+    if (runningTargetApps.length > 0) {
+      const todayStr = `${activeMonthKey}-${String(now.getDate()).padStart(2, "0")}`;
+      loggedDatesSet.add(todayStr);
+    }
+
+    actualKwh += liveSessionKwh;
+    actualCost += liveSessionCost;
+
     const loggedDaysCount = loggedDatesSet.size;
     const avgDailyLoggedKwh = loggedDaysCount > 0 ? actualKwh / loggedDaysCount : 0;
 
@@ -153,7 +206,7 @@ export const ForecastingView: React.FC = () => {
       avgDailyLoggedKwh: Number(avgDailyLoggedKwh.toFixed(3)),
       hasLoggedRecords: actualKwh > 0,
     };
-  }, [dailyRecords, activeMonthKey, targetApplianceIds]);
+  }, [dailyRecords, activeMonthKey, targetApplianceIds, targetAppliances, liveNow, now]);
 
   // 3. Daily Routine Baseline from User's Registered Inventory
   const routineBaseline = useMemo(() => {
@@ -386,6 +439,47 @@ export const ForecastingView: React.FC = () => {
       ...prev,
       [appId]: Math.max(0, Math.min(24, Number(hours.toFixed(1)))),
     }));
+  };
+
+  const handleSaveWhatIfToSimulationPlan = async () => {
+    setIsSavingPlan(true);
+    try {
+      const remainingDates: string[] = [];
+      const startDay = now.getDate();
+      for (let d = startDay; d <= daysInActiveMonth; d++) {
+        remainingDates.push(`${activeMonthKey}-${String(d).padStart(2, "0")}`);
+      }
+      for (const [appId, hours] of Object.entries(whatIfHours)) {
+        const app = targetAppliances.find((a) => a.id === appId);
+        if (!app) continue;
+        for (const dateStr of remainingDates) {
+          await saveSimulatedAppliance({
+            appliance_id: app.id,
+            usage_date: dateStr,
+            hours_used: hours,
+            watts: app.watts,
+            quantity: app.quantity || 1,
+            user_id: app.user_id,
+            effectiveRate: simulatedGenRate + 7.7,
+            source: "simulation_plan",
+          });
+        }
+      }
+      showSuccess(
+        language === "tl"
+          ? `Nailapat ang What-If plan sa Simulation Plan para sa natitirang ${remainingDates.length} araw!`
+          : `Applied What-If plan to Simulation Plan across ${remainingDates.length} remaining days!`
+      );
+      if (simulatedUsageRes?.refetch) simulatedUsageRes.refetch();
+    } catch (err: any) {
+      showError(
+        language === "tl"
+          ? `Bigo sa pag-save ng simulation plan: ${err.message || err}`
+          : `Failed to save simulation plan: ${err.message || err}`
+      );
+    } finally {
+      setIsSavingPlan(false);
+    }
   };
 
   return (
@@ -1147,7 +1241,22 @@ export const ForecastingView: React.FC = () => {
                   {t("fc.whatIfSubtitle", "Adjust operating hours on individual appliances to simulate instant month-end bill impacts")}
                 </Typography>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                {Object.keys(whatIfHours).length > 0 && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="primary"
+                    disabled={isSavingPlan}
+                    startIcon={<ScienceIcon sx={{ fontSize: 16 }} />}
+                    onClick={handleSaveWhatIfToSimulationPlan}
+                    sx={{ borderRadius: 1, fontSize: "0.75rem", fontWeight: 700 }}
+                  >
+                    {isSavingPlan
+                      ? language === "tl" ? "Sini-save..." : "Saving..."
+                      : language === "tl" ? "Ilapat sa Simulation Plan" : "Apply to Simulation Plan"}
+                  </Button>
+                )}
                 <Button
                   size="small"
                   variant="outlined"
