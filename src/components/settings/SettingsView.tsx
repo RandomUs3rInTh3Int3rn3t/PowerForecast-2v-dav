@@ -496,10 +496,8 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
-  const handleRemoveMember = (memberId: string, memberName: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== memberId));
-    showInfo(language === "tl" ? `Tinanggal si ${memberName} sa household.` : `Removed ${memberName} from household.`);
-  };
+
+
 
   // ── Web Push & Background OS Notifications ────────────────
   const [isPushSubscribed, setIsPushSubscribed] = useState(false);
