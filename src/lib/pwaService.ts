@@ -12,6 +12,20 @@ export function registerServiceWorker() {
     return;
   }
 
+  // In development mode, unregister any active service worker and clear CacheStorage
+  // so mobile devices testing over Wi-Fi always receive real-time code without stale cache.
+  if (import.meta.env.DEV) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+    });
+    if ("caches" in window) {
+      caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
+    }
+    return;
+  }
+
   const doRegister = () => {
     navigator.serviceWorker
       .register("/sw.js")

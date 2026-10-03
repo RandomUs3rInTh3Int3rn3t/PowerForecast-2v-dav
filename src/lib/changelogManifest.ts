@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.5.0ev",
+    version: "3.5.0ev",
+    git_commit_tag: "3.5.0ev",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0ev - Apply Stack Template / shadcn neutral zinc landing page design overhaul, lightweight UI primitives (button, card, badge, separator), clean header navigation highlighting, and 100% original content preservation",
+  },
+  {
     id: "3.5.0dv",
     version: "3.5.0dv",
     git_commit_tag: "3.5.0dv",

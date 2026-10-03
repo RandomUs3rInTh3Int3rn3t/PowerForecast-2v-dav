@@ -1,65 +1,45 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import Grid from "@mui/material/Grid";
-import Chip from "@mui/material/Chip";
-import TextField from "@mui/material/TextField";
-import MenuItem from "@mui/material/MenuItem";
-import Slider from "@mui/material/Slider";
-import Divider from "@mui/material/Divider";
-import Paper from "@mui/material/Paper";
-import Accordion from "@mui/material/Accordion";
-import AccordionSummary from "@mui/material/AccordionSummary";
-import AccordionDetails from "@mui/material/AccordionDetails";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import AppBar from "@mui/material/AppBar";
-import Toolbar from "@mui/material/Toolbar";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
-import Drawer from "@mui/material/Drawer";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemText from "@mui/material/ListItemText";
-import LinearProgress from "@mui/material/LinearProgress";
 import {
-  Menu as MenuIcon,
-  Close as CloseIcon,
-  Calculate as CalculateIcon,
-  Layers as LayersIcon,
-  CameraAlt as CameraIcon,
-  Schedule as ClockIcon,
-  BarChart as BarChartIcon,
-  Memory as CpuIcon,
-  ArrowForward as ArrowForwardIcon,
-  ExpandMore as ExpandMoreIcon,
-  Security as ShieldIcon,
-  AutoAwesome as SparklesIcon,
-  AcUnit as AcIcon,
-  Kitchen as FridgeIcon,
-  Tv as TvIcon,
-  Lightbulb as BulbIcon,
-  Brightness4 as MoonIcon,
-  Brightness7 as SunIcon,
-  CheckCircle as CheckCircleIcon,
-  Timeline as TimelineIcon,
-  ElectricBolt as ElectricBoltIcon,
-  AutoFixHigh as AutoFixHighIcon,
-  Science as ScienceIcon,
-  DocumentScanner as DocumentScannerIcon,
-  MenuBook as DocsIcon,
-  Speed as SpeedIcon,
-  Computer as ComputerIcon,
-  Shower as ShowerIcon,
-} from "@mui/icons-material";
+  Menu,
+  X,
+  Calculator,
+  Layers,
+  Camera,
+  Clock,
+  ChartColumn,
+  Cpu,
+  ArrowRight,
+  ChevronDown,
+  ShieldCheck,
+  Sparkles,
+  AirVent,
+  Refrigerator,
+  Tv,
+  Lightbulb,
+  Moon,
+  Sun,
+  CircleCheck,
+  Activity,
+  Zap,
+  WandSparkles,
+  ScanText,
+  BookOpen,
+  Gauge,
+  Monitor,
+  ShowerHead,
+  Flame,
+  Fan,
+  Check,
+} from "lucide-react";
 import { useColorMode } from "../theme/AppTheme";
 import { APP_VERSION } from "../lib/supabaseClient";
 import { SystemTestingBanner } from "../components/common/SystemTestingBanner";
+import { Button, buttonVariants } from "../components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Separator } from "../components/ui/separator";
+import { cn } from "../lib/utils";
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -71,18 +51,25 @@ export const LandingPage: React.FC = () => {
   const [estimatorHours, setEstimatorHours] = useState<number>(8);
   const [estimatorRate, setEstimatorRate] = useState<number>(14.8261);
 
-  // Interactive showcase active tab
-  const [activeTab, setActiveTab] = useState<number>(0);
+  // Mobile drawer state
+  const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+
+  // FAQ open state (accordion)
+  const [openFaqs, setOpenFaqs] = useState<Record<number, boolean>>({ 0: true });
+
+  const toggleFaq = (index: number) => {
+    setOpenFaqs((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
 
   const applianceOptions = [
-    { label: "Inverter Split AC (1.5 HP)", value: 1050, icon: <AcIcon fontSize="small" />, desc: "Dual Inverter, CSPF 5.8" },
-    { label: "Window Non-Inverter AC (1.0 HP)", value: 950, icon: <AcIcon fontSize="small" />, desc: "Fixed Speed, Standard EER" },
-    { label: "Two-Door Inverter Refrigerator", value: 120, icon: <FridgeIcon fontSize="small" />, desc: "Linear Compressor (24/7)" },
-    { label: "55-inch 4K Smart OLED TV", value: 110, icon: <TvIcon fontSize="small" />, desc: "HDR Gaming & Streaming" },
-    { label: "Induction Cooker", value: 1800, icon: <CalculateIcon fontSize="small" />, desc: "Rapid High-Power Boil" },
-    { label: "Workstation & Gaming PC", value: 550, icon: <ComputerIcon fontSize="small" />, desc: "GPU Rendering Load" },
-    { label: "Electric Stand Fan (16-inch)", value: 60, icon: <BulbIcon fontSize="small" />, desc: "Standard Speed 3" },
-    { label: "Instant Multipoint Water Heater", value: 3500, icon: <ShowerIcon fontSize="small" />, desc: "High Draw Heating" },
+    { label: "Inverter Split AC (1.5 HP)", value: 1050, icon: AirVent, desc: "Dual Inverter, CSPF 5.8" },
+    { label: "Window Non-Inverter AC (1.0 HP)", value: 950, icon: AirVent, desc: "Fixed Speed, Standard EER" },
+    { label: "Two-Door Inverter Refrigerator", value: 120, icon: Refrigerator, desc: "Linear Compressor (24/7)" },
+    { label: "55-inch 4K Smart OLED TV", value: 110, icon: Tv, desc: "HDR Gaming & Streaming" },
+    { label: "Induction Cooker", value: 1800, icon: Flame, desc: "Rapid High-Power Boil" },
+    { label: "Workstation & Gaming PC", value: 550, icon: Monitor, desc: "GPU Rendering Load" },
+    { label: "Electric Stand Fan (16-inch)", value: 60, icon: Fan, desc: "Standard Speed 3" },
+    { label: "Instant Multipoint Water Heater", value: 3500, icon: ShowerHead, desc: "High Draw Heating" },
   ];
 
   const estimatorCalc = useMemo(() => {
@@ -101,23 +88,20 @@ export const LandingPage: React.FC = () => {
     };
   }, [selectedWatts, estimatorHours, estimatorRate]);
 
-  // Mobile drawer state
-  const [mobileOpen, setMobileOpen] = useState<boolean>(false);
-
   // Active section tracking for header scrollspy
   const [activeSection, setActiveSection] = useState<string>("estimator");
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      const yOffset = -80; // Offset for sticky AppBar height
+      const yOffset = -72; // Offset for sticky navbar
       const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
   };
 
   useEffect(() => {
-    const sectionIds = ["estimator", "showcase", "features", "tariffs", "faq"];
+    const sectionIds = ["estimator", "features", "faq"];
     const handleScroll = () => {
       const scrollY = window.scrollY;
       if (scrollY < 250) {
@@ -152,1365 +136,490 @@ export const LandingPage: React.FC = () => {
 
   const navLinks = [
     { id: "estimator", label: "Estimator" },
-    { id: "showcase", label: "Platform Showcase" },
     { id: "features", label: "Core Modules" },
-    { id: "tariffs", label: "Tariff Tiers" },
     { id: "faq", label: "FAQ" },
   ];
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
-      {/* 1. Sticky Navigation Header */}
-      <AppBar
-        position="sticky"
-        color="transparent"
-        elevation={0}
-        sx={{
-          backdropFilter: "blur(20px)",
-          bgcolor: (theme) =>
-            theme.palette.mode === "dark" ? "rgba(10, 10, 36, 0.82)" : "rgba(255, 255, 255, 0.88)",
-          borderBottom: "1px solid",
-          borderColor: "divider",
-          zIndex: 1100,
-        }}
-      >
-        <Container maxWidth="lg">
-          <Toolbar sx={{ justifyContent: "space-between", px: { xs: 0, sm: 2 }, minHeight: { xs: 58, sm: 64 } }}>
-            {/* Left: Mobile Menu & Logo */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <IconButton
-                onClick={() => setMobileOpen(true)}
-                size="small"
-                sx={{
-                  display: { xs: "inline-flex", md: "none" },
-                  border: "1px solid",
-                  borderColor: "divider",
-                  p: 0.75,
-                }}
-                aria-label="Open navigation menu"
-              >
-                <MenuIcon sx={{ fontSize: 20 }} />
-              </IconButton>
+    <div className="pf-landing min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+      {/* 1. Header (Reference: multi-tenant-starter-template landing-page-header) */}
+      <header className="fixed top-0 z-50 w-full border-b border-border/80 bg-background/80 px-4 backdrop-blur md:px-8">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between">
+          {/* Left: Mobile trigger + Logo */}
+          <div className="flex items-center gap-3 md:gap-8">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
 
-              <Box
-                component={Link}
-                to="/"
-                sx={{ display: "flex", alignItems: "center", gap: 1.5, textDecoration: "none", color: "inherit" }}
-              >
-                <Box
-                  component="img"
-                  src="/Assets/LOGO.png"
-                  alt="PowerForecast Logo"
-                  sx={{ width: 34, height: 34, objectFit: "contain" }}
-                />
-                <Typography variant="h6" sx={{ fontWeight: 900, letterSpacing: "-0.02em" }}>
-                  Power<Box component="span" sx={{ color: "primary.main" }}>Forecast</Box>
-                </Typography>
-                <Chip
-                  label={APP_VERSION}
-                  size="small"
-                  sx={{
-                    height: 22,
-                    fontSize: "0.6875rem",
-                    fontWeight: 800,
-                    bgcolor: "rgba(0, 229, 201, 0.15)",
-                    color: "primary.main",
-                    border: "1px solid rgba(0, 229, 201, 0.3)",
-                  }}
-                />
-              </Box>
-            </Box>
+            <Link to="/" className="flex items-center gap-2.5 text-foreground transition-opacity hover:opacity-90">
+              <img src="/Assets/LOGO.png" alt="PowerForecast Logo" className="h-7 w-7 object-contain" />
+              <span className="text-base font-bold tracking-tight sm:text-lg">PowerForecast</span>
+              <Badge variant="secondary" className="font-mono text-[10px] font-semibold">
+                {APP_VERSION}
+              </Badge>
+            </Link>
 
-            {/* Desktop Navigation Links */}
-            <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", gap: 1 }}>
+            {/* Desktop Navigation items */}
+            <nav className="hidden items-center gap-1 md:flex lg:gap-2">
               {navLinks.map((nav) => {
                 const isActive = activeSection === nav.id;
                 return (
-                  <Button
+                  <button
                     key={nav.id}
                     onClick={() => scrollToSection(nav.id)}
-                    variant="text"
-                    size="small"
-                    sx={{
-                      color: isActive ? "primary.main" : "text.secondary",
-                      fontWeight: isActive ? 800 : 600,
-                      fontSize: "0.875rem",
-                      textTransform: "none",
-                      px: 1.5,
-                      py: 0.6,
-                      borderRadius: 1,
-                      bgcolor: isActive
-                        ? (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(0, 229, 201, 0.12)"
-                              : "rgba(0, 158, 136, 0.08)"
-                        : "transparent",
-                      border: "1px solid",
-                      borderColor: isActive ? "rgba(0, 229, 201, 0.3)" : "transparent",
-                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                      "&:hover": {
-                        color: "primary.main",
-                        bgcolor: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(0, 229, 201, 0.08)"
-                            : "rgba(0, 158, 136, 0.04)",
-                        borderColor: "rgba(0, 229, 201, 0.2)",
-                      },
-                    }}
+                    className={cn(
+                      "cursor-pointer px-3 py-1.5 text-sm font-medium transition-colors",
+                      isActive ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+                    )}
                   >
                     {nav.label}
-                  </Button>
+                  </button>
                 );
               })}
-            </Box>
+            </nav>
+          </div>
 
-            {/* Right Action Group */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <Tooltip title={`Switch to ${isDark ? "Light" : "Dark"} mode`}>
-                <IconButton onClick={toggleColorMode} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
-                  {isDark ? <SunIcon sx={{ color: "#ffd54f", fontSize: 18 }} /> : <MoonIcon sx={{ color: "#4f46e5", fontSize: 18 }} />}
-                </IconButton>
-              </Tooltip>
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleColorMode}
+              aria-label={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
 
-              <Button
-                component={Link}
-                to="/login"
-                variant="outlined"
-                size="small"
-                sx={{ display: { xs: "none", sm: "inline-flex" }, fontWeight: 700 }}
-              >
-                Sign In
-              </Button>
+            <Link
+              to="/login"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "hidden sm:inline-flex")}
+            >
+              Sign In
+            </Link>
 
-              <Button
-                component={Link}
-                to="/signup"
-                variant="contained"
-                size="small"
-                endIcon={<ArrowForwardIcon />}
-                sx={{ fontWeight: 700 }}
-              >
-                Get Started
-              </Button>
-            </Box>
-          </Toolbar>
-        </Container>
-      </AppBar>
+            <Link to="/signup" className={cn(buttonVariants({ variant: "default", size: "sm" }))}>
+              <span>Get Started</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
 
-      {/* HubSpot-Style System Testing Announcement Banner Strip */}
-      <SystemTestingBanner variant="landing" />
-
-      {/* Mobile Navigation Drawer */}
-      <Drawer
-        anchor="left"
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        slotProps={{
-          paper: {
-            sx: {
-              width: 280,
-              bgcolor: (theme) => (theme.palette.mode === "dark" ? "#0f172a" : "#ffffff"),
-              p: 2.5,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-            },
-          },
-        }}
-      >
-        <Box>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Box component="img" src="/Assets/LOGO.png" alt="PowerForecast" sx={{ width: 28, height: 28 }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
-                Power<Box component="span" sx={{ color: "primary.main" }}>Forecast</Box>
-              </Typography>
-            </Box>
-            <IconButton onClick={() => setMobileOpen(false)} size="small" aria-label="Close menu">
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Box>
-
-          <Divider sx={{ mb: 2 }} />
-
-          <List sx={{ display: "flex", flexDirection: "column", gap: 0.5, p: 0 }}>
-            {navLinks.map((nav) => {
-              const isActive = activeSection === nav.id;
-              return (
-                <ListItem key={nav.id} disablePadding>
-                  <ListItemButton
+        {/* Mobile Navigation Dropdown Sheet */}
+        {mobileOpen && (
+          <div className="fixed inset-x-0 top-16 z-50 border-b border-border bg-background p-6 shadow-xl animate-in slide-in-from-top-2 md:hidden">
+            <nav className="flex flex-col gap-2">
+              {navLinks.map((nav) => {
+                const isActive = activeSection === nav.id;
+                return (
+                  <button
+                    key={nav.id}
                     onClick={() => {
                       setMobileOpen(false);
                       setTimeout(() => scrollToSection(nav.id), 120);
                     }}
-                    sx={{
-                      borderRadius: 2,
-                      bgcolor: isActive ? "action.selected" : "transparent",
-                      color: isActive ? "primary.main" : "text.primary",
-                      fontWeight: isActive ? 800 : 600,
-                    }}
+                    className={cn(
+                      "flex w-full items-center px-3 py-2 text-left text-sm font-medium transition-colors",
+                      isActive ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+                    )}
                   >
-                    <ListItemText
-                      primary={
-                        <Typography sx={{ fontWeight: isActive ? 800 : 600, fontSize: "0.9375rem" }}>
-                          {nav.label}
-                        </Typography>
-                      }
-                    />
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
-          </List>
-        </Box>
+                    {nav.label}
+                  </button>
+                );
+              })}
+              <Separator className="my-2" />
+              <div className="flex flex-col gap-2 pt-1">
+                <Link
+                  to="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(buttonVariants({ variant: "outline", size: "default" }), "w-full justify-center")}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(buttonVariants({ variant: "default", size: "default" }), "w-full justify-center")}
+                >
+                  Get Started
+                </Link>
+              </div>
+            </nav>
+          </div>
+        )}
+      </header>
 
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
-          <Button
-            component={Link}
-            to="/login"
-            variant="outlined"
-            fullWidth
-            onClick={() => setMobileOpen(false)}
-            sx={{ fontWeight: 700 }}
-          >
-            Sign In
-          </Button>
-          <Button
-            component={Link}
-            to="/signup"
-            variant="contained"
-            fullWidth
-            endIcon={<ArrowForwardIcon />}
-            onClick={() => setMobileOpen(false)}
-            sx={{ fontWeight: 800 }}
-          >
-            Get Started
-          </Button>
-        </Box>
-      </Drawer>
+      {/* 2. System Testing Banner Strip */}
+      <div className="pt-16">
+        <SystemTestingBanner variant="landing" />
+      </div>
 
-      {/* 2. Hero Section */}
-      <Box
-        sx={{
-          pt: { xs: 6, sm: 8, md: 10 },
-          pb: { xs: 6, sm: 8, md: 10 },
-          position: "relative",
-          overflow: "hidden",
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 229, 201, 0.2), transparent)"
-              : "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 158, 136, 0.12), transparent)",
-        }}
-      >
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", maxWidth: 920, mx: "auto", mb: { xs: 5, md: 7 } }}>
-            <Chip
-              icon={<SparklesIcon sx={{ color: "#ffd54f !important", fontSize: "16px !important" }} />}
-              label="Next-Gen Meralco Energy Intelligence & Appliance Tracking Platform"
-              sx={{
-                mb: 2.5,
-                fontWeight: 700,
-                fontSize: "0.8125rem",
-                bgcolor: "rgba(0, 229, 201, 0.12)",
-                color: "primary.main",
-                border: "1px solid rgba(0, 229, 201, 0.25)",
-                px: 1,
-              }}
-            />
+      <main className="flex-1">
+        {/* 3. Hero Section (Reference: multi-tenant-starter-template components/hero.tsx) */}
+        <section className="space-y-8 py-20 md:py-28 lg:py-32">
+          <div className="container mx-auto flex max-w-[64rem] flex-col items-center gap-5 px-4 text-center">
+            {/* Capsule pill */}
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-border/80 bg-muted px-4 py-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+              <Sparkles className="h-3.5 w-3.5 text-foreground" />
+              <span>Next-Gen Meralco Energy Intelligence & Appliance Tracking Platform</span>
+            </div>
 
-            <Typography
-              variant="h1"
-              sx={{
-                fontWeight: 900,
-                fontSize: { xs: "2.25rem", sm: "3.25rem", md: "4.15rem" },
-                letterSpacing: "-0.03em",
-                lineHeight: 1.15,
-                mb: 2.5,
-              }}
-            >
-              Master Your Electricity &{" "}
-              <Box
-                component="span"
-                sx={{
-                  background: "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #eab308 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                Meralco Power Bills
-              </Box>
-            </Typography>
+            {/* Headline */}
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+              Master Your Electricity & Meralco Power Bills
+            </h1>
 
-            <Typography
-              variant="body1"
-              sx={{
-                fontSize: { xs: "1rem", sm: "1.18rem" },
-                color: "text.secondary",
-                lineHeight: 1.65,
-                maxWidth: 820,
-                mx: "auto",
-                mb: 4,
-              }}
-            >
-              High-precision appliance telemetry with <strong>24-hour visual activity tracking</strong>, 
-              <strong> smart auto-midnight session splitting</strong>, <strong>isolated Simulate Appliance engine</strong>, 
-              official <strong>ERC unbundled tariff formulas</strong>, and <strong>DOE PELP energy efficiency star ratings</strong>.
-            </Typography>
+            {/* Subtitle */}
+            <p className="max-w-[44rem] text-sm leading-relaxed text-muted-foreground sm:text-lg sm:leading-8">
+              High-precision appliance telemetry with <strong className="font-semibold text-foreground">24-hour visual activity tracking</strong>,{" "}
+              <strong className="font-semibold text-foreground">smart auto-midnight session splitting</strong>,{" "}
+              <strong className="font-semibold text-foreground">routine defaults batch autofill</strong>, official{" "}
+              <strong className="font-semibold text-foreground">ERC unbundled tariff formulas</strong>, and{" "}
+              <strong className="font-semibold text-foreground">DOE PELP energy efficiency star ratings</strong>.
+            </p>
 
-            <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 2, mb: 4 }}>
+            {/* CTA Buttons */}
+            <div className="flex flex-wrap justify-center gap-3 pt-2">
+              <Link to="/signup" className={cn(buttonVariants({ variant: "default", size: "lg" }))}>
+                <span>Get Started Free</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link to="/calculator" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+                <Calculator className="h-4 w-4" />
+                <span>Unbundled Calculator</span>
+              </Link>
               <Button
-                component={Link}
-                to="/signup"
-                variant="contained"
-                size="large"
-                endIcon={<ArrowForwardIcon />}
-                sx={{ px: 4, py: 1.4, fontSize: "1.025rem", borderRadius: 1, fontWeight: 800 }}
+                variant="ghost"
+                size="lg"
+                onClick={() => scrollToSection("features")}
+                className="text-muted-foreground hover:text-foreground"
               >
-                Get Started Free
+                <Gauge className="h-4 w-4" />
+                <span>Core Modules</span>
               </Button>
-              <Button
-                component={Link}
-                to="/calculator"
-                variant="outlined"
-                size="large"
-                startIcon={<CalculateIcon />}
-                sx={{ px: 3.5, py: 1.4, fontSize: "1.025rem", borderRadius: 1, fontWeight: 800 }}
-              >
-                Unbundled Calculator
-              </Button>
-              <Button
-                onClick={() => scrollToSection("showcase")}
-                variant="text"
-                size="large"
-                startIcon={<SpeedIcon />}
-                sx={{ px: 2.5, py: 1.4, fontSize: "1.025rem", borderRadius: 1, fontWeight: 700 }}
-              >
-                Interactive Tour
-              </Button>
-            </Box>
+            </div>
 
             {/* Quick trust metrics row */}
-            <Grid container spacing={2} sx={{ justifyContent: "center", pt: 2 }}>
+            <div className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                { label: "100+ DOE PELP Catalog Models", icon: <LayersIcon fontSize="small" sx={{ color: "primary.main" }} /> },
-                { label: "ERC Unbundled Centavo Precision", icon: <CheckCircleIcon fontSize="small" sx={{ color: "#ffd54f" }} /> },
-                { label: "24-Hour Visual Activity Timeline", icon: <TimelineIcon fontSize="small" sx={{ color: "success.main" }} /> },
-                { label: "Smart Overnight Split Engine", icon: <ClockIcon fontSize="small" sx={{ color: "secondary.main" }} /> },
-              ].map((metric, i) => (
-                <Grid size={{ xs: 12, sm: 6, md: 3 }} key={i}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 1,
-                      px: 1.5,
-                      py: 1,
-                      borderRadius: 2,
-                      bgcolor: "action.hover",
-                      border: "1px solid",
-                      borderColor: "divider",
-                    }}
+                { label: "100+ DOE PELP Catalog Models", icon: Layers },
+                { label: "ERC Unbundled Centavo Precision", icon: Check },
+                { label: "24-Hour Visual Activity Timeline", icon: Activity },
+                { label: "Smart Overnight Split Engine", icon: Clock },
+              ].map((metric, i) => {
+                const IconComp = metric.icon;
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card/60 px-3 py-2 text-xs font-medium text-foreground shadow-xs backdrop-blur-sm"
                   >
-                    {metric.icon}
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: "text.primary" }}>
-                      {metric.label}
-                    </Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
+                    <IconComp className="h-3.5 w-3.5 text-foreground" />
+                    <span>{metric.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
-          {/* Interactive Live Estimator Card */}
-          <Card
-            id="estimator"
-            sx={{
-              scrollMarginTop: { xs: "72px", sm: "84px" },
-              p: { xs: 2.5, sm: 4 },
-              borderRadius: 1.5,
-              border: "1px solid",
-              borderColor: "divider",
-              boxShadow: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "0 20px 60px rgba(0, 0, 0, 0.45)"
-                  : "0 20px 60px rgba(0, 158, 136, 0.1)",
-            }}
-          >
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3, flexWrap: "wrap", gap: 1.5 }}>
-              <Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <ElectricBoltIcon sx={{ color: "#ffd54f" }} />
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
+        {/* 4. Live Estimator Section */}
+        <section id="estimator" className="container mx-auto max-w-5xl scroll-mt-24 px-4 pb-20">
+          <Card className="border-border shadow-md">
+            <CardHeader className="space-y-2 border-b border-border pb-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-muted">
+                    <Zap className="h-4 w-4 text-foreground" />
+                  </div>
+                  <CardTitle className="text-xl sm:text-2xl">
                     Real-Time Appliance Bill & Running Cost Estimator
-                  </Typography>
-                </Box>
-                <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-                  Adjust appliance wattage, daily runtime, and effective Meralco tariff rate to see live cost projections.
-                </Typography>
-              </Box>
-              <Chip
-                icon={<SparklesIcon sx={{ fontSize: "14px !important", color: "inherit" }} />}
-                label="Dynamic Telemetry Engine"
-                color="secondary"
-                size="small"
-                sx={{ fontWeight: 800 }}
-              />
-            </Box>
+                  </CardTitle>
+                </div>
+                <Badge variant="secondary" className="gap-1 font-medium">
+                  <Sparkles className="h-3 w-3" />
+                  <span>Dynamic Telemetry Engine</span>
+                </Badge>
+              </div>
+              <CardDescription className="text-sm">
+                Adjust appliance wattage, daily runtime, and effective Meralco tariff rate to see live cost projections.
+              </CardDescription>
+            </CardHeader>
 
-            <Grid container spacing={{ xs: 2.5, sm: 3.5 }}>
-              {/* Controls Column */}
-              <Grid size={{ xs: 12, md: 7 }}>
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Select Standard Appliance Preset"
+            <CardContent className="grid gap-8 p-6 md:grid-cols-12 md:p-8">
+              {/* Controls Column (7 cols) */}
+              <div className="space-y-6 md:col-span-7">
+                {/* Appliance Preset Selector */}
+                <div className="space-y-2">
+                  <label htmlFor="appliance-preset" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Select Standard Appliance Preset
+                  </label>
+                  <select
+                    id="appliance-preset"
                     value={selectedWatts}
                     onChange={(e) => setSelectedWatts(Number(e.target.value))}
-                    size="small"
-                    helperText="Pick a common household load or customize wattage below"
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     {applianceOptions.map((opt) => (
-                      <MenuItem key={opt.value + opt.label} value={opt.value}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%", justifyContent: "space-between" }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                            {opt.icon}
-                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                              {opt.label}
-                            </Typography>
-                          </Box>
-                          <Typography variant="caption" sx={{ fontFamily: "monospace", color: "text.secondary" }}>
-                            {opt.value}W • {opt.desc}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
+                      <option key={opt.value + opt.label} value={opt.value}>
+                        {opt.label} — {opt.value}W ({opt.desc})
+                      </option>
                     ))}
-                  </TextField>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Pick a common household load or customize daily runtime and rate below.
+                  </p>
+                </div>
 
-                  <Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", letterSpacing: "0.05em" }}>
-                        DAILY RUNTIME (DUTY CYCLE)
-                      </Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 900, color: "primary.main" }}>
-                        {estimatorHours} hours / day
-                      </Typography>
-                    </Box>
-                    <Slider
-                      value={estimatorHours}
+                {/* Daily Runtime Slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="uppercase tracking-wider text-muted-foreground">Daily Runtime (Duty Cycle)</span>
+                    <span className="font-mono text-foreground">{estimatorHours} hours / day</span>
+                  </div>
+                  <div className="relative flex items-center py-2">
+                    <input
+                      type="range"
                       min={0.5}
                       max={24}
                       step={0.5}
-                      onChange={(_, val) => setEstimatorHours(val as number)}
-                      valueLabelDisplay="auto"
-                      valueLabelFormat={(x) => `${x}h`}
+                      value={estimatorHours}
+                      onChange={(e) => setEstimatorHours(Number(e.target.value))}
+                      className="lp-range h-2 w-full cursor-pointer rounded-full bg-secondary accent-primary"
                     />
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>30 min (Quick Use)</Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>8 hrs (Typical)</Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>24 hrs (Continuous)</Typography>
-                    </Box>
-                  </Box>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground">
+                    <span>30 min (Quick Use)</span>
+                    <span>8 hrs (Typical)</span>
+                    <span>24 hrs (Continuous)</span>
+                  </div>
+                </div>
 
-                  <Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", letterSpacing: "0.05em" }}>
-                        EFFECTIVE MERALCO TARIFF RATE (₱ / kWh)
-                      </Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 900, color: "#eab308" }}>
-                        ₱{estimatorRate.toFixed(4)} / kWh
-                      </Typography>
-                    </Box>
-                    <Slider
-                      value={estimatorRate}
+                {/* Meralco Tariff Rate Slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="uppercase tracking-wider text-muted-foreground">
+                      Effective Meralco Tariff Rate (₱ / kWh)
+                    </span>
+                    <span className="font-mono text-foreground">₱{estimatorRate.toFixed(4)} / kWh</span>
+                  </div>
+                  <div className="relative flex items-center py-2">
+                    <input
+                      type="range"
                       min={8.0}
                       max={20.0}
                       step={0.05}
-                      onChange={(_, val) => setEstimatorRate(val as number)}
-                      valueLabelDisplay="auto"
-                      valueLabelFormat={(x) => `₱${x.toFixed(2)}`}
+                      value={estimatorRate}
+                      onChange={(e) => setEstimatorRate(Number(e.target.value))}
+                      className="lp-range h-2 w-full cursor-pointer rounded-full bg-secondary accent-primary"
                     />
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>₱8.50 (Lifeline)</Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>₱14.82 (Standard 200kWh+)</Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>₱20.00 (High Peak)</Typography>
-                    </Box>
-                  </Box>
-                </Box>
-              </Grid>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground">
+                    <span>₱8.50 (Lifeline)</span>
+                    <span>₱14.82 (Standard 200kWh+)</span>
+                    <span>₱20.00 (High Peak)</span>
+                  </div>
+                </div>
+              </div>
 
-              {/* Dynamic Projection Result Card */}
-              <Grid size={{ xs: 12, md: 5 }}>
-                <Paper
-                  sx={{
-                    p: { xs: 2.5, sm: 3 },
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    borderRadius: 1.25,
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark" ? "rgba(0, 229, 201, 0.08)" : "rgba(0, 158, 136, 0.06)",
-                    border: "1px solid",
-                    borderColor: "primary.main",
-                  }}
-                >
-                  <Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: "primary.light", textTransform: "uppercase" }}>
-                        Projected Monthly Spend
-                      </Typography>
-                      <Chip label="Unbundled Est." size="small" sx={{ height: 18, fontSize: "0.625rem", fontWeight: 700 }} />
-                    </Box>
-                    <Typography
-                      variant="h3"
-                      sx={{
-                        fontWeight: 900,
-                        fontFamily: "monospace",
-                        color: "#ffd54f",
-                        my: 1,
-                        fontSize: { xs: "2.1rem", sm: "2.6rem" },
-                      }}
-                    >
+              {/* Dynamic Projection Result Card (5 cols) */}
+              <div className="flex flex-col justify-between rounded-lg border border-border bg-muted/40 p-6 md:col-span-5">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Projected Monthly Spend
+                    </span>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      Unbundled Est.
+                    </Badge>
+                  </div>
+
+                  <div>
+                    <div className="font-mono text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
                       ₱{estimatorCalc.monthlyCost}
-                      <Typography component="span" variant="body2" sx={{ color: "text.secondary", ml: 1 }}>
-                        / mo
-                      </Typography>
-                    </Typography>
-                  </Box>
+                      <span className="ml-1 text-sm font-normal text-muted-foreground">/ mo</span>
+                    </div>
+                  </div>
 
-                  <Divider sx={{ my: 1.5 }} />
+                  <Separator />
 
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.1 }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>Continuous Hourly Cost:</Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: "success.light", fontFamily: "monospace" }}>
-                        ₱{estimatorCalc.hourlyCost} / hour
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>Daily Energy Load:</Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 800, fontFamily: "monospace" }}>
-                        {estimatorCalc.dailyKwh} kWh / day
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>Monthly Consumption:</Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 800, fontFamily: "monospace" }}>
-                        {estimatorCalc.monthlyKwh} kWh / mo
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>Annual Spend (12-Mo):</Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 800, fontFamily: "monospace", color: "#eab308" }}>
-                        ₱{estimatorCalc.annualCost} / yr
-                      </Typography>
-                    </Box>
-                  </Box>
+                  <dl className="space-y-2.5 text-xs">
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Continuous Hourly Cost:</dt>
+                      <dd className="font-mono font-semibold text-foreground">₱{estimatorCalc.hourlyCost} / hour</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Daily Energy Load:</dt>
+                      <dd className="font-mono font-semibold text-foreground">{estimatorCalc.dailyKwh} kWh / day</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Monthly Consumption:</dt>
+                      <dd className="font-mono font-semibold text-foreground">{estimatorCalc.monthlyKwh} kWh / mo</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Annual Spend (12-Mo):</dt>
+                      <dd className="font-mono font-semibold text-foreground">₱{estimatorCalc.annualCost} / yr</dd>
+                    </div>
+                  </dl>
+                </div>
 
-                  <Box sx={{ mt: 2.5, display: "flex", flexDirection: "column", gap: 1 }}>
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      size="small"
-                      onClick={() => navigate("/calculator")}
-                      sx={{ fontWeight: 800, py: 1 }}
-                    >
-                      Open Full Unbundled Bill Calculator
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      size="small"
-                      onClick={() => navigate("/appliances")}
-                      sx={{ fontWeight: 700 }}
-                    >
-                      Compare with DOE PELP Catalog
-                    </Button>
-                  </Box>
-                </Paper>
-              </Grid>
-            </Grid>
-          </Card>
-        </Container>
-      </Box>
-
-      {/* 3. Philippine Utility & Regulatory Standards */}
-      <Box sx={{ py: 5, borderY: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}>
-        <Container maxWidth="lg">
-          <Typography
-            variant="caption"
-            sx={{
-              display: "block",
-              textAlign: "center",
-              fontWeight: 800,
-              color: "text.secondary",
-              letterSpacing: "0.08em",
-              mb: 3,
-            }}
-          >
-            BUILT AROUND PHILIPPINE DOE PELP STANDARDS & ERC UNBUNDLED TARIFF PROTOCOLS
-          </Typography>
-          <Grid container spacing={2} sx={{ justifyContent: "center", alignItems: "center" }}>
-            {[
-              { label: "DOE PELP Star Ratings", sub: "Philippine Energy Labeling" },
-              { label: "ERC Unbundled Framework", sub: "Itemized Centavo Formulas" },
-              { label: "RA 11285 Framework", sub: "Appliance Efficiency & Labeling" },
-              { label: "Meralco Tariff Schedule", sub: "Residential & Commercial" },
-            ].map((item, i) => (
-              <Grid size={{ xs: 6, sm: 3 }} key={i} sx={{ textAlign: "center" }}>
-                <Box
-                  sx={{
-                    p: 1.5,
-                    borderRadius: 2.5,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    bgcolor: "background.paper",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
-                    <ShieldIcon sx={{ color: "primary.main", fontSize: 18 }} />
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                      {item.label}
-                    </Typography>
-                  </Box>
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.6875rem" }}>
-                    {item.sub}
-                  </Typography>
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
-      </Box>
-
-      {/* 4. Interactive Platform Showcase (Tabbed Walkthrough) */}
-      <Box id="showcase" sx={{ py: { xs: 8, md: 11 }, scrollMarginTop: { xs: "72px", sm: "84px" } }}>
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", maxWidth: 780, mx: "auto", mb: { xs: 4, md: 6 } }}>
-            <Chip
-              label="Interactive Platform Capabilities"
-              color="primary"
-              size="small"
-              sx={{ mb: 1.5, fontWeight: 800 }}
-            />
-            <Typography variant="h3" sx={{ fontWeight: 900, mb: 1.5, letterSpacing: "-0.02em" }}>
-              Explore the PowerForecast Platform & Energy Tools
-            </Typography>
-            <Typography variant="body1" sx={{ color: "text.secondary" }}>
-              Click through the core engines built to eliminate bill shocks and optimize your household power consumption.
-            </Typography>
-          </Box>
-
-          <Paper
-            sx={{
-              borderRadius: 1.5,
-              border: "1px solid",
-              borderColor: "divider",
-              overflow: "hidden",
-              boxShadow: "0 10px 40px rgba(0,0,0,0.1)",
-            }}
-          >
-            <Tabs
-              value={activeTab}
-              onChange={(_, v) => setActiveTab(v)}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{
-                borderBottom: "1px solid",
-                borderColor: "divider",
-                bgcolor: "action.hover",
-                px: 2,
-                "& .MuiTab-root": { fontWeight: 700, textTransform: "none", py: 2 },
-              }}
-            >
-              <Tab icon={<TimelineIcon />} iconPosition="start" label="24-Hour Activity & Cost Ticker" />
-              <Tab icon={<ClockIcon />} iconPosition="start" label="Smart Calendar & Midnight Splitting" />
-              <Tab icon={<ScienceIcon />} iconPosition="start" label="Simulate Appliance & What-If Planner" />
-              <Tab icon={<CalculateIcon />} iconPosition="start" label="Unbundled ERC Calculator" />
-              <Tab icon={<LayersIcon />} iconPosition="start" label="DOE PELP Energy Catalog" />
-              <Tab icon={<DocumentScannerIcon />} iconPosition="start" label="AI Vision OCR Scanner" />
-            </Tabs>
-
-            <Box sx={{ p: { xs: 3, sm: 5 } }}>
-              {/* Tab 0: 24h Activity Timeline */}
-              {activeTab === 0 && (
-                <Grid container spacing={4} sx={{ alignItems: "center" }}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Chip label="Real-Time Telemetry" color="success" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
-                    <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
-                      24-Hour Activity Timeline & Dynamic Cost Ticker
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: "text.secondary", lineHeight: 1.7, mb: 3 }}>
-                      Monitor your household's active power footprint in real-time. The dashboard renders an hourly 24-hour visual activity track, computes instant running cost per hour (₱/hr), and tracks simultaneous circuit breaker capacity.
-                    </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
-                      {[
-                        "Live ₱/hr running rate ticker synchronized to active circuits",
-                        "24-hour visual energy load distribution bars across morning, afternoon, and night",
-                        "Active breaker load percentage with overload alert warnings",
-                      ].map((item, idx) => (
-                        <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <CheckCircleIcon sx={{ color: "success.main", fontSize: 18 }} />
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {item}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                    <Button
-                      component={Link}
-                      to="/dashboard"
-                      variant="contained"
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{ fontWeight: 800 }}
-                    >
-                      View Live Dashboard
-                    </Button>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    {/* Simulated 24h Timeline Widget Mock */}
-                    <Card sx={{ p: 3, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                          Today's Live Power Ticker
-                        </Typography>
-                        <Chip label="LIVE MONITOR" color="error" size="small" sx={{ fontWeight: 800, height: 20 }} />
-                      </Box>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", bgcolor: "action.hover", p: 2, borderRadius: 1.25, mb: 2.5 }}>
-                        <Box>
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>ACTIVE RUNNING RATE</Typography>
-                          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "success.light" }}>
-                            ₱15.57 / hr
-                          </Typography>
-                        </Box>
-                        <Box sx={{ textAlign: "right" }}>
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>SIMULTANEOUS LOAD</Typography>
-                          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#ffd54f" }}>
-                            1,050 W (4.77A)
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                          <Typography variant="caption" sx={{ fontWeight: 700 }}>Circuit Breaker Load (30A Limit)</Typography>
-                          <Typography variant="caption" sx={{ fontWeight: 800, color: "success.main" }}>15.2% Safe</Typography>
-                        </Box>
-                        <LinearProgress variant="determinate" value={15.2} color="success" sx={{ height: 8, borderRadius: 1 }} />
-                      </Box>
-                    </Card>
-                  </Grid>
-                </Grid>
-              )}
-
-              {/* Tab 1: Smart Calendar & Midnight Splitting */}
-              {activeTab === 1 && (
-                <Grid container spacing={4} sx={{ alignItems: "center" }}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Chip label="Overnight Session Engine" color="secondary" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
-                    <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
-                      Smart Calendar with Auto-Midnight Multi-Day Splitting
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: "text.secondary", lineHeight: 1.7, mb: 3 }}>
-                      Running an air conditioner from 10:00 PM to 2:00 AM? PowerForecast automatically splits overnight sessions at the 23:59:59 boundary, attributing exactly 2 hours to Day 1 and 2 hours to Day 2 with flawless calendar parity.
-                    </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
-                      {[
-                        "Smart midnight crossing detector automatically creates balanced multi-day usage logs",
-                        "Interactive Smart Calendar Simulation Engine with built-in 24-hour visual load curve",
-                        "Detailed date analytics modal showing exact kWh, cost, and session breakdown per day",
-                      ].map((item, idx) => (
-                        <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <CheckCircleIcon sx={{ color: "secondary.main", fontSize: 18 }} />
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {item}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                    <Button
-                      component={Link}
-                      to="/calendar"
-                      variant="contained"
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{ fontWeight: 800 }}
-                    >
-                      Open Smart Calendar
-                    </Button>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Card sx={{ p: 3, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                        Auto-Midnight Crossing Split Visualizer
-                      </Typography>
-                      <Box sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1.25, mb: 2 }}>
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>LOGGED SESSION</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: "primary.light" }}>
-                          Master Bedroom AC: 10:00 PM → 02:00 AM (4.0 hrs Total)
-                        </Typography>
-                      </Box>
-                      <Grid container spacing={1.5}>
-                        <Grid size={{ xs: 6 }}>
-                          <Paper sx={{ p: 2, border: "1px solid", borderColor: "primary.main", borderRadius: 1.25 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 800, color: "primary.main" }}>DAY 1 LOG (Aug 23)</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 900, fontFamily: "monospace" }}>2.0 hrs</Typography>
-                            <Typography variant="caption" sx={{ color: "text.secondary" }}>22:00 - 23:59 (2.10 kWh)</Typography>
-                          </Paper>
-                        </Grid>
-                        <Grid size={{ xs: 6 }}>
-                          <Paper sx={{ p: 2, border: "1px solid", borderColor: "secondary.main", borderRadius: 1.25 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 800, color: "secondary.main" }}>DAY 2 LOG (Aug 24)</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 900, fontFamily: "monospace" }}>2.0 hrs</Typography>
-                            <Typography variant="caption" sx={{ color: "text.secondary" }}>00:00 - 02:00 (2.10 kWh)</Typography>
-                          </Paper>
-                        </Grid>
-                      </Grid>
-                    </Card>
-                  </Grid>
-                </Grid>
-              )}
-
-              {/* Tab 2: Simulate Appliance & What-If Planner */}
-              {activeTab === 2 && (
-                <Grid container spacing={4} sx={{ alignItems: "center" }}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Chip label="Isolated What-If Modeling" color="primary" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
-                    <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
-                      Simulate Appliance & Dual-Tab Calendar Engine
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: "text.secondary", lineHeight: 1.7, mb: 3 }}>
-                      Experiment freely without contaminating your verified actual records. Model appliance schedules, measure tasks with a live test-run stopwatch, and plan future billing cycles in a dedicated simulation layer.
-                    </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
-                      {[
-                        "Dual-Tab Calendar: Strict isolation between measured Actuals and What-If Simulations",
-                        "Test-Run Stopwatch: Time appliance cycles in real-time and apply duration directly to your plan",
-                        "Blended Forecasting: Combines actuals-to-date with remaining simulation days for exact predictions",
-                      ].map((item, idx) => (
-                        <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <CheckCircleIcon sx={{ color: "primary.main", fontSize: 18 }} />
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {item}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                    <Button
-                      component={Link}
-                      to="/calendar"
-                      variant="contained"
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{ fontWeight: 800 }}
-                    >
-                      Explore Simulation Plan
-                    </Button>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Card sx={{ p: 3, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                        3 Pillars of PowerForecast Simulation
-                      </Typography>
-                      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                        <Paper sx={{ p: 2, border: "1px solid", borderColor: "primary.main", bgcolor: "rgba(0, 229, 201, 0.08)", borderRadius: 1.25 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main" }}>Pillar 1: 100% Data Isolation</Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            Simulated plans commit exclusively to isolated tables so verified stopwatch sessions are never overwritten.
-                          </Typography>
-                        </Paper>
-                        <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1.25 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Pillar 2: Test-Run Stopwatch</Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            Time chore durations or inverter cool-down periods with a built-in stopwatch to craft realistic routine targets.
-                          </Typography>
-                        </Paper>
-                        <Paper sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1.25 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Pillar 3: Plan Quota Alerts</Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            Receive automated audio, push, and haptic notifications if live stopwatch runtime exceeds your simulated quota.
-                          </Typography>
-                        </Paper>
-                      </Box>
-                    </Card>
-                  </Grid>
-                </Grid>
-              )}
-
-              {/* Tab 3: Unbundled ERC Calculator */}
-              {activeTab === 3 && (
-                <Grid container spacing={4} sx={{ alignItems: "center" }}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Chip label="ERC Centavo Accuracy" color="warning" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
-                    <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
-                      Official ERC Unbundled Tariff Calculator
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: "text.secondary", lineHeight: 1.7, mb: 3 }}>
-                      PowerForecast breaks down electricity charges into their exact legal components according to official Energy Regulatory Commission (ERC) guidelines.
-                    </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
-                      {[
-                        "Generation Charges (IPP & WESM energy market rates)",
-                        "Transmission Wheeling & Ancillary Grid Services (NGCP)",
-                        "Distribution Wheeling, Metering & Supply Charges (Meralco)",
-                        "Universal Charges, FIT-All, Lifeline Subsidies, and 12% VAT",
-                      ].map((item, idx) => (
-                        <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <CheckCircleIcon sx={{ color: "#eab308", fontSize: 18 }} />
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {item}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                    <Button
-                      component={Link}
-                      to="/calculator"
-                      variant="contained"
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{ fontWeight: 800 }}
-                    >
-                      Calculate Your Bill
-                    </Button>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Card sx={{ p: 3, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                        Unbundled Cost Component Breakdown (200 kWh)
-                      </Typography>
-                      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                        {[
-                          { name: "Generation Charge", pct: 54, val: "₱1,580.40", color: "#6366f1" },
-                          { name: "Distribution Charge (Meralco)", pct: 18, val: "₱526.80", color: "#a855f7" },
-                          { name: "Government Taxes (12% VAT)", pct: 12, val: "₱351.20", color: "#ec4899" },
-                          { name: "Transmission (NGCP)", pct: 9, val: "₱263.40", color: "#eab308" },
-                          { name: "System Loss & Universal", pct: 7, val: "₱204.86", color: "#22c55e" },
-                        ].map((c, i) => (
-                          <Box key={i}>
-                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                              <Typography variant="caption" sx={{ fontWeight: 700 }}>{c.name} ({c.pct}%)</Typography>
-                              <Typography variant="caption" sx={{ fontWeight: 800, fontFamily: "monospace" }}>{c.val}</Typography>
-                            </Box>
-                            <LinearProgress
-                              variant="determinate"
-                              value={c.pct}
-                              sx={{
-                                height: 8,
-                                borderRadius: 1,
-                                bgcolor: "action.selected",
-                                "& .MuiLinearProgress-bar": { bgcolor: c.color },
-                              }}
-                            />
-                          </Box>
-                        ))}
-                      </Box>
-                    </Card>
-                  </Grid>
-                </Grid>
-              )}
-
-              {/* Tab 4: DOE PELP Catalog */}
-              {activeTab === 4 && (
-                <Grid container spacing={4} sx={{ alignItems: "center" }}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Chip label="DOE Energy Star Database" color="info" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
-                    <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
-                      DOE PELP Verified Rating Catalog
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: "text.secondary", lineHeight: 1.7, mb: 3 }}>
-                      Access verified Philippine Energy Labeling Program ratings directly. Compare CSPF (Cooling Seasonal Performance Factor) and EER ratings for top air conditioning and refrigeration brands in the Philippines.
-                    </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
-                      {[
-                        "Over 100+ verified inverter and non-inverter appliance models",
-                        "Energy Star rating lookup (1-Star to 5-Star efficiency)",
-                        "Autofill appliance specifications into your personal inventory with 1 click",
-                      ].map((item, idx) => (
-                        <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <CheckCircleIcon sx={{ color: "info.main", fontSize: 18 }} />
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {item}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                    <Button
-                      component={Link}
-                      to="/appliances"
-                      variant="contained"
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{ fontWeight: 800 }}
-                    >
-                      Browse PELP Catalog
-                    </Button>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Card sx={{ p: 3, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                        Verified Inverter Efficiency Ratings
-                      </Typography>
-                      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                        {[
-                          { brand: "Panasonic Premium Inverter 1.5HP", cspf: "CSPF 6.10", stars: "★★★★★ (5-Star)", watts: "920W Avg" },
-                          { brand: "Carrier Aura Inverter 1.0HP", cspf: "CSPF 5.85", stars: "★★★★★ (5-Star)", watts: "780W Avg" },
-                          { brand: "Daikin D-Smart King 1.5HP", cspf: "CSPF 5.92", stars: "★★★★★ (5-Star)", watts: "980W Avg" },
-                          { brand: "Standard Window Non-Inverter", cspf: "EER 9.80", stars: "★★☆☆☆ (2-Star)", watts: "1,150W Peak" },
-                        ].map((m, i) => (
-                          <Paper key={i} sx={{ p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1.25 }}>
-                            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{m.brand}</Typography>
-                              <Typography variant="caption" sx={{ color: "#ffd54f", fontWeight: 800 }}>{m.stars}</Typography>
-                            </Box>
-                            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
-                              <Typography variant="caption" sx={{ color: "text.secondary" }}>Rating: {m.cspf}</Typography>
-                              <Typography variant="caption" sx={{ fontWeight: 700, fontFamily: "monospace" }}>{m.watts}</Typography>
-                            </Box>
-                          </Paper>
-                        ))}
-                      </Box>
-                    </Card>
-                  </Grid>
-                </Grid>
-              )}
-
-              {/* Tab 5: AI Vision Scanner */}
-              {activeTab === 5 && (
-                <Grid container spacing={4} sx={{ alignItems: "center" }}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Chip label="Optical AI Recognition" color="secondary" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
-                    <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
-                      AI Vision OCR Appliance & Label Scanner
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: "text.secondary", lineHeight: 1.7, mb: 3 }}>
-                      Point your phone or webcam at any appliance manufacturer rating plate, inverter badge, or DOE Energy Guide yellow label. The optical AI parser extracts wattage, voltage, amps, star rating, and monthly estimated kWh automatically into your inventory.
-                    </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 3 }}>
-                      {[
-                        "Optical Character Recognition (OCR) with confidence score validation",
-                        "Automatic extraction of Rated Power (Watts), Voltage (V), and Amperage (A)",
-                        "Direct 1-click sync to your active appliance spaces and inventory list",
-                      ].map((item, idx) => (
-                        <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <CheckCircleIcon sx={{ color: "secondary.main", fontSize: 18 }} />
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {item}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                    <Button
-                      component={Link}
-                      to="/appliances"
-                      variant="contained"
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{ fontWeight: 800 }}
-                    >
-                      Scan an Appliance
-                    </Button>
-                  </Grid>
-
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Card sx={{ p: 3, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                        AI OCR Plate Extraction Preview
-                      </Typography>
-                      <Paper sx={{ p: 2, bgcolor: "action.hover", border: "1px dashed", borderColor: "primary.main", borderRadius: 1.25, mb: 2 }}>
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 800, color: "primary.light" }}>NAMEPLATE OCR DETECTED</Typography>
-                          <Chip label="98.4% Confidence" color="success" size="small" sx={{ height: 18, fontSize: "0.625rem", fontWeight: 700 }} />
-                        </Box>
-                        <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                          Model: CS/CU-XPU12XKQ • 230V ~ 60Hz
-                        </Typography>
-                      </Paper>
-                      <Grid container spacing={1.5}>
-                        <Grid size={{ xs: 4 }}>
-                          <Paper sx={{ p: 1.5, textAlign: "center", borderRadius: 1.25 }}>
-                            <Typography variant="caption" sx={{ color: "text.secondary" }}>Power</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "#ffd54f" }}>1,050 W</Typography>
-                          </Paper>
-                        </Grid>
-                        <Grid size={{ xs: 4 }}>
-                          <Paper sx={{ p: 1.5, textAlign: "center", borderRadius: 1.25 }}>
-                            <Typography variant="caption" sx={{ color: "text.secondary" }}>Current</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "primary.light" }}>4.75 A</Typography>
-                          </Paper>
-                        </Grid>
-                        <Grid size={{ xs: 4 }}>
-                          <Paper sx={{ p: 1.5, textAlign: "center", borderRadius: 1.25 }}>
-                            <Typography variant="caption" sx={{ color: "text.secondary" }}>Type</Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "success.light" }}>Inverter</Typography>
-                          </Paper>
-                        </Grid>
-                      </Grid>
-                    </Card>
-                  </Grid>
-                </Grid>
-              )}
-            </Box>
-          </Paper>
-        </Container>
-      </Box>
-
-      {/* 5. Core Platform Modules Grid */}
-      <Box id="features" sx={{ py: { xs: 8, md: 11 }, bgcolor: "action.hover", scrollMarginTop: { xs: "72px", sm: "84px" } }}>
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", maxWidth: 750, mx: "auto", mb: { xs: 5, md: 7 } }}>
-            <Typography variant="h3" sx={{ fontWeight: 900, mb: 1.5, letterSpacing: "-0.02em" }}>
-              Engineered for Complete Energy Control
-            </Typography>
-            <Typography variant="body1" sx={{ color: "text.secondary" }}>
-              Explore the full suite of specialized tools built to track, forecast, audit, and optimize your monthly electric bills.
-            </Typography>
-          </Box>
-
-          <Grid container spacing={{ xs: 2.5, sm: 3 }}>
-            {[
-              {
-                icon: <TimelineIcon sx={{ fontSize: 28, color: "#ffd54f" }} />,
-                title: "24-Hour Live Activity Timeline",
-                desc: "Live hourly load telemetry bar chart, dynamic ₱/hr running rate ticker, and instantaneous circuit load monitoring on the dashboard.",
-              },
-              {
-                icon: <ClockIcon sx={{ fontSize: 28, color: "secondary.main" }} />,
-                title: "Smart Calendar & Midnight Splitting",
-                desc: "Overnight appliance runs are automatically split at 23:59:59 into two accurate day logs, keeping calendar metrics 100% truthful.",
-              },
-              {
-                icon: <ScienceIcon sx={{ fontSize: 28, color: "primary.light" }} />,
-                title: "Simulate Appliance & What-If Planner",
-                desc: "Experiment with what-if schedules and test-run stopwatches in an isolated simulation layer without altering your verified measured telemetry.",
-              },
-              {
-                icon: <CalculateIcon sx={{ fontSize: 28, color: "warning.main" }} />,
-                title: "ERC Unbundled Tariff Calculator",
-                desc: "Centavo-accurate unbundled billing covering Generation, Transmission, Distribution, System Loss, Subsidies, FIT-All, and 12% VAT.",
-              },
-              {
-                icon: <LayersIcon sx={{ fontSize: 28, color: "info.main" }} />,
-                title: "DOE PELP Energy Catalog",
-                desc: "Compare verified Energy Efficiency Ratios (EER) and CSPF star ratings for over 100+ inverter air conditioners and refrigerators.",
-              },
-              {
-                icon: <CameraIcon sx={{ fontSize: 28, color: "success.main" }} />,
-                title: "AI Vision OCR Label Scanner",
-                desc: "Capture physical appliance nameplates and DOE Energy Guide yellow labels with optical AI recognition, confidence verification, and auto-populated specs.",
-              },
-              {
-                icon: <CpuIcon sx={{ fontSize: 28, color: "error.main" }} />,
-                title: "Live Circuit Breaker Load Monitor",
-                desc: "Track simultaneous active circuit amperage and wattage against standard household breaker ratings (30A, 40A, 60A) with instant overload warnings.",
-              },
-              {
-                icon: <BarChartIcon sx={{ fontSize: 28, color: "#a855f7" }} />,
-                title: "3-Scenario What-If Forecasting",
-                desc: "Model your month-end bill across Baseline, Eco-Saver (15% reduction), and Summer Heat Surge (25% increase) scenarios with ERC bracket tracking.",
-              },
-            ].map((f, idx) => (
-              <Grid size={{ xs: 12, sm: 6, md: 3 }} key={idx}>
-                <Card
-                  sx={{
-                    height: "100%",
-                    p: 3,
-                    display: "flex",
-                    flexDirection: "column",
-                    borderRadius: 1.5,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                    "&:hover": {
-                      transform: "translateY(-4px)",
-                      borderColor: "primary.main",
-                      boxShadow: "0 10px 30px rgba(0, 229, 201, 0.15)",
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      bgcolor: "action.hover",
-                      border: "1px solid",
-                      borderColor: "divider",
-                      mb: 2,
-                    }}
-                  >
-                    {f.icon}
-                  </Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
-                    {f.title}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.6, fontSize: "0.875rem" }}>
-                    {f.desc}
-                  </Typography>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
-      </Box>
-
-      {/* 6. Tariff Tiers Comparison */}
-      <Box id="tariffs" sx={{ py: { xs: 8, md: 11 }, scrollMarginTop: { xs: "72px", sm: "84px" } }}>
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", maxWidth: 720, mx: "auto", mb: { xs: 5, md: 7 } }}>
-            <Chip label="Official Rate Brackets" color="secondary" size="small" sx={{ mb: 1.5, fontWeight: 800 }} />
-            <Typography variant="h3" sx={{ fontWeight: 900, mb: 1.5, letterSpacing: "-0.02em" }}>
-              Meralco Residential Tariff Brackets
-            </Typography>
-            <Typography variant="body1" sx={{ color: "text.secondary" }}>
-              PowerForecast models the unbundled rate structures across all residential and small commercial brackets.
-            </Typography>
-          </Box>
-
-          <Grid container spacing={{ xs: 2.5, sm: 3 }}>
-            {[
-              {
-                title: "Lifeline Subsidy Tier",
-                kwh: "0 - 100 kWh",
-                price: "₱8.50 - ₱10.20",
-                desc: "Eligible for qualified low-income households with 20% to 100% subsidies on generation and distribution charges.",
-                popular: false,
-                badge: "Subsidized",
-              },
-              {
-                title: "Standard Residential",
-                kwh: "101 - 300 kWh",
-                price: "₱12.45 - ₱14.82",
-                desc: "Standard household rate with full unbundled generation, transmission, system loss, universal, and 12% VAT charges.",
-                popular: true,
-                badge: "Most Common",
-              },
-              {
-                title: "Heavy Residential",
-                kwh: "301+ kWh",
-                price: "₱14.80 - ₱16.50",
-                desc: "Higher consumption households with multi-split air conditioners, continuous appliances, and marginal bracket rates.",
-                popular: false,
-                badge: "High Load",
-              },
-              {
-                title: "Small Commercial / Mixed",
-                kwh: "Multi-Space",
-                price: "₱13.80 - ₱15.50",
-                desc: "Sari-sari stores, workshops, and rental spaces with flat commercial distribution and fixed customer meter charges.",
-                popular: false,
-                badge: "Business",
-              },
-            ].map((tier, idx) => (
-              <Grid size={{ xs: 12, sm: 6, md: 3 }} key={idx}>
-                <Card
-                  sx={{
-                    p: 3.5,
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    borderRadius: 1.5,
-                    position: "relative",
-                    border: "1px solid",
-                    borderColor: tier.popular ? "primary.main" : "divider",
-                    boxShadow: tier.popular ? "0 10px 30px rgba(0, 229, 201, 0.2)" : "none",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                    "&:hover": {
-                      transform: "translateY(-4px)",
-                    },
-                  }}
-                >
-                  <Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                      <Chip
-                        label={tier.badge}
-                        color={tier.popular ? "primary" : "default"}
-                        size="small"
-                        sx={{ fontWeight: 800 }}
-                      />
-                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-                        {tier.kwh}
-                      </Typography>
-                    </Box>
-
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, mt: 1.5 }}>
-                      {tier.title}
-                    </Typography>
-
-                    <Typography variant="h4" sx={{ fontWeight: 900, fontFamily: "monospace", my: 1.5, color: "#ffd54f" }}>
-                      {tier.price} <Typography component="span" variant="caption" sx={{ color: "text.secondary" }}>/kWh</Typography>
-                    </Typography>
-
-                    <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.85rem", lineHeight: 1.6, mb: 3 }}>
-                      {tier.desc}
-                    </Typography>
-                  </Box>
-
-                  <Button
-                    component={Link}
-                    to="/signup"
-                    variant={tier.popular ? "contained" : "outlined"}
-                    fullWidth
-                    size="small"
-                    sx={{ fontWeight: 800, py: 1 }}
-                  >
-                    Select Tier
+                <div className="mt-6 flex flex-col gap-2">
+                  <Button onClick={() => navigate("/calculator")} className="w-full justify-center">
+                    Open Full Unbundled Bill Calculator
                   </Button>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
-      </Box>
+                  <Button variant="outline" onClick={() => navigate("/appliances")} className="w-full justify-center">
+                    Compare with DOE PELP Catalog
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
 
-      {/* 7. Architecture & Developer Ecosystem */}
-      <Box sx={{ py: 6, borderY: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}>
-        <Container maxWidth="lg">
-          <Grid container spacing={4} sx={{ alignItems: "center" }}>
-            <Grid size={{ xs: 12, md: 8 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
-                <DocsIcon sx={{ color: "primary.main" }} />
-                <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                  Developer Ecosystem & Built-in OpenAPI Docs
-                </Typography>
-              </Box>
-              <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.7 }}>
-                Explore comprehensive API specifications, unbundled ERC calculation formulas, telemetry schemas, and database changelogs in our integrated interactive documentation portal.
-              </Typography>
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }} sx={{ textAlign: { xs: "left", md: "right" } }}>
-              <Button
-                component={Link}
-                to="/docs"
-                variant="contained"
-                size="large"
-                startIcon={<DocsIcon />}
-                sx={{ fontWeight: 800, borderRadius: 1 }}
-              >
-                Open API Docs
-              </Button>
-            </Grid>
-          </Grid>
-        </Container>
-      </Box>
+        {/* 5. Philippine Utility & Regulatory Standards Strip */}
+        <section className="border-y border-border bg-muted/30 py-10">
+          <div className="container mx-auto max-w-6xl px-4">
+            <p className="mb-6 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              BUILT AROUND PHILIPPINE DOE PELP STANDARDS & ERC UNBUNDLED TARIFF PROTOCOLS
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: "DOE PELP Star Ratings", sub: "Philippine Energy Labeling" },
+                { label: "ERC Unbundled Framework", sub: "Itemized Centavo Formulas" },
+                { label: "RA 11285 Framework", sub: "Appliance Efficiency & Labeling" },
+                { label: "Meralco Tariff Schedule", sub: "Residential & Commercial" },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col items-center justify-center rounded-lg border border-border bg-card p-4 text-center shadow-xs"
+                >
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-foreground" />
+                    <span className="text-sm font-bold text-foreground">{item.label}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{item.sub}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
-      {/* 8. FAQ Section */}
-      <Box id="faq" sx={{ py: { xs: 8, md: 11 }, scrollMarginTop: { xs: "72px", sm: "84px" } }}>
-        <Container maxWidth="md">
-          <Typography variant="h3" sx={{ fontWeight: 900, textAlign: "center", mb: { xs: 4, md: 6 }, letterSpacing: "-0.02em" }}>
-            Frequently Asked Questions
-          </Typography>
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+
+        {/* 7. Core Platform Modules (Reference: multi-tenant-starter-template components/features.tsx FeatureGrid) */}
+        <section id="features" className="container mx-auto max-w-6xl scroll-mt-24 space-y-6 px-4 py-16 md:py-24">
+          <div className="mx-auto flex max-w-3xl flex-col items-center space-y-4 text-center">
+            <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
+              Engineered for Complete Energy Control
+            </h2>
+            <p className="max-w-[85%] text-sm text-muted-foreground sm:text-lg">
+              Explore the full suite of specialized tools built to track, forecast, audit, and optimize your monthly electric bills.
+            </p>
+          </div>
+
+          <div className="mx-auto grid justify-center gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {[
+              {
+                icon: Activity,
+                title: "24-Hour Live Activity Timeline",
+                description: "Live hourly load telemetry bar chart, dynamic ₱/hr running rate ticker, and instantaneous circuit load monitoring on the dashboard.",
+              },
+              {
+                icon: Clock,
+                title: "Smart Calendar & Midnight Splitting",
+                description: "Overnight appliance runs are automatically split at 23:59:59 into two accurate day logs, keeping calendar metrics 100% truthful.",
+              },
+              {
+                icon: WandSparkles,
+                title: "Multi-Range Routine Autofill",
+                description: "Batch populate usage records from 1st to Today, Full Month, or Custom Date Range in 1 click using your appliances' default routine hours.",
+              },
+              {
+                icon: Calculator,
+                title: "ERC Unbundled Tariff Calculator",
+                description: "Centavo-accurate unbundled billing covering Generation, Transmission, Distribution, System Loss, Subsidies, FIT-All, and 12% VAT.",
+              },
+              {
+                icon: Layers,
+                title: "DOE PELP Energy Catalog",
+                description: "Compare verified Energy Efficiency Ratios (EER) and CSPF star ratings for over 100+ inverter air conditioners and refrigerators.",
+              },
+              {
+                icon: Camera,
+                title: "AI Vision OCR Label Scanner",
+                description: "Capture physical appliance nameplates and DOE Energy Guide yellow labels with optical AI recognition, confidence verification, and auto-populated specs.",
+              },
+              {
+                icon: Cpu,
+                title: "Live Circuit Breaker Load Monitor",
+                description: "Track simultaneous active circuit amperage and wattage against standard household breaker ratings (30A, 40A, 60A) with instant overload warnings.",
+              },
+              {
+                icon: ChartColumn,
+                title: "3-Scenario What-If Forecasting",
+                description: "Model your month-end bill across Baseline, Eco-Saver (15% reduction), and Summer Heat Surge (25% increase) scenarios with ERC bracket tracking.",
+              },
+            ].map((f, idx) => {
+              const IconComp = f.icon;
+              return (
+                <div key={idx} className="relative overflow-hidden rounded-lg border border-border bg-background p-2 transition-colors hover:border-foreground/40">
+                  <div className="flex h-full min-h-[200px] flex-col justify-between rounded-md p-6 gap-4">
+                    <div className="space-y-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-muted">
+                        <IconComp className="h-5 w-5 text-foreground" />
+                      </div>
+                      <h3 className="font-bold text-base leading-snug">{f.title}</h3>
+                      <p className="text-xs leading-relaxed text-muted-foreground">{f.description}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+
+
+        {/* 9. Architecture & Developer Ecosystem */}
+        <section className="border-y border-border bg-muted/30 py-12">
+          <div className="container mx-auto max-w-6xl px-4">
+            <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+              <div className="space-y-2 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-foreground" />
+                  <h3 className="text-xl font-bold tracking-tight sm:text-2xl">
+                    Developer Ecosystem & Built-in OpenAPI Docs
+                  </h3>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Explore comprehensive API specifications, unbundled ERC calculation formulas, telemetry schemas, and database changelogs in our integrated interactive documentation portal.
+                </p>
+              </div>
+              <Link to="/docs" className={cn(buttonVariants({ variant: "default", size: "lg" }), "shrink-0")}>
+                <BookOpen className="h-4 w-4" />
+                <span>Open API Docs</span>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* 10. FAQ Section */}
+        <section id="faq" className="container mx-auto max-w-4xl scroll-mt-24 px-4 py-16 md:py-24">
+          <div className="mx-auto flex max-w-3xl flex-col items-center space-y-4 text-center mb-10">
+            <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-sm text-muted-foreground sm:text-base">
+              Answers to common questions about power calculation accuracy, multi-day session splitting, and Philippine regulatory modeling.
+            </p>
+          </div>
+
+          <div className="space-y-3">
             {[
               {
                 q: "How does the 24-Hour Activity Timeline calculate live running costs?",
@@ -1521,8 +630,8 @@ export const LandingPage: React.FC = () => {
                 a: "When you log an overnight session (e.g. 10:00 PM to 2:00 AM), PowerForecast automatically detects the 23:59:59 crossing and splits the session into 2 distinct records: 2 hours attributed to Day 1, and 2 hours attributed to Day 2. This guarantees 100% calendar accuracy.",
               },
               {
-                q: "How does the Simulate Appliance and Dual-Tab Calendar work?",
-                a: "PowerForecast isolates real telemetry from budget planning. The Actual Tracker tab records verified stopwatch sessions and measured kWh, while the Simulation Plan tab lets you experiment with what-if runtimes, test-run stopwatches, and quota targets without distorting your actual records. Forecasting then blends both to deliver the most accurate month-end bill projection.",
+                q: "What is the multi-range Routine Defaults autofill feature?",
+                a: "Routine Defaults allows you to set standard daily hours for each appliance (e.g., Refrigerator 24h, AC 8h, Fan 10h). You can then batch autofill records for '1st to Today', 'Full Month', or any 'Custom Range' in a single click with full edit and delete support.",
               },
               {
                 q: "How accurate is the ERC unbundled Meralco calculation formula?",
@@ -1540,163 +649,153 @@ export const LandingPage: React.FC = () => {
                 q: "Is my household energy data stored securely?",
                 a: "Yes. All appliance inventories and schedule records are stored securely in Supabase Cloud DB with automatic fallback to offline browser storage.",
               },
-            ].map((faq, idx) => (
-              <Accordion key={idx} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.25, "&:before": { display: "none" } }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                    {faq.q}
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.7 }}>
-                    {faq.a}
-                  </Typography>
-                </AccordionDetails>
-              </Accordion>
-            ))}
-          </Box>
-        </Container>
-      </Box>
+            ].map((faq, idx) => {
+              const isOpen = !!openFaqs[idx];
+              return (
+                <div key={idx} className="rounded-lg border border-border bg-card transition-colors">
+                  <button
+                    onClick={() => toggleFaq(idx)}
+                    className="flex w-full items-center justify-between p-4 text-left font-semibold text-sm sm:text-base cursor-pointer hover:bg-muted/40 rounded-lg transition-colors"
+                  >
+                    <span>{faq.q}</span>
+                    <ChevronDown
+                      className={cn("h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground", isOpen && "rotate-180")}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-4 pb-4 pt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-      {/* 9. Final Call to Action Banner */}
-      <Box sx={{ py: { xs: 8, md: 10 }, bgcolor: "primary.main", color: "primary.contrastText" }}>
-        <Container maxWidth="md">
-          <Box sx={{ textAlign: "center" }}>
-            <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, letterSpacing: "-0.02em" }}>
+        {/* 11. Final Call to Action */}
+        <section className="border-t border-border bg-muted/40 py-20">
+          <div className="container mx-auto max-w-4xl px-4 text-center space-y-6">
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
               Take Total Control of Your Power Bill Today
-            </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.9, maxWidth: 650, mx: "auto", mb: 4, lineHeight: 1.6 }}>
+            </h2>
+            <p className="mx-auto max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
               Join households across the Philippines tracking their circuits, stopping peak overloads, and computing unbundled Meralco bills with centavo precision.
-            </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 2 }}>
-              <Button
-                component={Link}
-                to="/signup"
-                variant="contained"
-                size="large"
-                sx={{
-                  bgcolor: "#ffffff",
-                  color: "#1e1b4b",
-                  fontWeight: 900,
-                  px: 4,
-                  py: 1.4,
-                  borderRadius: 1,
-                  "&:hover": { bgcolor: "#f1f5f9" },
-                }}
-              >
-                Create Free Account
-              </Button>
-              <Button
-                component={Link}
-                to="/calculator"
-                variant="outlined"
-                size="large"
-                sx={{
-                  borderColor: "rgba(255,255,255,0.7)",
-                  color: "#ffffff",
-                  fontWeight: 800,
-                  px: 3.5,
-                  py: 1.4,
-                  borderRadius: 1,
-                  "&:hover": { borderColor: "#ffffff", bgcolor: "rgba(255,255,255,0.1)" },
-                }}
-              >
+            </p>
+            <div className="flex flex-wrap justify-center gap-3 pt-2">
+              <Link to="/signup" className={cn(buttonVariants({ variant: "default", size: "lg" }))}>
+                <span>Create Free Account</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link to="/calculator" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
                 Try Unbundled Calculator
-              </Button>
-            </Box>
-          </Box>
-        </Container>
-      </Box>
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
 
-      {/* 10. Footer */}
-      <Box sx={{ py: 6, borderTop: "1px solid", borderColor: "divider", bgcolor: "background.default" }}>
-        <Container maxWidth="lg">
-          <Grid container spacing={4} sx={{ mb: 4 }}>
-            {/* Col 1: Brand */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
-                <Box component="img" src="/Assets/LOGO.png" alt="PowerForecast Logo" sx={{ width: 32, height: 32, objectFit: "contain" }} />
-                <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                  Power<Box component="span" sx={{ color: "primary.main" }}>Forecast</Box>
-                </Typography>
-                <Chip label={APP_VERSION} size="small" sx={{ fontFamily: "monospace", fontWeight: 800 }} />
-              </Box>
-              <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.6, mb: 2 }}>
+      {/* 12. Footer (Reference: multi-tenant-starter-template components/footer.tsx) */}
+      <footer className="border-t border-border bg-background">
+        <div className="container mx-auto max-w-6xl px-4 py-12 md:py-16">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-5">
+            {/* Col 1 & 2: Brand */}
+            <div className="space-y-3 sm:col-span-2">
+              <div className="flex items-center gap-2">
+                <img src="/Assets/LOGO.png" alt="PowerForecast Logo" className="h-6 w-6 object-contain" />
+                <span className="font-bold text-base tracking-tight">PowerForecast</span>
+                <Badge variant="outline" className="font-mono text-[10px]">
+                  {APP_VERSION}
+                </Badge>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground max-w-sm">
                 Next-generation Meralco energy intelligence, real-time circuit power telemetry, and ERC unbundled bill forecasting platform for Philippine households.
-              </Typography>
-            </Grid>
+              </p>
+            </div>
 
-            {/* Col 2: Navigation */}
-            <Grid size={{ xs: 6, sm: 4, md: 2.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                Platform Views
-              </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography component={Link} to="/dashboard" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  Live Dashboard
-                </Typography>
-                <Typography component={Link} to="/calendar" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  Smart Calendar
-                </Typography>
-                <Typography component={Link} to="/appliances" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  Appliances Hub
-                </Typography>
-                <Typography component={Link} to="/calculator" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  Unbundled Calculator
-                </Typography>
-                <Typography component={Link} to="/forecasting" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  Forecast & Anomaly
-                </Typography>
-              </Box>
-            </Grid>
+            {/* Col 3: Platform Views */}
+            <div className="space-y-2.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">Platform Views</h4>
+              <ul className="space-y-1.5 text-xs text-muted-foreground">
+                <li>
+                  <Link to="/dashboard" className="transition-colors hover:text-foreground hover:underline">
+                    Live Dashboard
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/calendar" className="transition-colors hover:text-foreground hover:underline">
+                    Smart Calendar
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/appliances" className="transition-colors hover:text-foreground hover:underline">
+                    Appliances Hub
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/calculator" className="transition-colors hover:text-foreground hover:underline">
+                    Unbundled Calculator
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/forecasting" className="transition-colors hover:text-foreground hover:underline">
+                    Forecast & Anomaly
+                  </Link>
+                </li>
+              </ul>
+            </div>
 
-            {/* Col 3: Resources & Docs */}
-            <Grid size={{ xs: 6, sm: 4, md: 2.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                Documentation
-              </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography component={Link} to="/docs" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  OpenAPI Specs
-                </Typography>
-                <Typography component={Link} to="/docs" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  ERC Tariff Formulas
-                </Typography>
-                <Typography component={Link} to="/docs" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  System Audit Logs
-                </Typography>
-              </Box>
-            </Grid>
+            {/* Col 4: Documentation */}
+            <div className="space-y-2.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">Documentation</h4>
+              <ul className="space-y-1.5 text-xs text-muted-foreground">
+                <li>
+                  <Link to="/docs" className="transition-colors hover:text-foreground hover:underline">
+                    OpenAPI Specs
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/docs" className="transition-colors hover:text-foreground hover:underline">
+                    ERC Tariff Formulas
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/docs" className="transition-colors hover:text-foreground hover:underline">
+                    System Audit Logs
+                  </Link>
+                </li>
+              </ul>
+            </div>
 
-            {/* Col 4: Developer & Support */}
-            <Grid size={{ xs: 6, sm: 4, md: 3 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>
-                Support & Contact
-              </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography component={Link} to="/login" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  Sign In to Household
-                </Typography>
-                <Typography component={Link} to="/signup" variant="body2" sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { color: "primary.main" } }}>
-                  Create Free Account
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
+            {/* Col 5: Support & Contact */}
+            <div className="space-y-2.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">Support & Contact</h4>
+              <ul className="space-y-1.5 text-xs text-muted-foreground">
+                <li>
+                  <Link to="/login" className="transition-colors hover:text-foreground hover:underline">
+                    Sign In to Household
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/signup" className="transition-colors hover:text-foreground hover:underline">
+                    Create Free Account
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
 
-          <Divider sx={{ my: 3 }} />
+          <Separator className="my-8" />
 
-          <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              © {new Date().getFullYear()} PowerForecast • Developed by AJ Umali • Built with Refine, React 19, Material UI, and Supabase.
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
-              Version {APP_VERSION}
-            </Typography>
-          </Box>
-        </Container>
-      </Box>
-    </Box>
+          <div className="flex flex-col items-center justify-between gap-4 text-xs text-muted-foreground sm:flex-row">
+            <p>
+              © {new Date().getFullYear()} PowerForecast • Developed by AJ Umali • Built with Refine, React, Tailwind CSS, and Supabase.
+            </p>
+            <div className="font-mono text-[11px]">Version {APP_VERSION}</div>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 };
 

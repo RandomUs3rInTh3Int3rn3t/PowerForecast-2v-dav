@@ -54,8 +54,14 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Ignore non-GET requests and browser extensions
-  if (request.method !== 'GET' || url.protocol.startsWith('chrome-extension')) {
+  // Ignore non-GET requests, browser extensions, and local development traffic
+  if (
+    request.method !== 'GET' ||
+    url.protocol.startsWith('chrome-extension') ||
+    url.port === '5173' ||
+    url.hostname === 'localhost' ||
+    url.hostname.startsWith('192.168.')
+  ) {
     return;
   }
 

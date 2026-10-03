@@ -19,6 +19,25 @@
   </head>
   <body class="bg-[#08091a] text-slate-100 min-h-screen antialiased selection:bg-indigo-500 selection:text-white overscroll-none">
     <div id="root"></div>
+    <script>
+      // Clear any stale Service Worker and Cache Storage from previous production builds when testing in dev/LAN
+      if (window.location.port === "5173" || window.location.hostname === "localhost" || window.location.hostname.startsWith("192.168.")) {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+            }
+          });
+        }
+        if ("caches" in window) {
+          caches.keys().then(function(keys) {
+            for (var j = 0; j < keys.length; j++) {
+              caches.delete(keys[j]);
+            }
+          });
+        }
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
