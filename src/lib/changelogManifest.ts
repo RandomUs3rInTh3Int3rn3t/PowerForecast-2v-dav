@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.6.0dv",
+    version: "3.6.0dv",
+    git_commit_tag: "3.6.0dv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.6.0dv - Excise Developer Ecosystem & OpenAPI Docs banner section from LandingPage for a streamlined, focused user interface",
+  },
+  {
     id: "3.6.0cv",
     version: "3.6.0cv",
     git_commit_tag: "3.6.0cv",

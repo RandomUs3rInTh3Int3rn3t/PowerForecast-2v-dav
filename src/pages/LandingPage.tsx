@@ -24,7 +24,6 @@ import {
   Zap,
   WandSparkles,
   ScanText,
-  BookOpen,
   Monitor,
   ShowerHead,
   Flame,
@@ -541,28 +540,7 @@ export const LandingPage: React.FC = () => {
 
 
 
-        {/* 9. Architecture & Developer Ecosystem */}
-        <section className="border-y border-border bg-muted/30 py-12">
-          <div className="container mx-auto max-w-6xl px-4">
-            <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-              <div className="space-y-2 max-w-2xl">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-foreground" />
-                  <h3 className="text-xl font-bold tracking-tight sm:text-2xl">
-                    Developer Ecosystem & Built-in OpenAPI Docs
-                  </h3>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Explore comprehensive API specifications, unbundled ERC calculation formulas, telemetry schemas, and database changelogs in our integrated interactive documentation portal.
-                </p>
-              </div>
-              <Link to="/docs" className={cn(buttonVariants({ variant: "default", size: "lg" }), "shrink-0")}>
-                <BookOpen className="h-4 w-4" />
-                <span>Open API Docs</span>
-              </Link>
-            </div>
-          </div>
-        </section>
+
 
         {/* 10. FAQ Section */}
         <section id="faq" className="container mx-auto max-w-4xl scroll-mt-24 px-4 py-16 md:py-24">
