@@ -147,61 +147,80 @@ export const colorSchemes = {
 };
 
 export const typography = {
-  fontFamily: ['"Inter"', '"Roboto"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'].join(','),
+  fontFamily: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'].join(','),
   h1: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '2.5rem',
     fontWeight: 800,
     lineHeight: 1.2,
-    letterSpacing: '-0.02em',
+    letterSpacing: '-0.03em',
   },
   h2: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '2rem',
     fontWeight: 700,
     lineHeight: 1.25,
-    letterSpacing: '-0.015em',
+    letterSpacing: '-0.025em',
   },
   h3: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '1.5rem',
     fontWeight: 700,
     lineHeight: 1.3,
-    letterSpacing: '-0.01em',
+    letterSpacing: '-0.02em',
   },
   h4: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '1.25rem',
     fontWeight: 600,
     lineHeight: 1.35,
+    letterSpacing: '-0.015em',
   },
   h5: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '1.1rem',
     fontWeight: 600,
     lineHeight: 1.4,
+    letterSpacing: '-0.01em',
   },
   h6: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '0.95rem',
     fontWeight: 600,
     lineHeight: 1.45,
+    letterSpacing: '-0.005em',
   },
   subtitle1: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '1rem',
     fontWeight: 500,
     lineHeight: 1.5,
+    letterSpacing: '-0.01em',
   },
   subtitle2: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '0.875rem',
     fontWeight: 500,
     lineHeight: 1.5,
+    letterSpacing: '-0.005em',
   },
   body1: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '0.925rem',
     lineHeight: 1.55,
+    letterSpacing: '-0.011em',
   },
   body2: {
+    fontFamily: '"Inter", sans-serif',
     fontSize: '0.8125rem',
     lineHeight: 1.5,
+    letterSpacing: '-0.005em',
   },
   button: {
+    fontFamily: '"Inter", sans-serif',
     textTransform: 'none' as const,
     fontWeight: 600,
+    letterSpacing: '-0.01em',
   },
 };
 

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 :root {
   --transition-speed: 0.24s;
   --transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -239,8 +244,21 @@ textarea,
 
 html,
 body {
+  font-family: var(--font-sans);
+  font-feature-settings: "rlig" 1, "calt" 1, "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.025em;
+}
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
 }
 
 :root {

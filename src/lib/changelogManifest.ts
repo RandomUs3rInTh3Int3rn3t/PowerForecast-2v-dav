@@ -3,6 +3,16 @@ import type { SystemChangelogEntry } from "./changelogService";
 // Master compiled GitHub deployment history covering all releases
 export const COMPLETE_GITHUB_DEPLOYMENTS: SystemChangelogEntry[] = [
   {
+    id: "3.5.0fv",
+    version: "3.5.0fv",
+    git_commit_tag: "3.5.0fv",
+    created_at: new Date().toISOString(),
+    deployed_by: "Antigravity Pair Programmer",
+    source: "github",
+    description:
+      "3.5.0fv - Standardize full webapp typography to the Stack Template design system: Inter variable font (weights 100-900 with optical sizing & stylistic sets), JetBrains Mono for telemetry, negative heading tracking, and unified typography across Tailwind and MUI themes",
+  },
+  {
     id: "3.5.0ev",
     version: "3.5.0ev",
     git_commit_tag: "3.5.0ev",
